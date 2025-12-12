@@ -81,7 +81,7 @@ const Groups = () => {
     setSubmitting(true);
     
     try {
-      await axios.post(`${API}/groups/${selectedGroup}/add-student?student_id=${selectedStudent}`);
+      await axios.post(`${API}/groups/${selectedGroup}/add-student`, { student_id: selectedStudent });
       toast.success('تم إضافة الطالب للمجموعة');
       setAddStudentOpen(false);
       setSelectedStudent('');
