@@ -196,6 +196,17 @@ function AppRoutes() {
         }
       />
 
+      <Route
+        path="/my-points"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <MyPoints />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Default Route */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
