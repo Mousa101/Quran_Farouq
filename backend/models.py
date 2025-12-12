@@ -160,3 +160,33 @@ class WeeklyRanking(BaseModel):
     bronze_student_id: Optional[str] = None
     scores: List[StudentScore] = []
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# Points & Badges System
+class Badge(BaseModel):
+    id: str
+    name: str
+    description: str
+    icon: str
+    points_required: int
+    category: str  # attendance, recitation, tracking, special
+
+class StudentPoints(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    student_id: str
+    total_points: int = 0
+    attendance_points: int = 0
+    recitation_points: int = 0
+    tracking_points: int = 0
+    badges: List[str] = []  # List of badge IDs
+    level: int = 1
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class PointsTransaction(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    student_id: str
+    points: int
+    category: str  # attendance, recitation, tracking, bonus
+    description: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
