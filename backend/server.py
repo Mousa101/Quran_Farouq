@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 
+from pydantic import BaseModel as PydanticBaseModel
 from models import (
     UserCreate, UserLogin, User, UserResponse, 
     GroupCreate, Group,
@@ -18,6 +19,9 @@ from models import (
     NotificationCreate, Notification,
     StudentScore, WeeklyRanking
 )
+
+class BaseModel(PydanticBaseModel):
+    pass
 from auth import (
     get_password_hash, verify_password, create_access_token,
     get_current_user, security
@@ -160,8 +164,12 @@ async def get_groups(current_user: dict = Depends(get_current_user)):
             groups = []
     return groups
 
+class AddStudentRequest(BaseModel):
+    student_id: str
+
 @api_router.post("/groups/{group_id}/add-student")
-async def add_student_to_group(group_id: str, student_id: str, current_user: dict = Depends(get_current_user)):
+async def add_student_to_group(group_id: str, request: AddStudentRequest, current_user: dict = Depends(get_current_user)):
+    student_id = request.student_id
     if current_user["role"] not in ["sheikh", "admin"]:
         raise HTTPException(status_code=403, detail="غير مصرح لك")
     
