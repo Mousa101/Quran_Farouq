@@ -614,7 +614,287 @@ async def get_users(role: Optional[str] = None, current_user: dict = Depends(get
 
 @api_router.get("/")
 async def root():
-    return {"message": "مرحباً بكم في تطبيق حافظ"}
+    return {"message": "مرحباً بكم في مركز الفاروق القرآني"}
+
+# ============== POINTS & BADGES SYSTEM ==============
+
+# Define available badges
+BADGES = [
+    {"id": "first_attendance", "name": "أول حضور", "description": "حضرت أول حلقة", "icon": "🌟", "points_required": 0, "category": "attendance"},
+    {"id": "week_streak", "name": "أسبوع متواصل", "description": "حضرت أسبوع كامل", "icon": "🔥", "points_required": 70, "category": "attendance"},
+    {"id": "month_streak", "name": "شهر متواصل", "description": "حضرت شهر كامل", "icon": "💎", "points_required": 300, "category": "attendance"},
+    {"id": "first_recitation", "name": "أول تسميع", "description": "أتممت أول تسميع", "icon": "📖", "points_required": 0, "category": "recitation"},
+    {"id": "excellent_reciter", "name": "متميز في التسميع", "description": "حصلت على 10/10 في التسميع", "icon": "⭐", "points_required": 100, "category": "recitation"},
+    {"id": "quran_lover", "name": "محب القرآن", "description": "جلست 1000 دقيقة مع القرآن", "icon": "❤️", "points_required": 500, "category": "tracking"},
+    {"id": "prayer_keeper", "name": "محافظ على الصلاة", "description": "أديت 100 صلاة", "icon": "🕌", "points_required": 200, "category": "tracking"},
+    {"id": "gold_winner", "name": "فائز ذهبي", "description": "حصلت على المركز الأول", "icon": "🥇", "points_required": 0, "category": "special"},
+    {"id": "silver_winner", "name": "فائز فضي", "description": "حصلت على المركز الثاني", "icon": "🥈", "points_required": 0, "category": "special"},
+    {"id": "bronze_winner", "name": "فائز برونزي", "description": "حصلت على المركز الثالث", "icon": "🥉", "points_required": 0, "category": "special"},
+    {"id": "100_points", "name": "100 نقطة", "description": "وصلت إلى 100 نقطة", "icon": "💯", "points_required": 100, "category": "special"},
+    {"id": "500_points", "name": "500 نقطة", "description": "وصلت إلى 500 نقطة", "icon": "🏆", "points_required": 500, "category": "special"},
+    {"id": "1000_points", "name": "1000 نقطة", "description": "وصلت إلى 1000 نقطة", "icon": "👑", "points_required": 1000, "category": "special"},
+]
+
+def calculate_level(total_points: int) -> int:
+    """Calculate level based on total points"""
+    if total_points < 100:
+        return 1
+    elif total_points < 300:
+        return 2
+    elif total_points < 600:
+        return 3
+    elif total_points < 1000:
+        return 4
+    elif total_points < 1500:
+        return 5
+    elif total_points < 2500:
+        return 6
+    elif total_points < 4000:
+        return 7
+    elif total_points < 6000:
+        return 8
+    elif total_points < 9000:
+        return 9
+    else:
+        return 10
+
+async def add_points(student_id: str, points: int, category: str, description: str):
+    """Add points to a student and check for new badges"""
+    # Get or create student points record
+    student_points = await db.student_points.find_one({"student_id": student_id}, {"_id": 0})
+    
+    if not student_points:
+        student_points = {
+            "id": str(uuid.uuid4()),
+            "student_id": student_id,
+            "total_points": 0,
+            "attendance_points": 0,
+            "recitation_points": 0,
+            "tracking_points": 0,
+            "badges": [],
+            "level": 1,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.student_points.insert_one(student_points)
+    
+    # Update points
+    category_field = f"{category}_points" if category in ["attendance", "recitation", "tracking"] else "total_points"
+    
+    update_dict = {
+        "total_points": student_points["total_points"] + points,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    if category in ["attendance", "recitation", "tracking"]:
+        update_dict[category_field] = student_points.get(category_field, 0) + points
+    
+    # Calculate new level
+    new_level = calculate_level(update_dict["total_points"])
+    update_dict["level"] = new_level
+    
+    await db.student_points.update_one(
+        {"student_id": student_id},
+        {"$set": update_dict}
+    )
+    
+    # Record transaction
+    transaction = {
+        "id": str(uuid.uuid4()),
+        "student_id": student_id,
+        "points": points,
+        "category": category,
+        "description": description,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.points_transactions.insert_one(transaction)
+    
+    # Check for new badges
+    new_badges = await check_and_award_badges(student_id, update_dict["total_points"])
+    
+    # Notify if level up
+    if new_level > student_points.get("level", 1):
+        await create_notification_internal(
+            student_id,
+            "ترقية مستوى! 🎉",
+            f"مبارك! وصلت للمستوى {new_level}",
+            "success"
+        )
+    
+    return {"points_added": points, "total_points": update_dict["total_points"], "level": new_level, "new_badges": new_badges}
+
+async def check_and_award_badges(student_id: str, total_points: int) -> list:
+    """Check and award badges based on points and achievements"""
+    student_points = await db.student_points.find_one({"student_id": student_id}, {"_id": 0})
+    current_badges = student_points.get("badges", [])
+    new_badges = []
+    
+    # Check points-based badges
+    for badge in BADGES:
+        if badge["id"] not in current_badges and badge["points_required"] > 0:
+            if total_points >= badge["points_required"]:
+                current_badges.append(badge["id"])
+                new_badges.append(badge)
+                await create_notification_internal(
+                    student_id,
+                    f"شارة جديدة! {badge['icon']}",
+                    f"حصلت على شارة: {badge['name']}",
+                    "success"
+                )
+    
+    if new_badges:
+        await db.student_points.update_one(
+            {"student_id": student_id},
+            {"$set": {"badges": current_badges}}
+        )
+    
+    return new_badges
+
+async def award_badge(student_id: str, badge_id: str):
+    """Award a specific badge to a student"""
+    student_points = await db.student_points.find_one({"student_id": student_id}, {"_id": 0})
+    
+    if not student_points:
+        student_points = {
+            "id": str(uuid.uuid4()),
+            "student_id": student_id,
+            "total_points": 0,
+            "attendance_points": 0,
+            "recitation_points": 0,
+            "tracking_points": 0,
+            "badges": [],
+            "level": 1,
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.student_points.insert_one(student_points)
+    
+    current_badges = student_points.get("badges", [])
+    
+    if badge_id not in current_badges:
+        current_badges.append(badge_id)
+        await db.student_points.update_one(
+            {"student_id": student_id},
+            {"$set": {"badges": current_badges}}
+        )
+        
+        badge = next((b for b in BADGES if b["id"] == badge_id), None)
+        if badge:
+            await create_notification_internal(
+                student_id,
+                f"شارة جديدة! {badge['icon']}",
+                f"حصلت على شارة: {badge['name']}",
+                "success"
+            )
+
+@api_router.get("/points/my-points")
+async def get_my_points(current_user: dict = Depends(get_current_user)):
+    """Get current user's points and badges"""
+    student_points = await db.student_points.find_one(
+        {"student_id": current_user["user_id"]}, 
+        {"_id": 0}
+    )
+    
+    if not student_points:
+        student_points = {
+            "total_points": 0,
+            "attendance_points": 0,
+            "recitation_points": 0,
+            "tracking_points": 0,
+            "badges": [],
+            "level": 1
+        }
+    
+    # Get badge details
+    badge_details = [b for b in BADGES if b["id"] in student_points.get("badges", [])]
+    
+    return {
+        **student_points,
+        "badge_details": badge_details,
+        "next_level_points": get_next_level_points(student_points.get("level", 1))
+    }
+
+def get_next_level_points(current_level: int) -> int:
+    """Get points needed for next level"""
+    level_thresholds = {1: 100, 2: 300, 3: 600, 4: 1000, 5: 1500, 6: 2500, 7: 4000, 8: 6000, 9: 9000, 10: 999999}
+    return level_thresholds.get(current_level, 999999)
+
+@api_router.get("/points/student/{student_id}")
+async def get_student_points(student_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a specific student's points (for sheikh/admin)"""
+    if current_user["role"] not in ["sheikh", "admin"] and current_user["user_id"] != student_id:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    student_points = await db.student_points.find_one(
+        {"student_id": student_id}, 
+        {"_id": 0}
+    )
+    
+    if not student_points:
+        student_points = {
+            "total_points": 0,
+            "attendance_points": 0,
+            "recitation_points": 0,
+            "tracking_points": 0,
+            "badges": [],
+            "level": 1
+        }
+    
+    badge_details = [b for b in BADGES if b["id"] in student_points.get("badges", [])]
+    
+    return {
+        **student_points,
+        "badge_details": badge_details
+    }
+
+@api_router.get("/points/transactions")
+async def get_my_transactions(current_user: dict = Depends(get_current_user)):
+    """Get point transactions history"""
+    transactions = await db.points_transactions.find(
+        {"student_id": current_user["user_id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return transactions
+
+@api_router.get("/points/leaderboard")
+async def get_points_leaderboard(current_user: dict = Depends(get_current_user)):
+    """Get top students by points"""
+    leaderboard = await db.student_points.find(
+        {},
+        {"_id": 0}
+    ).sort("total_points", -1).to_list(20)
+    
+    # Add student names
+    for entry in leaderboard:
+        student = await db.users.find_one({"id": entry["student_id"]}, {"_id": 0, "name": 1})
+        entry["student_name"] = student["name"] if student else "غير معروف"
+    
+    return leaderboard
+
+@api_router.get("/badges/all")
+async def get_all_badges(current_user: dict = Depends(get_current_user)):
+    """Get all available badges"""
+    return BADGES
+
+@api_router.post("/points/award-bonus")
+async def award_bonus_points(
+    student_id: str,
+    points: int,
+    reason: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Award bonus points to a student (admin/sheikh only)"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    result = await add_points(student_id, points, "bonus", reason)
+    
+    await create_notification_internal(
+        student_id,
+        "نقاط إضافية! 🎁",
+        f"حصلت على {points} نقطة: {reason}",
+        "success"
+    )
+    
+    return {"message": "تم منح النقاط بنجاح", **result}
 
 # Include the router
 app.include_router(api_router)
