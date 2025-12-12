@@ -230,10 +230,35 @@ async def create_tracking_sheet(sheet_data: TrackingSheetCreate, current_user: d
         "info"
     )
     
+    # Award points based on tracking data
+    tracking_points = 0
+    tracking_points += analysis_result["prayers_count"]  # 1 point per prayer
+    tracking_points += analysis_result["quran_sitting_minutes"] // 10  # 1 point per 10 minutes
+    tracking_points += analysis_result["family_recitation_count"] * 3  # 3 points per family recitation
+    
+    if tracking_points > 0:
+        await add_points(
+            sheet_data.student_id,
+            tracking_points,
+            "tracking",
+            f"ورقة متابعة أسبوع {sheet_data.week_start}"
+        )
+    
+    # Check for badges
+    total_tracking = await db.tracking_sheets.find({"student_id": sheet_data.student_id}, {"_id": 0}).to_list(1000)
+    total_prayers = sum(t["data"]["prayers_count"] for t in total_tracking)
+    total_quran_time = sum(t["data"]["quran_sitting_minutes"] for t in total_tracking)
+    
+    if total_prayers >= 100:
+        await award_badge(sheet_data.student_id, "prayer_keeper")
+    if total_quran_time >= 1000:
+        await award_badge(sheet_data.student_id, "quran_lover")
+    
     return {
         "message": "تم رفع ورقة المتابعة وتحليلها بنجاح",
         "sheet_id": sheet.id,
-        "analysis": analysis_result
+        "analysis": analysis_result,
+        "points_earned": tracking_points
     }
 
 @api_router.get("/tracking-sheets")
