@@ -11,7 +11,8 @@ import {
   BookOpen,
   UserCheck,
   FileText,
-  UsersRound
+  UsersRound,
+  Star
 } from 'lucide-react';
 import { Button } from './ui/button';
 
