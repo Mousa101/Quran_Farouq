@@ -71,8 +71,8 @@ const Sidebar = () => {
             <BookOpen className="w-6 h-6 text-emerald-400" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-white font-cairo">حافظ</h1>
-            <p className="text-xs text-slate-400">تطبيق حفظ القرآن</p>
+            <h1 className="text-lg font-bold text-white font-cairo">مركز الفاروق</h1>
+            <p className="text-xs text-emerald-400">القرآني</p>
           </div>
         </div>
       </div>
