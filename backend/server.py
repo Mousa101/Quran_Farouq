@@ -378,7 +378,7 @@ async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict 
     attendance = Attendance(
         student_id=attendance_data.student_id,
         sheikh_id=current_user["user_id"],
-        group_id=student.get("group_id", ""),
+        group_id=student.get("group_id") or "",
         date=attendance_data.date,
         status=attendance_data.status
     )
