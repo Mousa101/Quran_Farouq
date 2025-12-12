@@ -54,7 +54,8 @@ const Register = () => {
             <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-emerald-500/20 backdrop-blur-xl border border-emerald-500/30 flex items-center justify-center">
               <BookOpen className="w-10 h-10 text-emerald-400" />
             </div>
-            <h1 className="text-4xl font-bold text-white mb-4 font-cairo">انضم إلينا</h1>
+            <h1 className="text-4xl font-bold text-white mb-2 font-cairo">مركز الفاروق</h1>
+            <h2 className="text-2xl font-bold text-emerald-400 mb-4 font-cairo">القرآني</h2>
             <p className="text-lg text-slate-300 max-w-md">
               ابدأ رحلتك في حفظ كتاب الله
             </p>
