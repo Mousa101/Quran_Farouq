@@ -362,6 +362,28 @@ async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict 
     
     await db.attendance.insert_one(attendance_dict)
     
+    # Award points for attendance
+    if attendance_data.status == "present":
+        points = 10
+        await add_points(
+            attendance_data.student_id,
+            points,
+            "attendance",
+            f"حضور يوم {attendance_data.date}"
+        )
+        
+        # Check if first attendance
+        attendance_count = await db.attendance.count_documents({
+            "student_id": attendance_data.student_id,
+            "status": "present"
+        })
+        if attendance_count == 1:
+            await award_badge(attendance_data.student_id, "first_attendance")
+        elif attendance_count >= 7:
+            await award_badge(attendance_data.student_id, "week_streak")
+        elif attendance_count >= 30:
+            await award_badge(attendance_data.student_id, "month_streak")
+    
     return {"message": "تم تسجيل الحضور بنجاح", "attendance_id": attendance.id}
 
 @api_router.get("/attendance")
