@@ -1,0 +1,191 @@
+{
+  "identity": {
+    "name": "Hafiz - The Sacred Companion",
+    "persona": "E1: The Anti-AI Designer",
+    "tone": "Spiritual, Disciplined, Modern, Community-Focused",
+    "aesthetic": "Sacred Digital - Deep Emeralds, Luminous Gold, Glassmorphism",
+    "direction": "rtl"
+  },
+  "typography": {
+    "font_family": {
+      "heading": "Cairo, sans-serif",
+      "body": "Tajawal, sans-serif",
+      "english_fallback": "Manrope, sans-serif"
+    },
+    "google_fonts_import": "https://fonts.googleapis.com/css2?family=Cairo:wght@200..1000&family=Manrope:wght@200..800&family=Tajawal:wght@200;300;400;500;700;800;900&display=swap",
+    "rules": [
+      "Use 'Cairo' for all Headings (h1-h4) and UI Labels (Buttons, Nav).",
+      "Use 'Tajawal' for long-form text (Quran verses, instructions, posts).",
+      "Headings must be Bold (700) or Black (900) for impact.",
+      "Letter spacing: 'tracking-normal' for Arabic (Arabic letters connect, do not track out).",
+      "Line height: 'leading-relaxed' for Arabic body text to accommodate diacritics (Tashkeel)."
+    ]
+  },
+  "colors": {
+    "palette": {
+      "background": "#020617", 
+      "foreground": "#f8fafc",
+      "card": "#0f172a",
+      "card_foreground": "#f8fafc",
+      "popover": "#0f172a",
+      "popover_foreground": "#f8fafc",
+      "primary": "#10b981",
+      "primary_foreground": "#020617",
+      "secondary": "#1e293b",
+      "secondary_foreground": "#f8fafc",
+      "muted": "#1e293b",
+      "muted_foreground": "#94a3b8",
+      "accent": "#fbbf24",
+      "accent_foreground": "#451a03",
+      "destructive": "#ef4444",
+      "destructive_foreground": "#f8fafc",
+      "border": "#1e293b",
+      "input": "#1e293b",
+      "ring": "#10b981"
+    },
+    "css_vars": {
+      "light": {
+        "background": "0 0% 100%",
+        "foreground": "222.2 84% 4.9%",
+        "card": "0 0% 100%",
+        "card_foreground": "222.2 84% 4.9%",
+        "popover": "0 0% 100%",
+        "popover_foreground": "222.2 84% 4.9%",
+        "primary": "142.1 76.2% 36.3%",
+        "primary_foreground": "355.7 100% 97.3%",
+        "secondary": "210 40% 96.1%",
+        "secondary_foreground": "222.2 47.4% 11.2%",
+        "muted": "210 40% 96.1%",
+        "muted_foreground": "215.4 16.3% 46.9%",
+        "accent": "48 96% 53%",
+        "accent_foreground": "222.2 47.4% 11.2%",
+        "destructive": "0 84.2% 60.2%",
+        "destructive_foreground": "210 40% 98%",
+        "border": "214.3 31.8% 91.4%",
+        "input": "214.3 31.8% 91.4%",
+        "ring": "142.1 76.2% 36.3%",
+        "radius": "0.75rem"
+      },
+      "dark": {
+        "background": "222.2 84% 4.9%",
+        "foreground": "210 40% 98%",
+        "card": "222.2 84% 4.9%",
+        "card_foreground": "210 40% 98%",
+        "popover": "222.2 84% 4.9%",
+        "popover_foreground": "210 40% 98%",
+        "primary": "142.1 70.6% 45.3%",
+        "primary_foreground": "144.9 80.4% 10%",
+        "secondary": "217.2 32.6% 17.5%",
+        "secondary_foreground": "210 40% 98%",
+        "muted": "217.2 32.6% 17.5%",
+        "muted_foreground": "215 20.2% 65.1%",
+        "accent": "48 96% 53%",
+        "accent_foreground": "210 40% 98%",
+        "destructive": "0 62.8% 30.6%",
+        "destructive_foreground": "210 40% 98%",
+        "border": "217.2 32.6% 17.5%",
+        "input": "217.2 32.6% 17.5%",
+        "ring": "142.4 71.8% 29.2%"
+      }
+    },
+    "special_colors": {
+      "gold": "#fbbf24",
+      "silver": "#94a3b8",
+      "bronze": "#b45309",
+      "success": "#10b981",
+      "warning": "#f59e0b"
+    }
+  },
+  "visual_enhancers": {
+    "glassmorphism": "backdrop-blur-xl bg-background/60 border border-white/10 shadow-2xl",
+    "gradients": {
+      "hero": "bg-gradient-to-br from-emerald-900/50 via-background to-background",
+      "gold_glow": "bg-gradient-to-r from-amber-200 to-yellow-500",
+      "card_hover": "hover:bg-emerald-900/20 transition-colors duration-300"
+    },
+    "textures": "Use subtle Islamic geometric patterns as SVG background overlays with 5% opacity.",
+    "borders": "1px solid rgba(255,255,255,0.08)"
+  },
+  "layout_strategy": {
+    "container": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "spacing": "Generous. Use p-6 or p-8 for cards. Gap-6 for grids.",
+    "grids": {
+      "dashboard": "grid grid-cols-1 md:grid-cols-12 gap-6",
+      "stats_cards": "col-span-12 md:col-span-6 lg:col-span-3",
+      "main_content": "col-span-12 lg:col-span-8",
+      "sidebar": "col-span-12 lg:col-span-4"
+    },
+    "rtl_handling": "Ensure 'dir=rtl' is set on the root html tag. Use logical properties (ms-*, me-*) or Tailwind's RTL support (start-*, end-*)."
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8 rounded-full font-bold shadow-[0_0_20px_rgba(16,185,129,0.3)]",
+      "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/80 h-11 px-8 rounded-full",
+      "ghost": "hover:bg-accent hover:text-accent-foreground"
+    },
+    "cards": {
+      "default": "bg-card text-card-foreground rounded-xl border border-border shadow-sm",
+      "glass": "backdrop-blur-md bg-black/40 border border-white/10 rounded-xl"
+    },
+    "inputs": {
+      "default": "bg-secondary/50 border-transparent focus:border-primary focus:ring-primary rounded-lg h-11 text-right"
+    }
+  },
+  "image_urls": {
+    "login_hero": {
+      "url": "https://images.unsplash.com/photo-1674847719309-9fc2692b02bd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwxfHxxdXJhbiUyMG9wZW4lMjBkYXJrJTIwbW9vZHklMjBsaWdodGluZ3xlbnwwfHx8fDE3NjU1NjQ5NjZ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Atmospheric open Quran with warm light, perfect for login side panel or hero background."
+    },
+    "mosque_interior": {
+      "url": "https://images.unsplash.com/photo-1565221406225-40d1b01a52d6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBtb3NxdWUlMjBhcmNoaXRlY3R1cmUlMjBpbnRlcmlvciUyMGRhcmt8ZW58MHx8fHwxNzY1NTY0OTY5fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Dark modern mosque interior, good for 'Activities' or 'Community' section headers."
+    },
+    "pattern_texture": {
+      "url": "https://images.unsplash.com/photo-1655579263938-f76495c680df?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzV8MHwxfHNlYXJjaHw0fHxpc2xhbWljJTIwZ2VvbWV0cmljJTIwcGF0dGVybiUyMGRhcmt8ZW58MHx8fDE3NjU1NjQ5NzF8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Subtle geometric pattern for dashboard backgrounds or card overlays."
+    },
+    "student_reading": {
+      "url": "https://images.pexels.com/photos/11285680/pexels-photo-11285680.jpeg",
+      "description": "Student reading, suitable for 'My Progress' or profile section."
+    }
+  },
+  "icons": {
+    "library": "lucide-react",
+    "instructions": "Use Lucide icons. For Islamic specific icons (Kaaba, Quran, Prayer Beads), use SVGs or custom components if Lucide doesn't have them (e.g., BookOpen for Quran, Moon for Night, Sun for Day)."
+  },
+  "motion": {
+    "library": "framer-motion",
+    "variants": {
+      "fadeIn": {
+        "initial": { "opacity": 0, "y": 20 },
+        "animate": { "opacity": 1, "y": 0 },
+        "transition": { "duration": 0.4 }
+      },
+      "staggerContainer": {
+        "animate": { "transition": { "staggerChildren": 0.1 } }
+      }
+    }
+  },
+  "accessibility": {
+    "contrast": "Ensure text is legible on dark backgrounds. Use 'text-gray-200' instead of 'text-gray-500' for secondary text.",
+    "focus": "Visible focus rings in 'ring-primary' color.",
+    "rtl": "Test all layouts in RTL mode. Margins and paddings must be logical (ms-4 not ml-4)."
+  },
+  "instructions_to_main_agent": [
+    "1. SETUP: Install 'lucide-react', 'framer-motion', 'clsx', 'tailwind-merge' if not present.",
+    "2. CONFIG: Update 'tailwind.config.js' with the colors provided in 'css_vars'. Add the font families.",
+    "3. RTL: Add 'dir=\"rtl\"' to the main html tag or body wrapper.",
+    "4. COMPONENTS: Build the 'Sidebar' (Right side for RTL), 'StatCard', 'LeaderboardRow', and 'ActivityFeed'.",
+    "5. PAGES: Implement 'Login', 'SheikhDashboard', 'StudentDashboard', 'AdminDashboard'.",
+    "6. MOCK DATA: Create realistic mock data for students (names like Ahmed, Fatima), prayers, and recitation scores.",
+    "7. STYLE: Apply the 'Glassmorphism' effect to the main dashboard cards. Use the 'pattern_texture' as a subtle background for the main app container."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Do not use gradients for text unless it's a very large headline.",
+    "Avoid pure black (#000000). Use the provided dark slate/emerald codes.",
+    "Buttons should have a subtle glow effect in the primary color.",
+    "Use 'sonner' for toast notifications.",
+    "All interactive elements must have 'data-testid'.",
+    "Ensure the 'Gold/Silver/Bronze' incentive logic is visually distinct (e.g., Gold border + glow for 1st place)."
+  ]
+}
