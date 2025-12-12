@@ -285,7 +285,25 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
         "success" if recitation_data.quality_score >= 7 else "info"
     )
     
-    return {"message": "تم تسجيل التسميع بنجاح", "recitation_id": recitation.id}
+    # Award points based on quality
+    points = recitation_data.quality_score * 2  # 2-20 points based on score
+    if recitation_data.quality_score == 10:
+        points += 10  # Bonus for perfect score
+        await award_badge(recitation_data.student_id, "excellent_reciter")
+    
+    await add_points(
+        recitation_data.student_id,
+        points,
+        "recitation",
+        f"تسميع سورة {recitation_data.surah_name} - درجة {recitation_data.quality_score}/10"
+    )
+    
+    # Check if first recitation
+    recitation_count = await db.recitations.count_documents({"student_id": recitation_data.student_id})
+    if recitation_count == 1:
+        await award_badge(recitation_data.student_id, "first_recitation")
+    
+    return {"message": "تم تسجيل التسميع بنجاح", "recitation_id": recitation.id, "points_earned": points}
 
 @api_router.get("/recitations")
 async def get_recitations(
