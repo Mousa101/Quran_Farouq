@@ -133,8 +133,9 @@ class QuranAppAPITester:
             student_id = self.users['student']['id']
             group_id = self.test_data['group_id']
             
-            success, response, status = self.make_request('POST', f'groups/{group_id}/add-student', 
-                                                        student_id, token=self.tokens['sheikh'])
+            # The endpoint expects student_id as a query parameter, not in body
+            success, response, status = self.make_request('POST', f'groups/{group_id}/add-student?student_id={student_id}', 
+                                                        None, token=self.tokens['sheikh'])
             self.log_test("Add student to group", success, f"Status: {status}")
 
     def test_recitations(self):
