@@ -4,6 +4,7 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import uuid
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
