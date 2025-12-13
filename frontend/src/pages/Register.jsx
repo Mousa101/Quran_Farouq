@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
-import { BookOpen, Mail, Lock, User, Loader2, GraduationCap, Shield, Users } from 'lucide-react';
+import { BookOpen, Mail, Lock, User, Loader2, GraduationCap, Shield, Users, Key } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Register = () => {
@@ -14,16 +14,24 @@ const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('student');
+  const [registrationCode, setRegistrationCode] = useState('');
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate code for sheikh/admin
+    if ((role === 'sheikh' || role === 'admin') && !registrationCode.trim()) {
+      toast.error('كود التسجيل مطلوب للشيخ والمدير');
+      return;
+    }
+    
     setLoading(true);
 
     try {
-      const user = await register(name, email, password, role);
+      const user = await register(name, email, password, role, registrationCode);
       toast.success(`مرحباً ${user.name}، تم إنشاء حسابك بنجاح`);
       navigate('/dashboard');
     } catch (error) {
@@ -34,10 +42,12 @@ const Register = () => {
   };
 
   const roles = [
-    { value: 'student', label: 'طالب', icon: GraduationCap, description: 'طالب حفظ القرآن' },
-    { value: 'sheikh', label: 'شيخ', icon: Users, description: 'معلم ومحفظ' },
-    { value: 'admin', label: 'مدير', icon: Shield, description: 'إدارة المركز' },
+    { value: 'student', label: 'طالب', icon: GraduationCap, description: 'طالب حفظ القرآن', needsCode: false },
+    { value: 'sheikh', label: 'شيخ', icon: Users, description: 'معلم ومحفظ', needsCode: true },
+    { value: 'admin', label: 'مدير', icon: Shield, description: 'إدارة المركز', needsCode: true },
   ];
+
+  const needsCode = role === 'sheikh' || role === 'admin';
 
   return (
     <div className="min-h-screen bg-background pattern-overlay flex">
@@ -147,11 +157,38 @@ const Register = () => {
                       >
                         <r.icon className="w-6 h-6 mb-2 text-slate-400 peer-data-[state=checked]:text-emerald-400" />
                         <span className="text-sm font-medium text-white">{r.label}</span>
+                        {r.needsCode && (
+                          <span className="text-xs text-amber-400 mt-1">يحتاج كود</span>
+                        )}
                       </Label>
                     </div>
                   ))}
                 </RadioGroup>
               </div>
+
+              {/* Registration Code for Sheikh/Admin */}
+              {needsCode && (
+                <div className="space-y-2 animate-fadeIn">
+                  <Label htmlFor="code" className="text-slate-300 flex items-center gap-2">
+                    <Key className="w-4 h-4 text-amber-400" />
+                    كود التسجيل
+                  </Label>
+                  <Input
+                    id="code"
+                    type="text"
+                    placeholder="أدخل الكود المكون من 6 أرقام"
+                    value={registrationCode}
+                    onChange={(e) => setRegistrationCode(e.target.value)}
+                    className="bg-slate-800/50 border-amber-500/50 text-white placeholder:text-slate-500 text-center text-lg tracking-widest"
+                    maxLength={6}
+                    required
+                    data-testid="registration-code-input"
+                  />
+                  <p className="text-xs text-amber-400/80">
+                    * احصل على كود التسجيل من مدير المركز
+                  </p>
+                </div>
+              )}
 
               <Button
                 type="submit"
