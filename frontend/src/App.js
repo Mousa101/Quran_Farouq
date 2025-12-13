@@ -208,6 +208,17 @@ function AppRoutes() {
         }
       />
 
+      <Route
+        path="/registration-codes"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <RegistrationCodes />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Default Route */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
