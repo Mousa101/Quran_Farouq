@@ -37,6 +37,7 @@ const Sidebar = () => {
         { to: '/rankings', icon: Trophy, label: 'الحوافز' },
         { to: '/activities', icon: Calendar, label: 'الأنشطة' },
         { to: '/users', icon: Users, label: 'المستخدمين' },
+        { to: '/registration-codes', icon: Key, label: 'أكواد التسجيل' },
         { to: '/notifications', icon: Bell, label: 'الإشعارات' },
       ];
     }
