@@ -16,6 +16,7 @@ import Notifications from './pages/Notifications';
 import Rankings from './pages/Rankings';
 import UsersPage from './pages/UsersPage';
 import MyPoints from './pages/MyPoints';
+import RegistrationCodes from './pages/RegistrationCodes';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
