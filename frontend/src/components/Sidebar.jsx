@@ -12,7 +12,8 @@ import {
   UserCheck,
   FileText,
   UsersRound,
-  Star
+  Star,
+  Key
 } from 'lucide-react';
 import { Button } from './ui/button';
 
