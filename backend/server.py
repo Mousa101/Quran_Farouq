@@ -127,18 +127,24 @@ async def register(user_data: UserCreateWithCode):
     
     # Validate role and registration code
     if user_data.role in ["sheikh", "admin"]:
-        if not user_data.registration_code:
+        # Check if this is the first admin (allow without code)
+        admin_count = await db.users.count_documents({"role": "admin"})
+        
+        if user_data.role == "admin" and admin_count == 0:
+            # First admin - no code needed
+            pass
+        elif not user_data.registration_code:
             raise HTTPException(status_code=400, detail="كود التسجيل مطلوب للشيخ والمدير")
-        
-        # Verify code
-        code_doc = await db.registration_codes.find_one({
-            "code": user_data.registration_code,
-            "role": user_data.role,
-            "used": False
-        })
-        
-        if not code_doc:
-            raise HTTPException(status_code=400, detail="كود التسجيل غير صحيح أو مستخدم")
+        else:
+            # Verify code
+            code_doc = await db.registration_codes.find_one({
+                "code": user_data.registration_code,
+                "role": user_data.role,
+                "used": False
+            })
+            
+            if not code_doc:
+                raise HTTPException(status_code=400, detail="كود التسجيل غير صحيح أو مستخدم")
     
     # Create user
     user = User(
