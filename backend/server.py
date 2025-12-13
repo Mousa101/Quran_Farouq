@@ -50,14 +50,95 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ============== REGISTRATION CODES ==============
+
+class RegistrationCodeCreate(BaseModel):
+    role: str  # sheikh or admin
+    
+class RegistrationCodeResponse(BaseModel):
+    code: str
+    role: str
+    created_at: str
+    used: bool
+
+@api_router.post("/auth/generate-code")
+async def generate_registration_code(data: RegistrationCodeCreate, current_user: dict = Depends(get_current_user)):
+    """Generate registration code for sheikh/admin (admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إنشاء أكواد التسجيل")
+    
+    if data.role not in ["sheikh", "admin"]:
+        raise HTTPException(status_code=400, detail="الدور يجب أن يكون sheikh أو admin")
+    
+    # Generate 6-digit code
+    import random
+    code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+    
+    # Save code
+    code_doc = {
+        "id": str(uuid.uuid4()),
+        "code": code,
+        "role": data.role,
+        "created_by": current_user["user_id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "used": False,
+        "used_by": None
+    }
+    await db.registration_codes.insert_one(code_doc)
+    
+    return {"code": code, "role": data.role, "message": f"تم إنشاء كود تسجيل {data.role}"}
+
+@api_router.get("/auth/codes")
+async def get_registration_codes(current_user: dict = Depends(get_current_user)):
+    """Get all registration codes (admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    codes = await db.registration_codes.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return codes
+
+@api_router.delete("/auth/codes/{code}")
+async def delete_registration_code(code: str, current_user: dict = Depends(get_current_user)):
+    """Delete a registration code (admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    result = await db.registration_codes.delete_one({"code": code, "used": False})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="الكود غير موجود أو مستخدم")
+    
+    return {"message": "تم حذف الكود"}
+
 # ============== AUTH ROUTES ==============
 
+class UserCreateWithCode(BaseModel):
+    email: str
+    name: str
+    password: str
+    role: str
+    registration_code: Optional[str] = None
+
 @api_router.post("/auth/register")
-async def register(user_data: UserCreate):
+async def register(user_data: UserCreateWithCode):
     # Check if email exists
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
         raise HTTPException(status_code=400, detail="البريد الإلكتروني مسجل مسبقاً")
+    
+    # Validate role and registration code
+    if user_data.role in ["sheikh", "admin"]:
+        if not user_data.registration_code:
+            raise HTTPException(status_code=400, detail="كود التسجيل مطلوب للشيخ والمدير")
+        
+        # Verify code
+        code_doc = await db.registration_codes.find_one({
+            "code": user_data.registration_code,
+            "role": user_data.role,
+            "used": False
+        })
+        
+        if not code_doc:
+            raise HTTPException(status_code=400, detail="كود التسجيل غير صحيح أو مستخدم")
     
     # Create user
     user = User(
@@ -71,6 +152,13 @@ async def register(user_data: UserCreate):
     user_dict["created_at"] = user_dict["created_at"].isoformat()
     
     await db.users.insert_one(user_dict)
+    
+    # Mark code as used if sheikh/admin
+    if user_data.role in ["sheikh", "admin"]:
+        await db.registration_codes.update_one(
+            {"code": user_data.registration_code},
+            {"$set": {"used": True, "used_by": user.id, "used_at": datetime.now(timezone.utc).isoformat()}}
+        )
     
     # Create token
     token = create_access_token({
