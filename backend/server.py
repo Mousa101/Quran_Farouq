@@ -238,15 +238,31 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 
 # ============== GROUP ROUTES ==============
 
+class GroupCreateAdmin(BaseModel):
+    name: str
+    description: Optional[str] = None
+    sheikh_id: str
+
+class GroupUpdateAdmin(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    sheikh_id: Optional[str] = None
+
 @api_router.post("/groups")
-async def create_group(group_data: GroupCreate, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["sheikh", "admin"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك بإنشاء مجموعة")
+async def create_group(group_data: GroupCreateAdmin, current_user: dict = Depends(get_current_user)):
+    """Create a new group (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إنشاء مجموعة")
+    
+    # Verify sheikh exists
+    sheikh = await db.users.find_one({"id": group_data.sheikh_id, "role": "sheikh"})
+    if not sheikh:
+        raise HTTPException(status_code=404, detail="الشيخ غير موجود")
     
     group = Group(
         name=group_data.name,
         description=group_data.description,
-        sheikh_id=current_user["user_id"]
+        sheikh_id=group_data.sheikh_id
     )
     
     group_dict = group.model_dump()
@@ -260,8 +276,18 @@ async def create_group(group_data: GroupCreate, current_user: dict = Depends(get
 async def get_groups(current_user: dict = Depends(get_current_user)):
     if current_user["role"] == "admin":
         groups = await db.groups.find({}, {"_id": 0}).to_list(100)
+        # Add sheikh name to each group
+        for group in groups:
+            sheikh = await db.users.find_one({"id": group.get("sheikh_id")}, {"_id": 0, "name": 1})
+            group["sheikh_name"] = sheikh["name"] if sheikh else "غير معين"
+            # Count students
+            student_count = await db.users.count_documents({"group_id": group["id"], "role": "student"})
+            group["student_count"] = student_count
     elif current_user["role"] == "sheikh":
         groups = await db.groups.find({"sheikh_id": current_user["user_id"]}, {"_id": 0}).to_list(100)
+        for group in groups:
+            student_count = await db.users.count_documents({"group_id": group["id"], "role": "student"})
+            group["student_count"] = student_count
     else:
         user = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0})
         if user and user.get("group_id"):
@@ -270,22 +296,68 @@ async def get_groups(current_user: dict = Depends(get_current_user)):
             groups = []
     return groups
 
+@api_router.put("/groups/{group_id}")
+async def update_group(group_id: str, data: GroupUpdateAdmin, current_user: dict = Depends(get_current_user)):
+    """Update a group (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تعديل المجموعة")
+    
+    group = await db.groups.find_one({"id": group_id})
+    if not group:
+        raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
+    
+    update_data = {}
+    if data.name is not None:
+        update_data["name"] = data.name
+    if data.description is not None:
+        update_data["description"] = data.description
+    if data.sheikh_id is not None:
+        # Verify sheikh exists
+        sheikh = await db.users.find_one({"id": data.sheikh_id, "role": "sheikh"})
+        if not sheikh:
+            raise HTTPException(status_code=404, detail="الشيخ غير موجود")
+        update_data["sheikh_id"] = data.sheikh_id
+    
+    if update_data:
+        await db.groups.update_one({"id": group_id}, {"$set": update_data})
+    
+    return {"message": "تم تحديث المجموعة بنجاح"}
+
+@api_router.delete("/groups/{group_id}")
+async def delete_group(group_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a group (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف المجموعة")
+    
+    group = await db.groups.find_one({"id": group_id})
+    if not group:
+        raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
+    
+    # Remove group_id from all students in this group
+    await db.users.update_many(
+        {"group_id": group_id},
+        {"$set": {"group_id": None}}
+    )
+    
+    # Delete the group
+    await db.groups.delete_one({"id": group_id})
+    
+    return {"message": "تم حذف المجموعة بنجاح"}
+
 class AddStudentRequest(BaseModel):
     student_id: str
 
 @api_router.post("/groups/{group_id}/add-student")
 async def add_student_to_group(group_id: str, request: AddStudentRequest, current_user: dict = Depends(get_current_user)):
+    """Add student to group (Admin only)"""
     student_id = request.student_id
-    if current_user["role"] not in ["sheikh", "admin"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إضافة طالب للمجموعة")
     
-    # Verify group exists and belongs to sheikh
+    # Verify group exists
     group = await db.groups.find_one({"id": group_id}, {"_id": 0})
     if not group:
         raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
-    
-    if current_user["role"] == "sheikh" and group["sheikh_id"] != current_user["user_id"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك بإدارة هذه المجموعة")
     
     # Update student
     result = await db.users.update_one(
@@ -298,6 +370,24 @@ async def add_student_to_group(group_id: str, request: AddStudentRequest, curren
     
     return {"message": "تم إضافة الطالب للمجموعة بنجاح"}
 
+@api_router.post("/groups/{group_id}/remove-student")
+async def remove_student_from_group(group_id: str, request: AddStudentRequest, current_user: dict = Depends(get_current_user)):
+    """Remove student from group (Admin only)"""
+    student_id = request.student_id
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إزالة طالب من المجموعة")
+    
+    # Update student
+    result = await db.users.update_one(
+        {"id": student_id, "role": "student", "group_id": group_id},
+        {"$set": {"group_id": None}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود في هذه المجموعة")
+    
+    return {"message": "تم إزالة الطالب من المجموعة بنجاح"}
+
 @api_router.get("/groups/{group_id}/students")
 async def get_group_students(group_id: str, current_user: dict = Depends(get_current_user)):
     students = await db.users.find(
@@ -305,6 +395,18 @@ async def get_group_students(group_id: str, current_user: dict = Depends(get_cur
         {"_id": 0, "password_hash": 0}
     ).to_list(100)
     return students
+
+@api_router.get("/sheikhs")
+async def get_all_sheikhs(current_user: dict = Depends(get_current_user)):
+    """Get all sheikhs (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    sheikhs = await db.users.find(
+        {"role": "sheikh"},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(100)
+    return sheikhs
 
 # ============== TRACKING SHEET ROUTES ==============
 
