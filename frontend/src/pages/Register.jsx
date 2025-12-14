@@ -6,24 +6,45 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
-import { BookOpen, Mail, Lock, User, Loader2, GraduationCap, Shield, Users, Key } from 'lucide-react';
+import { BookOpen, Mail, Lock, User, Loader2, GraduationCap, Shield, Users, Key, Building, Calendar, Image } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Register = () => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState('student');
-  const [registrationCode, setRegistrationCode] = useState('');
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'student',
+    registrationCode: '',
+    mosqueName: '',
+    schoolName: '',
+    schoolGrade: '',
+    birthDate: '',
+    profileImage: ''
+  });
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
 
+  const handleChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        handleChange('profileImage', event.target.result.split(',')[1]);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validate code for sheikh/admin
-    if ((role === 'sheikh' || role === 'admin') && !registrationCode.trim()) {
+    if ((formData.role === 'sheikh' || formData.role === 'admin') && !formData.registrationCode.trim()) {
       toast.error('كود التسجيل مطلوب للشيخ والمدير');
       return;
     }
@@ -31,7 +52,18 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const user = await register(name, email, password, role, registrationCode);
+      const user = await register(
+        formData.name, 
+        formData.email, 
+        formData.password, 
+        formData.role, 
+        formData.registrationCode,
+        formData.mosqueName,
+        formData.schoolName,
+        formData.schoolGrade,
+        formData.birthDate,
+        formData.profileImage
+      );
       toast.success(`مرحباً ${user.name}، تم إنشاء حسابك بنجاح`);
       navigate('/dashboard');
     } catch (error) {
@@ -42,12 +74,13 @@ const Register = () => {
   };
 
   const roles = [
-    { value: 'student', label: 'طالب', icon: GraduationCap, description: 'طالب حفظ القرآن', needsCode: false },
-    { value: 'sheikh', label: 'شيخ', icon: Users, description: 'معلم ومحفظ', needsCode: true },
-    { value: 'admin', label: 'مدير', icon: Shield, description: 'إدارة المركز', needsCode: true },
+    { value: 'student', label: 'طالب', icon: GraduationCap, needsCode: false },
+    { value: 'sheikh', label: 'شيخ', icon: Users, needsCode: true },
+    { value: 'admin', label: 'مدير', icon: Shield, needsCode: true },
   ];
 
-  const needsCode = role === 'sheikh' || role === 'admin';
+  const needsCode = formData.role === 'sheikh' || formData.role === 'admin';
+  const isStudent = formData.role === 'student';
 
   return (
     <div className="min-h-screen bg-background pattern-overlay flex">
@@ -74,65 +107,82 @@ const Register = () => {
       </div>
 
       {/* Right side - Register Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
-        <Card className="w-full max-w-md glass-card animate-fadeIn">
-          <CardHeader className="text-center space-y-2">
-            <div className="lg:hidden w-16 h-16 mx-auto mb-4 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-              <BookOpen className="w-8 h-8 text-emerald-400" />
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 overflow-y-auto">
+        <Card className="w-full max-w-md glass-card animate-fadeIn my-4">
+          <CardHeader className="text-center space-y-2 pb-4">
+            <div className="lg:hidden w-14 h-14 mx-auto mb-2 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+              <BookOpen className="w-7 h-7 text-emerald-400" />
             </div>
-            <CardTitle className="text-2xl font-bold text-white font-cairo">إنشاء حساب</CardTitle>
-            <CardDescription className="text-slate-400">
-              أنشئ حسابك للبدء
-            </CardDescription>
+            <CardTitle className="text-xl font-bold text-white font-cairo">إنشاء حساب</CardTitle>
+            <CardDescription className="text-slate-400 text-sm">أنشئ حسابك للبدء</CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-5">
+          <CardContent className="pt-0">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Role Selection */}
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-slate-300">الاسم الكامل</Label>
-                <div className="relative">
-                  <User className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="أحمد محمد"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="pr-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
-                    required
-                    data-testid="register-name-input"
-                  />
+                <Label className="text-slate-300 text-sm">نوع الحساب</Label>
+                <RadioGroup value={formData.role} onValueChange={(v) => handleChange('role', v)} className="grid grid-cols-3 gap-2">
+                  {roles.map((r) => (
+                    <div key={r.value}>
+                      <RadioGroupItem value={r.value} id={r.value} className="peer sr-only" data-testid={`role-${r.value}`} />
+                      <Label
+                        htmlFor={r.value}
+                        className="flex flex-col items-center justify-center p-2 rounded-lg border-2 border-slate-700 bg-slate-800/30 cursor-pointer transition-all peer-data-[state=checked]:border-emerald-500 peer-data-[state=checked]:bg-emerald-500/10 hover:bg-slate-800/50"
+                      >
+                        <r.icon className="w-5 h-5 mb-1 text-slate-400" />
+                        <span className="text-xs font-medium text-white">{r.label}</span>
+                        {r.needsCode && <span className="text-[10px] text-amber-400">يحتاج كود</span>}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+
+              {/* Basic Info */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-slate-300 text-sm">الاسم</Label>
+                  <div className="relative">
+                    <User className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Input
+                      type="text"
+                      placeholder="الاسم الكامل"
+                      value={formData.name}
+                      onChange={(e) => handleChange('name', e.target.value)}
+                      className="pr-8 h-9 text-sm bg-slate-800/50 border-slate-700 text-white"
+                      required
+                      data-testid="register-name-input"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-slate-300 text-sm">البريد</Label>
+                  <div className="relative">
+                    <Mail className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Input
+                      type="email"
+                      placeholder="email@example.com"
+                      value={formData.email}
+                      onChange={(e) => handleChange('email', e.target.value)}
+                      className="pr-8 h-9 text-sm bg-slate-800/50 border-slate-700 text-white text-left"
+                      dir="ltr"
+                      required
+                      data-testid="register-email-input"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-300">البريد الإلكتروني</Label>
+              <div className="space-y-1">
+                <Label className="text-slate-300 text-sm">كلمة المرور</Label>
                 <div className="relative">
-                  <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                  <Lock className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="example@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="pr-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 text-left"
-                    dir="ltr"
-                    required
-                    data-testid="register-email-input"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-slate-300">كلمة المرور</Label>
-                <div className="relative">
-                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
-                  <Input
-                    id="password"
                     type="password"
                     placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pr-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+                    value={formData.password}
+                    onChange={(e) => handleChange('password', e.target.value)}
+                    className="pr-8 h-9 text-sm bg-slate-800/50 border-slate-700 text-white"
                     required
                     minLength={6}
                     data-testid="register-password-input"
@@ -140,78 +190,110 @@ const Register = () => {
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <Label className="text-slate-300">نوع الحساب</Label>
-                <RadioGroup value={role} onValueChange={setRole} className="grid grid-cols-3 gap-3">
-                  {roles.map((r) => (
-                    <div key={r.value}>
-                      <RadioGroupItem
-                        value={r.value}
-                        id={r.value}
-                        className="peer sr-only"
-                        data-testid={`role-${r.value}`}
-                      />
-                      <Label
-                        htmlFor={r.value}
-                        className="flex flex-col items-center justify-center p-3 rounded-xl border-2 border-slate-700 bg-slate-800/30 cursor-pointer transition-all peer-data-[state=checked]:border-emerald-500 peer-data-[state=checked]:bg-emerald-500/10 hover:bg-slate-800/50"
-                      >
-                        <r.icon className="w-6 h-6 mb-2 text-slate-400 peer-data-[state=checked]:text-emerald-400" />
-                        <span className="text-sm font-medium text-white">{r.label}</span>
-                        {r.needsCode && (
-                          <span className="text-xs text-amber-400 mt-1">يحتاج كود</span>
-                        )}
-                      </Label>
-                    </div>
-                  ))}
-                </RadioGroup>
-              </div>
-
               {/* Registration Code for Sheikh/Admin */}
               {needsCode && (
-                <div className="space-y-2 animate-fadeIn">
-                  <Label htmlFor="code" className="text-slate-300 flex items-center gap-2">
-                    <Key className="w-4 h-4 text-amber-400" />
+                <div className="space-y-1 animate-fadeIn">
+                  <Label className="text-slate-300 text-sm flex items-center gap-1">
+                    <Key className="w-3 h-3 text-amber-400" />
                     كود التسجيل
                   </Label>
                   <Input
-                    id="code"
                     type="text"
-                    placeholder="أدخل الكود المكون من 6 أرقام"
-                    value={registrationCode}
-                    onChange={(e) => setRegistrationCode(e.target.value)}
-                    className="bg-slate-800/50 border-amber-500/50 text-white placeholder:text-slate-500 text-center text-lg tracking-widest"
+                    placeholder="الكود من 6 أرقام"
+                    value={formData.registrationCode}
+                    onChange={(e) => handleChange('registrationCode', e.target.value)}
+                    className="h-9 text-sm bg-slate-800/50 border-amber-500/50 text-white text-center tracking-widest"
                     maxLength={6}
                     required
                     data-testid="registration-code-input"
                   />
-                  <p className="text-xs text-amber-400/80">
-                    * احصل على كود التسجيل من مدير المركز
-                  </p>
+                </div>
+              )}
+
+              {/* Student Extra Fields */}
+              {isStudent && (
+                <div className="space-y-3 p-3 rounded-lg bg-slate-800/30 border border-slate-700/50 animate-fadeIn">
+                  <p className="text-xs text-emerald-400 font-medium">معلومات الطالب (اختياري)</p>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-slate-400 text-xs">المسجد</Label>
+                      <Input
+                        type="text"
+                        placeholder="اسم المسجد"
+                        value={formData.mosqueName}
+                        onChange={(e) => handleChange('mosqueName', e.target.value)}
+                        className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
+                        data-testid="mosque-input"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-slate-400 text-xs">تاريخ الميلاد</Label>
+                      <Input
+                        type="date"
+                        value={formData.birthDate}
+                        onChange={(e) => handleChange('birthDate', e.target.value)}
+                        className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
+                        data-testid="birthdate-input"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-slate-400 text-xs">المدرسة</Label>
+                      <Input
+                        type="text"
+                        placeholder="اسم المدرسة"
+                        value={formData.schoolName}
+                        onChange={(e) => handleChange('schoolName', e.target.value)}
+                        className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
+                        data-testid="school-input"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-slate-400 text-xs">المعدل</Label>
+                      <Input
+                        type="text"
+                        placeholder="مثال: 95%"
+                        value={formData.schoolGrade}
+                        onChange={(e) => handleChange('schoolGrade', e.target.value)}
+                        className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
+                        data-testid="grade-input"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-slate-400 text-xs flex items-center gap-1">
+                      <Image className="w-3 h-3" />
+                      صورة شخصية
+                    </Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white file:bg-emerald-500/20 file:text-emerald-400 file:border-0 file:text-xs"
+                      data-testid="profile-image-input"
+                    />
+                  </div>
                 </div>
               )}
 
               <Button
                 type="submit"
-                className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl glow-green"
+                className="w-full h-10 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl"
                 disabled={loading}
                 data-testid="register-submit-btn"
               >
-                {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  'إنشاء الحساب'
-                )}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'إنشاء الحساب'}
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-slate-400">
-                لديك حساب بالفعل؟{' '}
-                <Link 
-                  to="/login" 
-                  className="text-emerald-400 hover:text-emerald-300 font-medium"
-                  data-testid="login-link"
-                >
+            <div className="mt-4 text-center">
+              <p className="text-slate-400 text-sm">
+                لديك حساب؟{' '}
+                <Link to="/login" className="text-emerald-400 hover:text-emerald-300 font-medium" data-testid="login-link">
                   سجل الدخول
                 </Link>
               </p>
