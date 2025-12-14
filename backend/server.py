@@ -783,26 +783,6 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
             "percentage": round(present_count / max(len(attendance), 1) * 100, 2)
         }
     }
-    
-    return {
-        "tracking": {
-            "total_prayers": total_prayers,
-            "total_quran_time": total_quran_time,
-            "total_family_recitation": total_family_recitation,
-            "sheets_count": len(tracking)
-        },
-        "recitation": {
-            "average_score": round(avg_recitation_score, 2),
-            "total_verses": total_verses,
-            "recitations_count": len(recitations)
-        },
-        "attendance": {
-            "present": present_count,
-            "absent": absent_count,
-            "total": len(attendance),
-            "percentage": round(present_count / max(len(attendance), 1) * 100, 2)
-        }
-    }
 
 @api_router.get("/statistics/overview")
 async def get_overview_statistics(current_user: dict = Depends(get_current_user)):
