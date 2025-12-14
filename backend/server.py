@@ -753,11 +753,36 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
     total_quran_time = sum(t["data"]["quran_sitting_minutes"] for t in tracking)
     total_family_recitation = sum(t["data"]["family_recitation_count"] for t in tracking)
     
-    avg_recitation_score = sum(r["quality_score"] for r in recitations) / max(len(recitations), 1)
-    total_verses = sum(r["verses_to"] - r["verses_from"] + 1 for r in recitations)
+    # New recitation calculations
+    total_new_pages = sum(r.get("pages_count", 0) or 0 for r in recitations if r.get("recitation_type") == "new_memorization")
+    total_review_pages = sum(r.get("review_pages", 0) or 0 for r in recitations if r.get("review_type") == "pages")
+    passed_count = sum(1 for r in recitations if r.get("passed_minimum") or r.get("passed_review_minimum"))
+    total_points = sum(r.get("points_earned", 0) for r in recitations)
     
     present_count = sum(1 for a in attendance if a["status"] == "present")
     absent_count = sum(1 for a in attendance if a["status"] == "absent")
+    
+    return {
+        "tracking": {
+            "total_prayers": total_prayers,
+            "total_quran_time": total_quran_time,
+            "total_family_recitation": total_family_recitation,
+            "sheets_count": len(tracking)
+        },
+        "recitation": {
+            "total_new_pages": total_new_pages,
+            "total_review_pages": total_review_pages,
+            "passed_count": passed_count,
+            "total_points": total_points,
+            "recitations_count": len(recitations)
+        },
+        "attendance": {
+            "present": present_count,
+            "absent": absent_count,
+            "total": len(attendance),
+            "percentage": round(present_count / max(len(attendance), 1) * 100, 2)
+        }
+    }
     
     return {
         "tracking": {
