@@ -101,3 +101,156 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: |
+  تطبيق مركز الفاروق القرآني لتحفيظ القرآن - المطلوب:
+  1. صفحة ملف شخصي مفصلة للطالب (يصل إليها المعلم بالنقر على اسم الطالب)
+  2. صلاحية إضافة/حذف/نقل الطلاب للمدير فقط
+  3. نظام إنذارات للمدير (غياب متكرر، عدم التسميع، سلوك سلبي)
+
+backend:
+  - task: "Student Profile API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "GET /api/students/{student_id}/profile - returns student info, group, points, badges, attendance summary, recitation summary, warnings"
+
+  - task: "Add Student (Admin Only)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "POST /api/admin/students - admin-only endpoint to create students"
+
+  - task: "Delete Student (Admin Only)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "DELETE /api/students/{student_id} - admin-only endpoint to delete students"
+
+  - task: "Change Student Group (Admin Only)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "POST /api/students/{student_id}/change-group - admin-only endpoint to change group"
+
+  - task: "Warning System API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "POST /api/admin/warnings - issue warnings. GET /api/admin/warnings - list all. DELETE /api/admin/warnings/{id} - delete"
+
+frontend:
+  - task: "Student Profile Page"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/StudentProfile.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Complete student profile with personal info, points, badges, attendance/recitation summary, warnings, and tabs for detailed records"
+
+  - task: "Student Management Page (Admin)"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/StudentManagement.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Admin page with add/delete/change group/issue warning functionality"
+
+  - task: "Clickable Student Names (Sheikh Dashboard)"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/SheikhDashboard.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Added 'My Students' section with clickable links to student profiles"
+
+  - task: "Clickable Student Names (Users Page)"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/UsersPage.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Student names are clickable for admin/sheikh to view profiles"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Student Profile Page"
+    - "Student Management Page (Admin)"
+    - "Warning System API"
+  stuck_tasks: []
+  test_all: true
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: |
+      Implemented student profile and management features:
+      1. Created StudentProfile.jsx - shows complete student info with personal details, points, badges, attendance/recitation summaries, warnings, and detailed record tabs
+      2. Created StudentManagement.jsx - admin-only page for adding/deleting/moving students and issuing warnings
+      3. Added warning system backend with POST/GET/DELETE endpoints
+      4. Updated UsersPage and SheikhDashboard to have clickable student names
+      
+      Test credentials:
+      - Admin: testadmin@test.com / 123456
+      - Sheikh: testsheikh@test.com / 123456
+      - Student: teststudent@test.com / 123456
+      
+      Test scenarios:
+      1. Login as admin → Navigate to إدارة الطلاب → View student profiles
+      2. Add a new student via the dialog
+      3. Issue a warning to a student
+      4. Change student group
+      5. Delete a student
+      6. Login as sheikh → View students in dashboard → Click to see profiles
