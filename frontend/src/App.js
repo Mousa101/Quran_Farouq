@@ -17,6 +17,8 @@ import Rankings from './pages/Rankings';
 import UsersPage from './pages/UsersPage';
 import MyPoints from './pages/MyPoints';
 import RegistrationCodes from './pages/RegistrationCodes';
+import StudentProfile from './pages/StudentProfile';
+import StudentManagement from './pages/StudentManagement';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
