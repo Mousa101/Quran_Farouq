@@ -244,6 +244,17 @@ function AppRoutes() {
         }
       />
 
+      <Route
+        path="/group-management"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <GroupManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Default Route */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
