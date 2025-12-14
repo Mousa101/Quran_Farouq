@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Users, BookOpen, UserCheck, FileText, Plus, TrendingUp } from 'lucide-react';
+import { Users, BookOpen, UserCheck, FileText, Plus, TrendingUp, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
