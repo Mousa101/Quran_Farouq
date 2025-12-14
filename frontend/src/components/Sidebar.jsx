@@ -13,7 +13,8 @@ import {
   FileText,
   UsersRound,
   Star,
-  Key
+  Key,
+  GraduationCap
 } from 'lucide-react';
 import { Button } from './ui/button';
 
