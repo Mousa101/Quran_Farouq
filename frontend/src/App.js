@@ -221,6 +221,28 @@ function AppRoutes() {
         }
       />
 
+      <Route
+        path="/student/:studentId"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <StudentProfile />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/student-management"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <StudentManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Default Route */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
