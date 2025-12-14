@@ -848,6 +848,10 @@ async def get_student_profile(student_id: str, current_user: dict = Depends(get_
     if not points_data:
         points_data = {"total_points": 0, "level": 1, "badges": []}
     
+    # Get badge details
+    badge_details = [b for b in BADGES if b["id"] in points_data.get("badges", [])]
+    points_data["badge_details"] = badge_details
+    
     # Get attendance records (last 30 days)
     attendance = await db.attendance.find(
         {"student_id": student_id},
@@ -865,6 +869,12 @@ async def get_student_profile(student_id: str, current_user: dict = Depends(get_
         {"student_id": student_id},
         {"_id": 0}
     ).sort("created_at", -1).to_list(100)
+    
+    # Get warnings
+    warnings = await db.warnings.find(
+        {"student_id": student_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
     
     # Calculate attendance summary
     present_count = sum(1 for a in attendance if a["status"] == "present")
@@ -895,7 +905,8 @@ async def get_student_profile(student_id: str, current_user: dict = Depends(get_
         },
         "attendance_records": attendance,
         "recitation_records": recitations,
-        "tracking_sheets": tracking_sheets
+        "tracking_sheets": tracking_sheets,
+        "warnings": warnings
     }
 
 @api_router.put("/students/{student_id}")
