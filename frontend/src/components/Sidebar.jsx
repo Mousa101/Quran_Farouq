@@ -35,6 +35,7 @@ const Sidebar = () => {
     if (user?.role === 'admin') {
       return [
         ...baseItems,
+        { to: '/group-management', icon: UsersRound, label: 'إدارة المجموعات' },
         { to: '/student-management', icon: GraduationCap, label: 'إدارة الطلاب' },
         { to: '/rankings', icon: Trophy, label: 'الحوافز' },
         { to: '/activities', icon: Calendar, label: 'الأنشطة' },
@@ -47,7 +48,6 @@ const Sidebar = () => {
     if (user?.role === 'sheikh') {
       return [
         ...baseItems,
-        { to: '/groups', icon: UsersRound, label: 'المجموعات' },
         { to: '/tracking', icon: FileText, label: 'ورق المتابعة' },
         { to: '/recitations', icon: BookOpen, label: 'التسميع' },
         { to: '/attendance', icon: UserCheck, label: 'الحضور' },
