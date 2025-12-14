@@ -8,7 +8,7 @@ import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   User, BookOpen, UserCheck, Star, Trophy, Calendar, ArrowRight,
-  CheckCircle, XCircle, Clock, FileText, AlertTriangle, School, Mosque
+  CheckCircle, XCircle, Clock, FileText, AlertTriangle, School, Home
 } from 'lucide-react';
 import { toast } from 'sonner';
 
