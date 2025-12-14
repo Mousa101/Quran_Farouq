@@ -120,7 +120,7 @@ const StudentManagement = () => {
     if (!selectedStudent) return;
     setSubmitting(true);
     try {
-      await axios.post(`${API}/students/${selectedStudent.id}/change-group?group_id=${newGroupId || ''}`);
+      await axios.post(`${API}/students/${selectedStudent.id}/change-group?group_id=${newGroupId === 'none' ? '' : newGroupId}`);
       toast.success('تم نقل الطالب بنجاح');
       setChangeGroupDialogOpen(false);
       setSelectedStudent(null);
