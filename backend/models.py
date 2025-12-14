@@ -3,11 +3,24 @@ from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
 
-# User Models
+# User Models - Updated with new fields
 class UserBase(BaseModel):
     email: EmailStr
     name: str
     role: str = Field(..., pattern="^(student|sheikh|admin)$")
+
+class StudentCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    role: str = "student"
+    registration_code: Optional[str] = None
+    # New student fields
+    mosque_name: Optional[str] = None
+    school_name: Optional[str] = None
+    school_grade: Optional[str] = None
+    birth_date: Optional[str] = None
+    profile_image: Optional[str] = None  # Base64 image
 
 class UserCreate(UserBase):
     password: str
@@ -22,12 +35,33 @@ class User(UserBase):
     group_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = True
+    # New student fields
+    mosque_name: Optional[str] = None
+    school_name: Optional[str] = None
+    school_grade: Optional[str] = None
+    birth_date: Optional[str] = None
+    profile_image: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: str
     email: str
     name: str
     role: str
+    group_id: Optional[str] = None
+    mosque_name: Optional[str] = None
+    school_name: Optional[str] = None
+    school_grade: Optional[str] = None
+    birth_date: Optional[str] = None
+    profile_image: Optional[str] = None
+
+# Student Profile Update (Admin only)
+class StudentProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    mosque_name: Optional[str] = None
+    school_name: Optional[str] = None
+    school_grade: Optional[str] = None
+    birth_date: Optional[str] = None
+    profile_image: Optional[str] = None
     group_id: Optional[str] = None
 
 # Group Models
@@ -65,14 +99,18 @@ class TrackingSheet(BaseModel):
     data: TrackingSheetData
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-# Recitation Models
+# NEW Recitation Models - Updated
 class RecitationCreate(BaseModel):
     student_id: str
-    surah_name: str
-    verses_from: int
-    verses_to: int
-    quality_score: int = Field(..., ge=1, le=10)
-    mistakes_count: int = 0
+    recitation_type: str  # "new_memorization" or "review"
+    # For new memorization
+    pages_count: Optional[int] = None  # عدد الصفحات
+    passed_minimum: bool = False  # اجتاز الحد الأدنى
+    # For review
+    review_type: Optional[str] = None  # "pages" or "juz"
+    review_pages: Optional[int] = None  # عدد صفحات المراجعة
+    review_juz: Optional[List[int]] = None  # أرقام الأجزاء المراجعة (1-30)
+    passed_review_minimum: bool = False  # اجتاز الحد الأدنى للمراجعة
     notes: Optional[str] = None
 
 class Recitation(BaseModel):
@@ -80,12 +118,15 @@ class Recitation(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     student_id: str
     sheikh_id: str
-    surah_name: str
-    verses_from: int
-    verses_to: int
-    quality_score: int
-    mistakes_count: int
+    recitation_type: str
+    pages_count: Optional[int] = None
+    passed_minimum: bool = False
+    review_type: Optional[str] = None
+    review_pages: Optional[int] = None
+    review_juz: Optional[List[int]] = None
+    passed_review_minimum: bool = False
     notes: Optional[str] = None
+    points_earned: int = 0
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Attendance Models
@@ -190,3 +231,13 @@ class PointsTransaction(BaseModel):
     category: str  # attendance, recitation, tracking, bonus
     description: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# Quran Juz names for reference
+QURAN_JUZ = [
+    "الجزء الأول", "الجزء الثاني", "الجزء الثالث", "الجزء الرابع", "الجزء الخامس",
+    "الجزء السادس", "الجزء السابع", "الجزء الثامن", "الجزء التاسع", "الجزء العاشر",
+    "الجزء الحادي عشر", "الجزء الثاني عشر", "الجزء الثالث عشر", "الجزء الرابع عشر", "الجزء الخامس عشر",
+    "الجزء السادس عشر", "الجزء السابع عشر", "الجزء الثامن عشر", "الجزء التاسع عشر", "الجزء العشرون",
+    "الجزء الحادي والعشرون", "الجزء الثاني والعشرون", "الجزء الثالث والعشرون", "الجزء الرابع والعشرون", "الجزء الخامس والعشرون",
+    "الجزء السادس والعشرون", "الجزء السابع والعشرون", "الجزء الثامن والعشرون", "الجزء التاسع والعشرون", "الجزء الثلاثون (جزء عم)"
+]
