@@ -9,6 +9,7 @@ import { Users, GraduationCap, Shield, Eye } from 'lucide-react';
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const UsersPage = () => {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
