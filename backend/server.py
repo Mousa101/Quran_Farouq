@@ -392,15 +392,50 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     if current_user["role"] != "sheikh":
         raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تسجيل التسميع")
     
+    # Calculate points based on new system
+    points = 0
+    description = ""
+    
+    if recitation_data.recitation_type == "new_memorization":
+        # حفظ جديد
+        if recitation_data.passed_minimum:
+            points = (recitation_data.pages_count or 1) * 15  # 15 نقطة لكل صفحة عند اجتياز الحد الأدنى
+            description = f"حفظ جديد: {recitation_data.pages_count} صفحة - اجتاز الحد الأدنى ✓"
+        else:
+            points = (recitation_data.pages_count or 1) * 5  # 5 نقاط لكل صفحة بدون اجتياز
+            description = f"حفظ جديد: {recitation_data.pages_count} صفحة"
+    else:
+        # مراجعة
+        if recitation_data.review_type == "pages":
+            if recitation_data.passed_review_minimum:
+                points = (recitation_data.review_pages or 1) * 10  # 10 نقاط لكل صفحة مراجعة
+                description = f"مراجعة: {recitation_data.review_pages} صفحة - اجتاز الحد الأدنى ✓"
+            else:
+                points = (recitation_data.review_pages or 1) * 3
+                description = f"مراجعة: {recitation_data.review_pages} صفحة"
+        else:  # juz
+            juz_count = len(recitation_data.review_juz or [])
+            if recitation_data.passed_review_minimum:
+                points = juz_count * 50  # 50 نقطة لكل جزء مراجعة
+                juz_names = [f"الجزء {j}" for j in (recitation_data.review_juz or [])]
+                description = f"مراجعة أجزاء: {', '.join(juz_names)} - اجتاز الحد الأدنى ✓"
+            else:
+                points = juz_count * 15
+                juz_names = [f"الجزء {j}" for j in (recitation_data.review_juz or [])]
+                description = f"مراجعة أجزاء: {', '.join(juz_names)}"
+    
     recitation = Recitation(
         student_id=recitation_data.student_id,
         sheikh_id=current_user["user_id"],
-        surah_name=recitation_data.surah_name,
-        verses_from=recitation_data.verses_from,
-        verses_to=recitation_data.verses_to,
-        quality_score=recitation_data.quality_score,
-        mistakes_count=recitation_data.mistakes_count,
-        notes=recitation_data.notes
+        recitation_type=recitation_data.recitation_type,
+        pages_count=recitation_data.pages_count,
+        passed_minimum=recitation_data.passed_minimum,
+        review_type=recitation_data.review_type,
+        review_pages=recitation_data.review_pages,
+        review_juz=recitation_data.review_juz,
+        passed_review_minimum=recitation_data.passed_review_minimum,
+        notes=recitation_data.notes,
+        points_earned=points
     )
     
     recitation_dict = recitation.model_dump()
@@ -412,22 +447,18 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     await create_notification_internal(
         recitation_data.student_id,
         "تسميع جديد",
-        f"تم تسجيل تسميعك لسورة {recitation_data.surah_name} - درجة: {recitation_data.quality_score}/10",
-        "success" if recitation_data.quality_score >= 7 else "info"
+        description,
+        "success" if (recitation_data.passed_minimum or recitation_data.passed_review_minimum) else "info"
     )
     
-    # Award points based on quality
-    points = recitation_data.quality_score * 2  # 2-20 points based on score
-    if recitation_data.quality_score == 10:
-        points += 10  # Bonus for perfect score
-        await award_badge(recitation_data.student_id, "excellent_reciter")
-    
-    await add_points(
-        recitation_data.student_id,
-        points,
-        "recitation",
-        f"تسميع سورة {recitation_data.surah_name} - درجة {recitation_data.quality_score}/10"
-    )
+    # Award points
+    if points > 0:
+        await add_points(
+            recitation_data.student_id,
+            points,
+            "recitation",
+            description
+        )
     
     # Check if first recitation
     recitation_count = await db.recitations.count_documents({"student_id": recitation_data.student_id})
@@ -451,8 +482,13 @@ async def get_recitations(
     elif student_id:
         query["student_id"] = student_id
     
-    recitations = await db.recitations.find(query, {"_id": 0}).to_list(100)
+    recitations = await db.recitations.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
     return recitations
+
+# Get Quran Juz list
+@api_router.get("/quran/juz")
+async def get_quran_juz(current_user: dict = Depends(get_current_user)):
+    return [{"number": i+1, "name": QURAN_JUZ[i]} for i in range(30)]
 
 # ============== ATTENDANCE ROUTES ==============
 
