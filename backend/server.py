@@ -569,6 +569,126 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     
     return {"message": "تم تسجيل التسميع بنجاح", "recitation_id": recitation.id, "points_earned": points}
 
+class RecitationUpdate(BaseModel):
+    recitation_type: Optional[str] = None
+    pages_count: Optional[int] = None
+    passed_minimum: Optional[bool] = None
+    review_type: Optional[str] = None
+    review_pages: Optional[int] = None
+    review_juz: Optional[List[int]] = None
+    passed_review_minimum: Optional[bool] = None
+    notes: Optional[str] = None
+
+@api_router.put("/recitations/{recitation_id}")
+async def update_recitation(recitation_id: str, data: RecitationUpdate, current_user: dict = Depends(get_current_user)):
+    """Update a recitation (Sheikh only - must be the one who recorded it)"""
+    if current_user["role"] not in ["sheikh", "admin"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    # Get existing recitation
+    recitation = await db.recitations.find_one({"id": recitation_id})
+    if not recitation:
+        raise HTTPException(status_code=404, detail="التسميع غير موجود")
+    
+    # Check permission - sheikh can only edit their own recitations
+    if current_user["role"] == "sheikh" and recitation.get("sheikh_id") != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="لا يمكنك تعديل تسميع مسجل من شيخ آخر")
+    
+    # Calculate old points
+    old_points = recitation.get("points_earned", 0)
+    
+    # Update fields
+    update_data = {}
+    if data.recitation_type is not None:
+        update_data["recitation_type"] = data.recitation_type
+    if data.pages_count is not None:
+        update_data["pages_count"] = data.pages_count
+    if data.passed_minimum is not None:
+        update_data["passed_minimum"] = data.passed_minimum
+    if data.review_type is not None:
+        update_data["review_type"] = data.review_type
+    if data.review_pages is not None:
+        update_data["review_pages"] = data.review_pages
+    if data.review_juz is not None:
+        update_data["review_juz"] = data.review_juz
+    if data.passed_review_minimum is not None:
+        update_data["passed_review_minimum"] = data.passed_review_minimum
+    if data.notes is not None:
+        update_data["notes"] = data.notes
+    
+    # Calculate new points
+    merged = {**recitation, **update_data}
+    new_points = 0
+    if merged.get("recitation_type") == "new_memorization":
+        if merged.get("passed_minimum"):
+            new_points = (merged.get("pages_count") or 1) * 15
+        else:
+            new_points = (merged.get("pages_count") or 1) * 5
+    else:
+        if merged.get("review_type") == "pages":
+            if merged.get("passed_review_minimum"):
+                new_points = (merged.get("review_pages") or 1) * 10
+            else:
+                new_points = (merged.get("review_pages") or 1) * 3
+        else:
+            juz_count = len(merged.get("review_juz") or [])
+            if merged.get("passed_review_minimum"):
+                new_points = juz_count * 30
+            else:
+                new_points = juz_count * 10
+    
+    update_data["points_earned"] = new_points
+    
+    await db.recitations.update_one({"id": recitation_id}, {"$set": update_data})
+    
+    # Update student points (difference)
+    points_diff = new_points - old_points
+    if points_diff != 0:
+        await db.student_points.update_one(
+            {"student_id": recitation["student_id"]},
+            {"$inc": {"total_points": points_diff}},
+            upsert=True
+        )
+    
+    return {"message": "تم تحديث التسميع بنجاح", "points_earned": new_points}
+
+@api_router.delete("/recitations/{recitation_id}")
+async def delete_recitation(recitation_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a recitation (Sheikh only - must be the one who recorded it)"""
+    if current_user["role"] not in ["sheikh", "admin"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    # Get existing recitation
+    recitation = await db.recitations.find_one({"id": recitation_id})
+    if not recitation:
+        raise HTTPException(status_code=404, detail="التسميع غير موجود")
+    
+    # Check permission
+    if current_user["role"] == "sheikh" and recitation.get("sheikh_id") != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="لا يمكنك حذف تسميع مسجل من شيخ آخر")
+    
+    # Deduct points from student
+    points = recitation.get("points_earned", 0)
+    if points > 0:
+        await db.student_points.update_one(
+            {"student_id": recitation["student_id"]},
+            {"$inc": {"total_points": -points}},
+            upsert=True
+        )
+    
+    # Delete recitation
+    await db.recitations.delete_one({"id": recitation_id})
+    
+    return {"message": "تم حذف التسميع بنجاح"}
+
+@api_router.get("/recitations/{recitation_id}")
+async def get_recitation(recitation_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a single recitation"""
+    recitation = await db.recitations.find_one({"id": recitation_id}, {"_id": 0})
+    if not recitation:
+        raise HTTPException(status_code=404, detail="التسميع غير موجود")
+    return recitation
+
 @api_router.get("/recitations")
 async def get_recitations(
     student_id: Optional[str] = None,
