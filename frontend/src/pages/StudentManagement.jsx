@@ -403,7 +403,7 @@ const StudentManagement = () => {
                 <SelectValue placeholder="اختر المجموعة" />
               </SelectTrigger>
               <SelectContent className="bg-slate-800 border-slate-700">
-                <SelectItem value="" className="text-white">بدون مجموعة</SelectItem>
+                <SelectItem value="none" className="text-white">بدون مجموعة</SelectItem>
                 {groups.map((group) => (
                   <SelectItem key={group.id} value={group.id} className="text-white">
                     {group.name}
