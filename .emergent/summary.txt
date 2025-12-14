@@ -1,0 +1,166 @@
+<analysis>**original_problem_statement:**
+The user requested a Quran memorization application with the following features:
+1.  **User Roles & Authentication:** Login for Student, Sheikh (Teacher), and Admin. Sheikhs can assign students to their groups. The user chose JWT-based authentication.
+2.  **Incentive System:** A weekly collective motivation section for the admin, ranking students into Gold, Silver, and Bronze tiers based on points.
+3.  **Point Sources:**
+    *   **Tracking Sheet:** Sheikhs upload a photo of a tracking sheet. The user chose to use Gemini 2.5 Flash to automatically extract statistics (prayers, Quran study time, recitation to parents).
+    *   **Recitation:** Student's recitation to the Sheikh.
+    *   **Attendance:** Student's attendance.
+4.  **Activities:** The admin can schedule and post activities.
+5.  **Gamification (Phase 2):** Add a points and badges system. Set the application name to مركز الفاروق القراني (Al-Farooq Quranic Center).
+6.  **Registration Flow (Phase 3):** Implement a logout button. Change the registration process so that Sheikhs and Admins require a 6-digit random code to register. These codes are generated and managed by an existing Admin.
+7.  **Recitation & Profile Overhaul (Phase 4):**
+    *   **Recitation:** Rework the recitation logging to differentiate between new memorization and revision. Use page counts instead of verses. For revision, allow selecting entire Juz' (parts of the Quran) via checkboxes. Points should be based on the teacher marking checkboxes for meeting minimum requirements.
+    *   **Student Profile:** Create a detailed student record page visible to teachers, showing personal info, mosque, photo, total points, attendance/absence summary, and a history of all recitations and submissions.
+    *   **Student Registration:** Add new fields for students: mosque, school, school average, date of birth, and an optional profile picture.
+    *   **Admin Permissions:** Make adding, deleting, or changing a student's group an admin-only function.
+
+**User's preferred language**: ar
+
+**what currently exists?**
+A full-stack application with a FastAPI backend, React frontend, and MongoDB database. It includes:
+- JWT authentication with three roles: Admin, Sheikh, and Student.
+- Role-specific dashboards.
+- A system for Admins to generate and manage registration codes required for Sheikh and new Admin sign-ups.
+- A complete points and badges gamification system. Students earn points for attendance and recitation.
+- A notification system for earned badges and other events.
+- Backend models and APIs have been partially updated for the new recitation and student profile features, but the work is incomplete.
+
+**Last working item**:
+    - Last item agent was working: The agent was in the middle of a major feature overhaul requested by the user. It had updated the backend models () and was heavily modifying  to support a new, more detailed recitation system and comprehensive student profiles. On the frontend, it had updated the student registration page and was about to create the new Student Profile page.
+    - Status: IN PROGRESS
+    - Agent Testing Done: N
+    - Which testing method agent to use? both
+    - User Testing Done: N
+
+**All Pending/In progress Issue list**:
+  Issue 1:  The current feature implementation for the recitation and student profile overhaul is incomplete and has broken existing functionality. The backend and frontend are out of sync. (Priority: P0)
+  
+  Issues Detail:
+  - Issue 1: 
+     - Attempted fixes: The agent has started rewriting backend APIs and frontend components but has not finished. This is a large, ongoing task, not a bug fix.
+     - Next debug checklist: 
+        1. Create the new frontend page for the student profile: .
+        2. Implement the frontend logic to fetch and display the detailed student data from the new backend endpoints.
+        3. Modify the  or Sheikh's dashboard to allow clicking a student's name to navigate to their new profile page.
+        4. Fully test the new student registration flow with all the new fields.
+        5. Fully test the new recitation submission flow from the  page.
+        6. Fully test the new admin-only endpoints for managing students (add, delete, change group).
+        7. Run the testing agent to perform a full regression test.
+     - Why fix this issue and what will be achieved with the fix? This will complete the user's latest and most significant feature request, which is central to the application's purpose.
+     - Status:  IN PROGRESS
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix? both
+     - Blocked on other issue: None
+
+**In progress Task List**:
+  - Task 1: Complete the Recitation and Student Profile Overhaul (Priority: P0)
+     - Where to resume: Start by creating the new student profile page at . The agent was just about to do this.
+     - What will be achieved with this? This will implement the user's request for a detailed student record page and a more nuanced recitation tracking system.
+     - Status:  IN PROGRESS
+     - Should Test frontend/backend/both after fix? both
+     - Blocked on something: None
+
+**Upcoming and Future Tasks**
+    Upcoming Tasks:
+    - P1: Implement Image Analysis with Gemini: The placeholder endpoint  exists, but the AI logic in  to extract data from uploaded images is not yet integrated or fully implemented.
+    - P2: Implement Weekly Rankings: The backend statistics endpoint calculates scores, but the frontend logic to display the Gold, Silver, and Bronze winners needs to be finalized in the  and potentially a new  component.
+    
+    Future Tasks:
+    - PDF reports for students.
+    - A direct messaging system between Sheikhs and students.
+    - Mobile push notifications.
+
+**Completed work in this session**
+- JWT Authentication system with three distinct user roles (Admin, Sheikh, Student).
+- Role-specific dashboards and sidebar navigation.
+- A complete points, levels, and badges gamification system.
+- An admin-managed registration code system for Sheikh and Admin sign-ups.
+- A notification system for in-app alerts.
+- Updated the application name to مركز الفاروق القراني.
+- Added a logout button.
+
+**Earlier issues found/mentioned but not fixed**
+   - None. The agent has been addressing issues as they arise.
+
+**Known issue recurrence from previous fork**
+  - No recurring issues from previous forks.
+
+**Code Architecture**
+
+
+**Key Technical Concepts**
+- **Backend:** FastAPI, Pydantic, Motor (async MongoDB driver), JWT for authentication.
+- **Frontend:** React, React Router, Axios, Tailwind CSS, Shadcn/UI components.
+- **Database:** MongoDB.
+- **Architecture:** Decoupled frontend/backend full-stack application.
+
+**key DB schema**
+  - **users:** {uid=0(root) gid=0(root) groups=0(root), , ,  (, , ), , , , , :{, , , , }}
+  - **groups:** {uid=0(root) gid=0(root) groups=0(root), , }
+  - **recitations:** {uid=0(root) gid=0(root) groups=0(root), , ,  (, ), , , , }
+  - **attendance:** {uid=0(root) gid=0(root) groups=0(root), ,  (, ), Sun Dec 14 17:37:05 UTC 2025}
+  - **registration_codes:** {, , , }
+  - **notifications:** {uid=0(root) gid=0(root) groups=0(root), , , }
+
+**changes in tech stack**
+  - None.
+
+**All files of reference**
+*   : The main FastAPI server. Heavily modified to add all application logic, including the incomplete new features.
+*   : Pydantic models for database objects and API requests/responses. Overwritten to support the new features.
+*   : The registration page. Overwritten multiple times to add the registration code logic and then the new student fields.
+*   : The page for logging recitations. Overwritten with a new form for the feature overhaul.
+*   : **To be created.** This is the next step.
+
+**Areas that need refactoring**:
+-  is becoming very large (over 800 lines). The business logic could be broken down into smaller, more manageable modules/routers (e.g., , , ).
+
+**key api endpoints**
+- : User registration (logic depends on role).
+- : User login.
+- : (Admin) Create registration codes.
+- : (Admin) View registration codes.
+- : Submit a new recitation record.
+- : Mark student attendance.
+- : **New** endpoint to get detailed student profile.
+- : **New** (Admin) endpoint to update a student.
+- : **New** (Admin) endpoint to delete a student.
+
+**Critical Info for New Agent**
+- You are in the middle of a large feature implementation. The backend has been significantly altered, but the frontend is only partially updated. Do not assume existing features work until the overhaul is complete and tested.
+- Your immediate next step is to create the student profile page: .
+- The user's requests are becoming increasingly complex. Ensure you fully understand all requirements for the recitation and student profile logic before completing the code.
+-  is monolithic. After completing the current task, consider proposing a refactor to split it into multiple routers for better maintainability.
+
+**documents created in this job**
+  - /app/requirements.md
+  - /app/design_guidelines.json
+
+**Last 10 User Messages and any pending user messages**
+- **User:** Add a logout button and a registration code system for Sheikhs/Admins. (Completed)
+- **User:** Rework the recitation system (new vs. revision, pages, Juz selection), create detailed student profiles, add new fields to student registration, and restrict student management to admins. (In Progress)
+
+The last message is a large, multi-part feature request which is the current 
+wtmp begins Fri Dec 12 18:32:15 2025.
+
+**Project Health Check:**
+- **Broken:** The recitation and student management features are currently broken due to the ongoing overhaul. The frontend and backend are not in sync for these features.
+
+**3rd Party Integrations**
+ - Gemini 2.5 Flash: Planned for image analysis of tracking sheets, but not yet implemented. Requires User LLM Key.
+
+**Testing status**
+  - Testing agent used after significant changes: YES
+  - Troubleshoot agent used after agent stuck in loop: NO
+  - Test files created: []
+  - Known regressions: Recitation, attendance, and user management functionalities are likely impacted by the ongoing backend changes and will not work as they did before.
+
+**Credentials to test flow:**
+The application now requires registration codes for admins and sheikhs. The first admin can be created without a code.
+- **Admin:**  / 
+- **Sheikh:**  /  (Requires a code from the admin to register)
+- **Student:**  / 
+
+**What agent forgot to execute**
+The agent has not forgotten any specific tasks but has not yet completed the large, multi-part feature request for overhauling the recitation and student profile systems. The AI-powered image analysis for tracking sheets also remains to be implemented.</analysis>
