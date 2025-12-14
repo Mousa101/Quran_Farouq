@@ -4,18 +4,13 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
-import { 
-  User, BookOpen, Calendar, CheckCircle, XCircle, Clock, Trophy, 
-  Star, Building, GraduationCap, Edit, Trash2, ArrowRight, Loader2,
-  FileText, RotateCcw
+import { Badge } from '../components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import {
+  User, BookOpen, UserCheck, Star, Trophy, Calendar, ArrowRight,
+  CheckCircle, XCircle, Clock, FileText, AlertTriangle, School, Mosque
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
-import { ar } from 'date-fns/locale';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -24,80 +19,39 @@ const StudentProfile = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [profileData, setProfileData] = useState(null);
-  const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editOpen, setEditOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [editData, setEditData] = useState({});
 
   useEffect(() => {
     fetchProfile();
-    fetchGroups();
   }, [studentId]);
 
   const fetchProfile = async () => {
     try {
       const response = await axios.get(`${API}/students/${studentId}/profile`);
       setProfileData(response.data);
-      setEditData({
-        name: response.data.student.name,
-        mosque_name: response.data.student.mosque_name || '',
-        school_name: response.data.student.school_name || '',
-        school_grade: response.data.student.school_grade || '',
-        birth_date: response.data.student.birth_date || '',
-        group_id: response.data.student.group_id || ''
-      });
     } catch (error) {
       console.error('Error:', error);
-      toast.error('فشل تحميل بيانات الطالب');
+      toast.error('فشل في تحميل بيانات الطالب');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchGroups = async () => {
-    try {
-      const response = await axios.get(`${API}/groups`);
-      setGroups(response.data);
-    } catch (error) {
-      console.error('Error:', error);
-    }
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('ar-SA');
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await axios.put(`${API}/students/${studentId}`, editData);
-      toast.success('تم تحديث البيانات بنجاح');
-      setEditOpen(false);
-      fetchProfile();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'فشل تحديث البيانات');
-    } finally {
-      setSaving(false);
+  const calculateAge = (birthDate) => {
+    if (!birthDate) return '-';
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+      age--;
     }
-  };
-
-  const handleDelete = async () => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا الطالب؟ سيتم حذف جميع بياناته!')) return;
-    
-    try {
-      await axios.delete(`${API}/students/${studentId}`);
-      toast.success('تم حذف الطالب بنجاح');
-      navigate('/users');
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'فشل حذف الطالب');
-    }
-  };
-
-  const handleChangeGroup = async (newGroupId) => {
-    try {
-      await axios.post(`${API}/students/${studentId}/change-group?group_id=${newGroupId || ''}`);
-      toast.success('تم نقل الطالب بنجاح');
-      fetchProfile();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'فشل نقل الطالب');
-    }
+    return `${age} سنة`;
   };
 
   if (loading) {
@@ -112,245 +66,145 @@ const StudentProfile = () => {
     return (
       <div className="text-center py-12 text-slate-400">
         <User className="w-16 h-16 mx-auto mb-4 opacity-50" />
-        <p>الطالب غير موجود</p>
+        <p>لم يتم العثور على بيانات الطالب</p>
       </div>
     );
   }
 
-  const { student, group, points, attendance_summary, recitation_summary, attendance_records, recitation_records, tracking_sheets } = profileData;
-  const isAdmin = user?.role === 'admin';
+  const { student, group, points, attendance_summary, recitation_summary, attendance_records, recitation_records, warnings } = profileData;
 
   return (
     <div className="space-y-6 animate-fadeIn" data-testid="student-profile-page">
       {/* Back Button */}
-      <Button variant="ghost" onClick={() => navigate(-1)} className="text-slate-400 hover:text-white">
-        <ArrowRight className="w-4 h-4 ml-2" />
+      <Button
+        variant="ghost"
+        onClick={() => navigate(-1)}
+        className="text-slate-400 hover:text-white"
+      >
+        <ArrowRight className="w-5 h-5 ml-2" />
         رجوع
       </Button>
 
-      {/* Profile Header */}
-      <Card className="glass-card border-white/10">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
+      {/* Header Card */}
+      <Card className="glass-card border-white/10 overflow-hidden">
+        <div className="h-24 bg-gradient-to-l from-emerald-500/30 to-blue-500/30" />
+        <CardContent className="relative pt-0">
+          <div className="flex flex-col md:flex-row gap-6 items-start -mt-12">
             {/* Profile Image */}
-            <div className="w-24 h-24 rounded-full bg-emerald-500/20 flex items-center justify-center overflow-hidden">
+            <div className="w-24 h-24 rounded-2xl bg-slate-800 border-4 border-slate-900 flex items-center justify-center overflow-hidden">
               {student.profile_image ? (
-                <img 
-                  src={`data:image/jpeg;base64,${student.profile_image}`} 
-                  alt={student.name}
-                  className="w-full h-full object-cover"
-                />
+                <img src={student.profile_image} alt={student.name} className="w-full h-full object-cover" />
               ) : (
-                <User className="w-12 h-12 text-emerald-400" />
+                <span className="text-4xl font-bold text-emerald-400">
+                  {student.name?.charAt(0)}
+                </span>
               )}
             </div>
 
-            {/* Info */}
+            {/* Basic Info */}
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-white mb-2">{student.name}</h1>
-              <div className="flex flex-wrap gap-4 text-sm">
-                {student.mosque_name && (
-                  <span className="text-slate-400 flex items-center gap-1">
-                    <Building className="w-4 h-4" />
-                    {student.mosque_name}
-                  </span>
-                )}
-                {student.school_name && (
-                  <span className="text-slate-400 flex items-center gap-1">
-                    <GraduationCap className="w-4 h-4" />
-                    {student.school_name}
-                  </span>
-                )}
-                {student.birth_date && (
-                  <span className="text-slate-400 flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    {student.birth_date}
-                  </span>
-                )}
-                {group && (
-                  <span className="text-emerald-400 flex items-center gap-1">
-                    <BookOpen className="w-4 h-4" />
-                    {group.name}
-                  </span>
-                )}
-              </div>
+              <h1 className="text-2xl font-bold text-white">{student.name}</h1>
+              <p className="text-slate-400 text-sm">{student.email}</p>
+              {group && (
+                <Badge className="mt-2 bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                  {group.name}
+                </Badge>
+              )}
             </div>
 
-            {/* Actions (Admin only) */}
-            {isAdmin && (
-              <div className="flex gap-2">
-                <Dialog open={editOpen} onOpenChange={setEditOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="border-slate-700">
-                      <Edit className="w-4 h-4 ml-1" />
-                      تعديل
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="bg-slate-900 border-slate-700">
-                    <DialogHeader>
-                      <DialogTitle className="text-white">تعديل بيانات الطالب</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 mt-4">
-                      <div className="space-y-2">
-                        <Label className="text-slate-300">الاسم</Label>
-                        <Input
-                          value={editData.name}
-                          onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                          className="bg-slate-800 border-slate-700 text-white"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="text-slate-300">المسجد</Label>
-                          <Input
-                            value={editData.mosque_name}
-                            onChange={(e) => setEditData({ ...editData, mosque_name: e.target.value })}
-                            className="bg-slate-800 border-slate-700 text-white"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-slate-300">المدرسة</Label>
-                          <Input
-                            value={editData.school_name}
-                            onChange={(e) => setEditData({ ...editData, school_name: e.target.value })}
-                            className="bg-slate-800 border-slate-700 text-white"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="text-slate-300">المعدل</Label>
-                          <Input
-                            value={editData.school_grade}
-                            onChange={(e) => setEditData({ ...editData, school_grade: e.target.value })}
-                            className="bg-slate-800 border-slate-700 text-white"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-slate-300">تاريخ الميلاد</Label>
-                          <Input
-                            type="date"
-                            value={editData.birth_date}
-                            onChange={(e) => setEditData({ ...editData, birth_date: e.target.value })}
-                            className="bg-slate-800 border-slate-700 text-white"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-slate-300">المجموعة</Label>
-                        <Select value={editData.group_id || ''} onValueChange={(v) => setEditData({ ...editData, group_id: v })}>
-                          <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                            <SelectValue placeholder="اختر المجموعة" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-slate-800 border-slate-700">
-                            <SelectItem value="" className="text-white">بدون مجموعة</SelectItem>
-                            {groups.map((g) => (
-                              <SelectItem key={g.id} value={g.id} className="text-white">{g.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <Button onClick={handleSave} className="w-full bg-emerald-500 hover:bg-emerald-600" disabled={saving}>
-                        {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'حفظ'}
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-                
-                <Button variant="outline" size="sm" onClick={handleDelete} className="border-red-500/50 text-red-400 hover:bg-red-500/10">
-                  <Trash2 className="w-4 h-4 ml-1" />
-                  حذف
-                </Button>
+            {/* Points & Level */}
+            <div className="flex items-center gap-4">
+              <div className="text-center p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                <Star className="w-6 h-6 text-amber-400 mx-auto" />
+                <p className="text-2xl font-bold text-amber-400 mt-1">{points?.total_points || 0}</p>
+                <p className="text-xs text-slate-400">النقاط</p>
               </div>
-            )}
+              <div className="text-center p-4 rounded-xl bg-purple-500/10 border border-purple-500/30">
+                <Trophy className="w-6 h-6 text-purple-400 mx-auto" />
+                <p className="text-2xl font-bold text-purple-400 mt-1">{points?.level || 1}</p>
+                <p className="text-xs text-slate-400">المستوى</p>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Personal Info & Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Personal Info */}
         <Card className="glass-card border-white/10">
-          <CardContent className="p-4 text-center">
-            <Trophy className="w-8 h-8 mx-auto text-amber-400 mb-2" />
-            <p className="text-2xl font-bold text-white">{points?.total_points || 0}</p>
-            <p className="text-slate-400 text-sm">مجموع النقاط</p>
+          <CardHeader>
+            <CardTitle className="text-lg text-white flex items-center gap-2">
+              <User className="w-5 h-5 text-emerald-400" />
+              المعلومات الشخصية
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
+              <Calendar className="w-5 h-5 text-slate-400" />
+              <div>
+                <p className="text-xs text-slate-400">تاريخ الميلاد</p>
+                <p className="text-white">{formatDate(student.birth_date)} ({calculateAge(student.birth_date)})</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
+              <Mosque className="w-5 h-5 text-slate-400" />
+              <div>
+                <p className="text-xs text-slate-400">المسجد</p>
+                <p className="text-white">{student.mosque_name || '-'}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
+              <School className="w-5 h-5 text-slate-400" />
+              <div>
+                <p className="text-xs text-slate-400">المدرسة</p>
+                <p className="text-white">{student.school_name || '-'}</p>
+              </div>
+            </div>
+            {student.school_grade && (
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
+                <FileText className="w-5 h-5 text-slate-400" />
+                <div>
+                  <p className="text-xs text-slate-400">الصف / المعدل</p>
+                  <p className="text-white">{student.school_grade}</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
-        <Card className="glass-card border-white/10">
-          <CardContent className="p-4 text-center">
-            <Star className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
-            <p className="text-2xl font-bold text-white">{points?.level || 1}</p>
-            <p className="text-slate-400 text-sm">المستوى</p>
-          </CardContent>
-        </Card>
-        <Card className="glass-card border-white/10">
-          <CardContent className="p-4 text-center">
-            <CheckCircle className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
-            <p className="text-2xl font-bold text-white">{attendance_summary?.percentage || 0}%</p>
-            <p className="text-slate-400 text-sm">نسبة الحضور</p>
-          </CardContent>
-        </Card>
-        <Card className="glass-card border-white/10">
-          <CardContent className="p-4 text-center">
-            <BookOpen className="w-8 h-8 mx-auto text-blue-400 mb-2" />
-            <p className="text-2xl font-bold text-white">{recitation_summary?.total_new_pages || 0}</p>
-            <p className="text-slate-400 text-sm">صفحات الحفظ</p>
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Detailed Records */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Attendance Summary */}
         <Card className="glass-card border-white/10">
           <CardHeader>
-            <CardTitle className="text-lg font-bold text-white">ملخص الحضور</CardTitle>
+            <CardTitle className="text-lg text-white flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-blue-400" />
+              ملخص الحضور
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="text-center p-3 rounded-lg bg-emerald-500/10">
-                <CheckCircle className="w-6 h-6 mx-auto text-emerald-400 mb-1" />
-                <p className="text-xl font-bold text-white">{attendance_summary?.present || 0}</p>
-                <p className="text-slate-400 text-xs">حاضر</p>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-red-500/10">
-                <XCircle className="w-6 h-6 mx-auto text-red-400 mb-1" />
-                <p className="text-xl font-bold text-white">{attendance_summary?.absent || 0}</p>
-                <p className="text-slate-400 text-xs">غائب</p>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-amber-500/10">
-                <Clock className="w-6 h-6 mx-auto text-amber-400 mb-1" />
-                <p className="text-xl font-bold text-white">{attendance_summary?.excused || 0}</p>
-                <p className="text-slate-400 text-xs">معذور</p>
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-blue-500/20 border-4 border-blue-500/30">
+                <span className="text-3xl font-bold text-blue-400">
+                  {attendance_summary?.percentage || 0}%
+                </span>
               </div>
             </div>
-            
-            {/* Attendance Table */}
-            <div className="max-h-48 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-slate-900">
-                  <tr className="border-b border-white/10">
-                    <th className="text-right py-2 text-slate-400">التاريخ</th>
-                    <th className="text-right py-2 text-slate-400">الحالة</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {attendance_records?.slice(0, 20).map((a, i) => (
-                    <tr key={i} className="border-b border-white/5">
-                      <td className="py-2 text-white">{a.date}</td>
-                      <td className="py-2">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          a.status === 'present' ? 'bg-emerald-500/20 text-emerald-400' :
-                          a.status === 'absent' ? 'bg-red-500/20 text-red-400' :
-                          'bg-amber-500/20 text-amber-400'
-                        }`}>
-                          {a.status === 'present' ? 'حاضر' : a.status === 'absent' ? 'غائب' : 'معذور'}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="p-3 rounded-lg bg-emerald-500/10">
+                <CheckCircle className="w-5 h-5 text-emerald-400 mx-auto" />
+                <p className="text-xl font-bold text-emerald-400 mt-1">{attendance_summary?.present || 0}</p>
+                <p className="text-xs text-slate-400">حضور</p>
+              </div>
+              <div className="p-3 rounded-lg bg-red-500/10">
+                <XCircle className="w-5 h-5 text-red-400 mx-auto" />
+                <p className="text-xl font-bold text-red-400 mt-1">{attendance_summary?.absent || 0}</p>
+                <p className="text-xs text-slate-400">غياب</p>
+              </div>
+              <div className="p-3 rounded-lg bg-amber-500/10">
+                <Clock className="w-5 h-5 text-amber-400 mx-auto" />
+                <p className="text-xl font-bold text-amber-400 mt-1">{attendance_summary?.excused || 0}</p>
+                <p className="text-xs text-slate-400">عذر</p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -358,98 +212,158 @@ const StudentProfile = () => {
         {/* Recitation Summary */}
         <Card className="glass-card border-white/10">
           <CardHeader>
-            <CardTitle className="text-lg font-bold text-white">سجل التسميع</CardTitle>
+            <CardTitle className="text-lg text-white flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-purple-400" />
+              ملخص التسميع
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="text-center p-3 rounded-lg bg-emerald-500/10">
-                <FileText className="w-6 h-6 mx-auto text-emerald-400 mb-1" />
-                <p className="text-xl font-bold text-white">{recitation_summary?.total_new_pages || 0}</p>
-                <p className="text-slate-400 text-xs">حفظ جديد</p>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-blue-500/10">
-                <RotateCcw className="w-6 h-6 mx-auto text-blue-400 mb-1" />
-                <p className="text-xl font-bold text-white">{recitation_summary?.total_review_pages || 0}</p>
-                <p className="text-slate-400 text-xs">مراجعة صفحات</p>
-              </div>
-              <div className="text-center p-3 rounded-lg bg-purple-500/10">
-                <BookOpen className="w-6 h-6 mx-auto text-purple-400 mb-1" />
-                <p className="text-xl font-bold text-white">{recitation_summary?.total_review_juz || 0}</p>
-                <p className="text-slate-400 text-xs">أجزاء مراجعة</p>
-              </div>
+          <CardContent className="space-y-4">
+            <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+              <p className="text-sm text-slate-400">الحفظ الجديد</p>
+              <p className="text-2xl font-bold text-emerald-400">{recitation_summary?.total_new_pages || 0} صفحة</p>
             </div>
-            
-            {/* Recitation Table */}
-            <div className="max-h-48 overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-slate-900">
-                  <tr className="border-b border-white/10">
-                    <th className="text-right py-2 text-slate-400">التاريخ</th>
-                    <th className="text-right py-2 text-slate-400">النوع</th>
-                    <th className="text-right py-2 text-slate-400">النقاط</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recitation_records?.slice(0, 20).map((r, i) => (
-                    <tr key={i} className="border-b border-white/5">
-                      <td className="py-2 text-white text-xs">
-                        {r.created_at ? format(new Date(r.created_at), 'MM/dd', { locale: ar }) : '-'}
-                      </td>
-                      <td className="py-2">
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          r.recitation_type === 'new_memorization' 
-                            ? 'bg-emerald-500/20 text-emerald-400' 
-                            : 'bg-blue-500/20 text-blue-400'
-                        }`}>
-                          {r.recitation_type === 'new_memorization' ? 
-                            `حفظ ${r.pages_count}ص` : 
-                            r.review_type === 'pages' ? `مراجعة ${r.review_pages}ص` : `مراجعة ${r.review_juz?.length}ج`
-                          }
-                        </span>
-                      </td>
-                      <td className="py-2 text-amber-400 font-bold">+{r.points_earned}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="p-4 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <p className="text-sm text-slate-400">المراجعة</p>
+              <p className="text-2xl font-bold text-blue-400">
+                {recitation_summary?.total_review_pages || 0} صفحة / {recitation_summary?.total_review_juz || 0} جزء
+              </p>
+            </div>
+            <div className="text-center pt-2">
+              <p className="text-slate-400 text-sm">إجمالي التسميعات</p>
+              <p className="text-xl font-bold text-white">{recitation_summary?.total_recitations || 0}</p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Tracking Sheets */}
-      <Card className="glass-card border-white/10">
-        <CardHeader>
-          <CardTitle className="text-lg font-bold text-white">ورق المتابعة</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {tracking_sheets?.length === 0 ? (
-            <p className="text-slate-400 text-center py-4">لا توجد ورق متابعة</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/10">
-                    <th className="text-right py-2 text-slate-400">الأسبوع</th>
-                    <th className="text-right py-2 text-slate-400">الصلوات</th>
-                    <th className="text-right py-2 text-slate-400">وقت القرآن</th>
-                    <th className="text-right py-2 text-slate-400">تسميع الأهل</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tracking_sheets?.map((t, i) => (
-                    <tr key={i} className="border-b border-white/5">
-                      <td className="py-2 text-white">{t.week_start}</td>
-                      <td className="py-2 text-emerald-400">{t.data?.prayers_count || 0}</td>
-                      <td className="py-2 text-blue-400">{t.data?.quran_sitting_minutes || 0} د</td>
-                      <td className="py-2 text-purple-400">{t.data?.family_recitation_count || 0}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {/* Warnings Section */}
+      {warnings && warnings.length > 0 && (
+        <Card className="glass-card border-red-500/30">
+          <CardHeader>
+            <CardTitle className="text-lg text-red-400 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              الإنذارات ({warnings.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {warnings.map((warning) => (
+                <div key={warning.id} className="p-4 rounded-lg bg-red-500/10 border border-red-500/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge className={`${
+                      warning.type === 'absence' ? 'bg-red-500/20 text-red-400' :
+                      warning.type === 'no_recitation' ? 'bg-amber-500/20 text-amber-400' :
+                      'bg-purple-500/20 text-purple-400'
+                    }`}>
+                      {warning.type === 'absence' ? 'غياب متكرر' :
+                       warning.type === 'no_recitation' ? 'عدم التسميع' :
+                       'سلوك سلبي'}
+                    </Badge>
+                    <span className="text-xs text-slate-400">{formatDate(warning.created_at)}</span>
+                  </div>
+                  <p className="text-white">{warning.message}</p>
+                </div>
+              ))}
             </div>
-          )}
-        </CardContent>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Badges */}
+      {points?.badge_details && points.badge_details.length > 0 && (
+        <Card className="glass-card border-white/10">
+          <CardHeader>
+            <CardTitle className="text-lg text-white">الشارات المكتسبة</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-3">
+              {points.badge_details.map((badge) => (
+                <div key={badge.id} className="p-3 rounded-xl bg-slate-800/50 border border-white/10 text-center min-w-[100px]">
+                  <span className="text-3xl">{badge.icon}</span>
+                  <p className="text-white text-sm mt-2">{badge.name}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Detailed Records Tabs */}
+      <Card className="glass-card border-white/10">
+        <Tabs defaultValue="recitations" className="w-full">
+          <TabsList className="w-full bg-slate-800/50 p-1 rounded-xl">
+            <TabsTrigger value="recitations" className="flex-1 data-[state=active]:bg-emerald-500">
+              التسميعات
+            </TabsTrigger>
+            <TabsTrigger value="attendance" className="flex-1 data-[state=active]:bg-emerald-500">
+              سجل الحضور
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="recitations" className="p-4">
+            {recitation_records && recitation_records.length > 0 ? (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {recitation_records.map((rec) => (
+                  <div key={rec.id} className="p-4 rounded-lg bg-slate-800/50 border border-white/5">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge className={rec.recitation_type === 'new_memorization' 
+                        ? 'bg-emerald-500/20 text-emerald-400' 
+                        : 'bg-blue-500/20 text-blue-400'}>
+                        {rec.recitation_type === 'new_memorization' ? 'حفظ جديد' : 'مراجعة'}
+                      </Badge>
+                      <span className="text-xs text-slate-400">{formatDate(rec.created_at)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-slate-300 text-sm">
+                        {rec.recitation_type === 'new_memorization' 
+                          ? `${rec.pages_count} صفحة` 
+                          : rec.review_type === 'pages' 
+                            ? `${rec.review_pages} صفحة مراجعة`
+                            : `أجزاء: ${rec.review_juz?.join(', ')}`
+                        }
+                        {(rec.passed_minimum || rec.passed_review_minimum) && (
+                          <CheckCircle className="w-4 h-4 text-emerald-400 inline-block mr-2" />
+                        )}
+                      </div>
+                      <span className="text-amber-400 font-bold">+{rec.points_earned}</span>
+                    </div>
+                    {rec.notes && (
+                      <p className="text-slate-400 text-xs mt-2">{rec.notes}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-slate-400">
+                لا توجد تسميعات مسجلة
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="attendance" className="p-4">
+            {attendance_records && attendance_records.length > 0 ? (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {attendance_records.map((att) => (
+                  <div key={att.id} className="p-3 rounded-lg bg-slate-800/50 border border-white/5 flex items-center justify-between">
+                    <span className="text-slate-300">{att.date}</span>
+                    <Badge className={`${
+                      att.status === 'present' ? 'bg-emerald-500/20 text-emerald-400' :
+                      att.status === 'absent' ? 'bg-red-500/20 text-red-400' :
+                      'bg-amber-500/20 text-amber-400'
+                    }`}>
+                      {att.status === 'present' ? 'حاضر' :
+                       att.status === 'absent' ? 'غائب' : 'عذر'}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-slate-400">
+                لا توجد سجلات حضور
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </Card>
     </div>
   );
