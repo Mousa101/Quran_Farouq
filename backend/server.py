@@ -1007,6 +1007,92 @@ async def admin_create_student(data: UserCreateWithCode, current_user: dict = De
     
     return {"message": "تم إضافة الطالب بنجاح", "student_id": user.id}
 
+# ============== WARNING SYSTEM ==============
+
+class WarningCreate(BaseModel):
+    student_id: str
+    type: str  # absence, no_recitation, behavior
+    message: str
+
+@api_router.post("/admin/warnings")
+async def issue_warning(data: WarningCreate, current_user: dict = Depends(get_current_user)):
+    """Issue a warning to a student (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إصدار الإنذارات")
+    
+    # Check if student exists
+    student = await db.users.find_one({"id": data.student_id, "role": "student"})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    warning_type_names = {
+        "absence": "غياب متكرر",
+        "no_recitation": "عدم التسميع",
+        "behavior": "سلوك سلبي"
+    }
+    
+    warning = {
+        "id": str(uuid.uuid4()),
+        "student_id": data.student_id,
+        "admin_id": current_user["user_id"],
+        "type": data.type,
+        "message": data.message,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.warnings.insert_one(warning)
+    
+    # Send notification to student
+    await create_notification_internal(
+        data.student_id,
+        f"⚠️ إنذار: {warning_type_names.get(data.type, 'إنذار')}",
+        data.message,
+        "warning"
+    )
+    
+    return {"message": "تم إصدار الإنذار بنجاح", "warning_id": warning["id"]}
+
+@api_router.get("/admin/warnings")
+async def get_all_warnings(
+    student_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all warnings (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    query = {}
+    if student_id:
+        query["student_id"] = student_id
+    
+    warnings = await db.warnings.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return warnings
+
+@api_router.get("/students/{student_id}/warnings")
+async def get_student_warnings(student_id: str, current_user: dict = Depends(get_current_user)):
+    """Get warnings for a specific student"""
+    # Verify access
+    if current_user["role"] == "student" and current_user["user_id"] != student_id:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    warnings = await db.warnings.find(
+        {"student_id": student_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(50)
+    return warnings
+
+@api_router.delete("/admin/warnings/{warning_id}")
+async def delete_warning(warning_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a warning (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف الإنذارات")
+    
+    result = await db.warnings.delete_one({"id": warning_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="الإنذار غير موجود")
+    
+    return {"message": "تم حذف الإنذار بنجاح"}
+
 @api_router.get("/")
 async def root():
     return {"message": "مرحباً بكم في مركز الفاروق القرآني"}
