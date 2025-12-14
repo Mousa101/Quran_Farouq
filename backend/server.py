@@ -819,6 +819,189 @@ async def get_users(role: Optional[str] = None, current_user: dict = Depends(get
     users = await db.users.find(query, {"_id": 0, "password_hash": 0}).to_list(1000)
     return users
 
+# ============== STUDENT PROFILE & MANAGEMENT ==============
+
+@api_router.get("/students/{student_id}/profile")
+async def get_student_profile(student_id: str, current_user: dict = Depends(get_current_user)):
+    """Get complete student profile with all records"""
+    # Verify access
+    if current_user["role"] == "student" and current_user["user_id"] != student_id:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    # Get student info
+    student = await db.users.find_one({"id": student_id, "role": "student"}, {"_id": 0, "password_hash": 0})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    # Get group info
+    group = None
+    if student.get("group_id"):
+        group = await db.groups.find_one({"id": student["group_id"]}, {"_id": 0})
+    
+    # Get points
+    points_data = await db.student_points.find_one({"student_id": student_id}, {"_id": 0})
+    if not points_data:
+        points_data = {"total_points": 0, "level": 1, "badges": []}
+    
+    # Get attendance records (last 30 days)
+    attendance = await db.attendance.find(
+        {"student_id": student_id},
+        {"_id": 0}
+    ).sort("date", -1).to_list(100)
+    
+    # Get recitation records
+    recitations = await db.recitations.find(
+        {"student_id": student_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    # Get tracking sheets
+    tracking_sheets = await db.tracking_sheets.find(
+        {"student_id": student_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    # Calculate attendance summary
+    present_count = sum(1 for a in attendance if a["status"] == "present")
+    absent_count = sum(1 for a in attendance if a["status"] == "absent")
+    excused_count = sum(1 for a in attendance if a["status"] == "excused")
+    
+    # Calculate recitation summary
+    total_new_pages = sum(r.get("pages_count", 0) or 0 for r in recitations if r.get("recitation_type") == "new_memorization")
+    total_review_pages = sum(r.get("review_pages", 0) or 0 for r in recitations if r.get("review_type") == "pages")
+    total_review_juz = sum(len(r.get("review_juz", []) or []) for r in recitations if r.get("review_type") == "juz")
+    
+    return {
+        "student": student,
+        "group": group,
+        "points": points_data,
+        "attendance_summary": {
+            "present": present_count,
+            "absent": absent_count,
+            "excused": excused_count,
+            "total": len(attendance),
+            "percentage": round(present_count / max(len(attendance), 1) * 100, 2)
+        },
+        "recitation_summary": {
+            "total_new_pages": total_new_pages,
+            "total_review_pages": total_review_pages,
+            "total_review_juz": total_review_juz,
+            "total_recitations": len(recitations)
+        },
+        "attendance_records": attendance,
+        "recitation_records": recitations,
+        "tracking_sheets": tracking_sheets
+    }
+
+@api_router.put("/students/{student_id}")
+async def update_student(student_id: str, data: StudentProfileUpdate, current_user: dict = Depends(get_current_user)):
+    """Update student profile (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تعديل بيانات الطالب")
+    
+    # Check if student exists
+    student = await db.users.find_one({"id": student_id, "role": "student"})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    # Build update dict
+    update_data = {}
+    if data.name is not None:
+        update_data["name"] = data.name
+    if data.mosque_name is not None:
+        update_data["mosque_name"] = data.mosque_name
+    if data.school_name is not None:
+        update_data["school_name"] = data.school_name
+    if data.school_grade is not None:
+        update_data["school_grade"] = data.school_grade
+    if data.birth_date is not None:
+        update_data["birth_date"] = data.birth_date
+    if data.profile_image is not None:
+        update_data["profile_image"] = data.profile_image
+    if data.group_id is not None:
+        update_data["group_id"] = data.group_id
+    
+    if update_data:
+        await db.users.update_one({"id": student_id}, {"$set": update_data})
+    
+    return {"message": "تم تحديث بيانات الطالب بنجاح"}
+
+@api_router.delete("/students/{student_id}")
+async def delete_student(student_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete student (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف الطالب")
+    
+    # Check if student exists
+    student = await db.users.find_one({"id": student_id, "role": "student"})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    # Delete student and all related data
+    await db.users.delete_one({"id": student_id})
+    await db.attendance.delete_many({"student_id": student_id})
+    await db.recitations.delete_many({"student_id": student_id})
+    await db.tracking_sheets.delete_many({"student_id": student_id})
+    await db.student_points.delete_many({"student_id": student_id})
+    await db.points_transactions.delete_many({"student_id": student_id})
+    await db.notifications.delete_many({"user_id": student_id})
+    
+    return {"message": "تم حذف الطالب وجميع بياناته بنجاح"}
+
+@api_router.post("/students/{student_id}/change-group")
+async def change_student_group(student_id: str, group_id: str, current_user: dict = Depends(get_current_user)):
+    """Change student's group (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه نقل الطالب")
+    
+    # Check if student exists
+    student = await db.users.find_one({"id": student_id, "role": "student"})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    # Check if group exists (if not empty)
+    if group_id:
+        group = await db.groups.find_one({"id": group_id})
+        if not group:
+            raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
+    
+    # Update student's group
+    new_group_id = group_id if group_id else None
+    await db.users.update_one({"id": student_id}, {"$set": {"group_id": new_group_id}})
+    
+    return {"message": "تم نقل الطالب بنجاح"}
+
+@api_router.post("/admin/students")
+async def admin_create_student(data: UserCreateWithCode, current_user: dict = Depends(get_current_user)):
+    """Create a new student (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إضافة طالب")
+    
+    # Check if email exists
+    existing = await db.users.find_one({"email": data.email})
+    if existing:
+        raise HTTPException(status_code=400, detail="البريد الإلكتروني مسجل مسبقاً")
+    
+    # Create student
+    user = User(
+        email=data.email,
+        name=data.name,
+        role="student",
+        mosque_name=data.mosque_name,
+        school_name=data.school_name,
+        school_grade=data.school_grade,
+        birth_date=data.birth_date,
+        profile_image=data.profile_image
+    )
+    
+    user_dict = user.model_dump()
+    user_dict["password_hash"] = get_password_hash(data.password)
+    user_dict["created_at"] = user_dict["created_at"].isoformat()
+    
+    await db.users.insert_one(user_dict)
+    
+    return {"message": "تم إضافة الطالب بنجاح", "student_id": user.id}
+
 @api_router.get("/")
 async def root():
     return {"message": "مرحباً بكم في مركز الفاروق القرآني"}
