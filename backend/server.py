@@ -18,7 +18,8 @@ from models import (
     AttendanceCreate, Attendance,
     ActivityCreate, Activity,
     NotificationCreate, Notification,
-    StudentScore, WeeklyRanking
+    StudentScore, WeeklyRanking,
+    StudentProfileUpdate, StudentCreate, QURAN_JUZ
 )
 
 class BaseModel(PydanticBaseModel):
