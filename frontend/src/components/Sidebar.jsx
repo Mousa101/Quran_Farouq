@@ -35,6 +35,7 @@ const Sidebar = () => {
     if (user?.role === 'admin') {
       return [
         ...baseItems,
+        { to: '/student-management', icon: GraduationCap, label: 'إدارة الطلاب' },
         { to: '/rankings', icon: Trophy, label: 'الحوافز' },
         { to: '/activities', icon: Calendar, label: 'الأنشطة' },
         { to: '/users', icon: Users, label: 'المستخدمين' },
