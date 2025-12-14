@@ -118,6 +118,12 @@ class UserCreateWithCode(BaseModel):
     password: str
     role: str
     registration_code: Optional[str] = None
+    # New student fields
+    mosque_name: Optional[str] = None
+    school_name: Optional[str] = None
+    school_grade: Optional[str] = None
+    birth_date: Optional[str] = None
+    profile_image: Optional[str] = None
 
 @api_router.post("/auth/register")
 async def register(user_data: UserCreateWithCode):
@@ -146,11 +152,16 @@ async def register(user_data: UserCreateWithCode):
             if not code_doc:
                 raise HTTPException(status_code=400, detail="كود التسجيل غير صحيح أو مستخدم")
     
-    # Create user
+    # Create user with all fields
     user = User(
         email=user_data.email,
         name=user_data.name,
-        role=user_data.role
+        role=user_data.role,
+        mosque_name=user_data.mosque_name,
+        school_name=user_data.school_name,
+        school_grade=user_data.school_grade,
+        birth_date=user_data.birth_date,
+        profile_image=user_data.profile_image
     )
     
     user_dict = user.model_dump()
