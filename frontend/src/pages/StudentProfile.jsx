@@ -148,7 +148,7 @@ const StudentProfile = () => {
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
-              <Mosque className="w-5 h-5 text-slate-400" />
+              <Home className="w-5 h-5 text-slate-400" />
               <div>
                 <p className="text-xs text-slate-400">المسجد</p>
                 <p className="text-white">{student.mosque_name || '-'}</p>
