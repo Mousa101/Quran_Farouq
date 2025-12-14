@@ -48,6 +48,7 @@ const Sidebar = () => {
     if (user?.role === 'sheikh') {
       return [
         ...baseItems,
+        { to: '/groups', icon: UsersRound, label: 'مجموعاتي' },
         { to: '/tracking', icon: FileText, label: 'ورق المتابعة' },
         { to: '/recitations', icon: BookOpen, label: 'التسميع' },
         { to: '/attendance', icon: UserCheck, label: 'الحضور' },
