@@ -129,7 +129,14 @@ const UsersPage = () => {
                     </span>
                   </div>
                   <div>
-                    <h3 className="text-white font-medium">{user.name}</h3>
+                    {user.role === 'student' && (currentUser?.role === 'admin' || currentUser?.role === 'sheikh') ? (
+                      <Link to={`/student/${user.id}`} className="text-white font-medium hover:text-emerald-400 transition-colors flex items-center gap-2">
+                        {user.name}
+                        <Eye className="w-4 h-4 opacity-50" />
+                      </Link>
+                    ) : (
+                      <h3 className="text-white font-medium">{user.name}</h3>
+                    )}
                     <p className="text-slate-400 text-sm">{user.email}</p>
                   </div>
                 </div>
