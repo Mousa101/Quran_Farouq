@@ -417,6 +417,150 @@ async def get_all_sheikhs(current_user: dict = Depends(get_current_user)):
     ).to_list(100)
     return sheikhs
 
+# ============== INITIAL ASSESSMENT ROUTES ==============
+
+@api_router.post("/students/{student_id}/initial-assessment")
+async def submit_initial_assessment(student_id: str, data: InitialAssessment, current_user: dict = Depends(get_current_user)):
+    """Submit initial assessment for a new student (Sheikh only)"""
+    if current_user["role"] != "sheikh":
+        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تقييم الطالب")
+    
+    # Get student
+    student = await db.users.find_one({"id": student_id, "role": "student"})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    # Check if student is in sheikh's group
+    group = await db.groups.find_one({"sheikh_id": current_user["user_id"]})
+    if not group or student.get("group_id") != group["id"]:
+        raise HTTPException(status_code=403, detail="الطالب ليس في مجموعتك")
+    
+    # Validate tajweed level
+    valid_levels = ["تمهيدية", "متوسطة", "متقدمة"]
+    if data.tajweed_level not in valid_levels:
+        raise HTTPException(status_code=400, detail="مستوى التجويد غير صحيح")
+    
+    # Update student with initial assessment
+    update_data = {
+        "previous_memorization_juz": data.previous_memorization_juz,
+        "previous_memorization_pages": data.previous_memorization_pages,
+        "tajweed_level": data.tajweed_level,
+        "initial_assessment_done": True
+    }
+    
+    await db.users.update_one({"id": student_id}, {"$set": update_data})
+    
+    # Calculate total pages from previous memorization
+    # Each juz has 20 pages
+    total_previous_pages = len(data.previous_memorization_juz) * 20 + data.previous_memorization_pages
+    
+    # Create a notification for the student
+    await create_notification_internal(
+        student_id,
+        "تم تقييمك الأولي",
+        f"تم تسجيل حفظك السابق: {len(data.previous_memorization_juz)} جزء و {data.previous_memorization_pages} صفحة. مستوى التجويد: {data.tajweed_level}",
+        "success"
+    )
+    
+    # Also notify admin
+    admins = await db.users.find({"role": "admin"}, {"_id": 0, "id": 1}).to_list(10)
+    for admin in admins:
+        await create_notification_internal(
+            admin["id"],
+            f"تقييم أولي للطالب {student['name']}",
+            f"الحفظ السابق: {len(data.previous_memorization_juz)} جزء و {data.previous_memorization_pages} صفحة. التجويد: {data.tajweed_level}",
+            "info"
+        )
+    
+    return {
+        "message": "تم تسجيل التقييم الأولي بنجاح",
+        "total_previous_pages": total_previous_pages
+    }
+
+@api_router.get("/students/{student_id}/progress")
+async def get_student_progress(student_id: str, current_user: dict = Depends(get_current_user)):
+    """Get student's total memorization progress (old + new)"""
+    # Verify access
+    if current_user["role"] == "student" and current_user["user_id"] != student_id:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    # Get student
+    student = await db.users.find_one({"id": student_id, "role": "student"}, {"_id": 0, "password_hash": 0})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    # Previous memorization (from initial assessment)
+    previous_juz = student.get("previous_memorization_juz") or []
+    previous_pages = student.get("previous_memorization_pages") or 0
+    previous_total_pages = len(previous_juz) * 20 + previous_pages
+    
+    # New memorization (from recitations)
+    recitations = await db.recitations.find(
+        {"student_id": student_id, "recitation_type": "new_memorization"},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    new_total_pages = 0
+    for rec in recitations:
+        if rec.get("page_from") and rec.get("page_to"):
+            new_total_pages += rec["page_to"] - rec["page_from"] + 1
+        elif rec.get("pages_count"):
+            new_total_pages += rec["pages_count"]
+    
+    # Calculate total progress
+    total_pages = previous_total_pages + new_total_pages
+    total_juz = total_pages // 20
+    remaining_pages = total_pages % 20
+    
+    # Calculate percentage of Quran (604 pages total)
+    progress_percentage = round((total_pages / 604) * 100, 1)
+    
+    return {
+        "student_name": student.get("name"),
+        "tajweed_level": student.get("tajweed_level"),
+        "initial_assessment_done": student.get("initial_assessment_done", False),
+        "previous_memorization": {
+            "juz": previous_juz,
+            "juz_count": len(previous_juz),
+            "additional_pages": previous_pages,
+            "total_pages": previous_total_pages
+        },
+        "new_memorization": {
+            "total_pages": new_total_pages,
+            "recitation_count": len(recitations)
+        },
+        "total_progress": {
+            "total_pages": total_pages,
+            "total_juz": total_juz,
+            "remaining_pages": remaining_pages,
+            "percentage": progress_percentage,
+            "description": f"{total_juz} جزء و {remaining_pages} صفحة ({progress_percentage}% من القرآن)"
+        }
+    }
+
+@api_router.get("/students/pending-assessment")
+async def get_students_pending_assessment(current_user: dict = Depends(get_current_user)):
+    """Get students in sheikh's group who haven't been assessed yet"""
+    if current_user["role"] != "sheikh":
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    # Get sheikh's group
+    group = await db.groups.find_one({"sheikh_id": current_user["user_id"]})
+    if not group:
+        return []
+    
+    # Get students without initial assessment
+    students = await db.users.find(
+        {
+            "group_id": group["id"],
+            "role": "student",
+            "initial_assessment_done": {"$ne": True}
+        },
+        {"_id": 0, "password_hash": 0}
+    ).to_list(100)
+    
+    return students
+
 # ============== TRACKING SHEET ROUTES ==============
 
 @api_router.post("/tracking-sheets")
