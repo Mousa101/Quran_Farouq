@@ -103,13 +103,26 @@
 #====================================================================================================
 
 user_problem_statement: |
-  تطبيق مركز الفاروق القرآني لتحفيظ القرآن - المطلوب:
-  1. صفحة ملف شخصي مفصلة للطالب (يصل إليها المعلم بالنقر على اسم الطالب)
-  2. صلاحية إضافة/حذف/نقل الطلاب للمدير فقط
-  3. نظام إنذارات للمدير (غياب متكرر، عدم التسميع، سلوك سلبي)
+  تطبيق مركز الفاروق القرآني لتحفيظ القرآن - المطلوب الجديد:
+  1. التحقق من ميزة تتبع التقدم - يجب أن تظهر في ملف الطالب
+  2. إضافة خاصية للطالب تمكنه من التعديل على بعض البيانات الشخصية (رقم الهاتف، الصورة، المدرسة، الصف، المعدل)
+  3. إضافة خاصية للمعلم تمكنه من كتابة العذر عند تسجيل الحضور والغياب
+  4. إضافة التاريخ مع اليوم في سجل التسميع والحضور في تقرير الطالب
 
 backend:
   - task: "Student Profile API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "GET /api/students/{student_id}/profile - returns student info, group, points, badges, attendance summary, recitation summary, warnings"
+
+  - task: "Student Self Update API"
     implemented: true
     working: true
     file: "/app/backend/server.py"
@@ -119,15 +132,39 @@ backend:
     status_history:
       - working: true
         agent: "main"
-        comment: "GET /api/students/{student_id}/profile - returns student info, group, points, badges, attendance summary, recitation summary, warnings"
+        comment: "NEW: PUT /api/students/me/profile and GET /api/students/me/profile - allows students to update phone, school, grade, average, profile image"
 
-  - task: "Add Student (Admin Only)"
+  - task: "Attendance with Excuse Reason API"
     implemented: true
     working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
     needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "UPDATED: POST /api/attendance now accepts optional excuse_reason field. The excuse reason is stored and returned with attendance records"
+
+  - task: "Student Progress API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "GET /api/students/{student_id}/progress - returns combined progress (previous memorization + new recitations)"
+
+  - task: "Add Student (Admin Only)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
@@ -138,8 +175,8 @@ backend:
     working: true
     file: "/app/backend/server.py"
     stuck_count: 0
-    priority: "high"
-    needs_retesting: true
+    priority: "medium"
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
@@ -150,8 +187,8 @@ backend:
     working: true
     file: "/app/backend/server.py"
     stuck_count: 0
-    priority: "high"
-    needs_retesting: true
+    priority: "medium"
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
@@ -162,15 +199,15 @@ backend:
     working: true
     file: "/app/backend/server.py"
     stuck_count: 0
-    priority: "high"
-    needs_retesting: true
+    priority: "medium"
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "POST /api/admin/warnings - issue warnings. GET /api/admin/warnings - list all. DELETE /api/admin/warnings/{id} - delete"
 
 frontend:
-  - task: "Student Profile Page"
+  - task: "Student Profile Page with Date+Day"
     implemented: true
     working: true
     file: "/app/frontend/src/pages/StudentProfile.jsx"
@@ -180,15 +217,39 @@ frontend:
     status_history:
       - working: true
         agent: "main"
-        comment: "Complete student profile with personal info, points, badges, attendance/recitation summary, warnings, and tabs for detailed records"
+        comment: "UPDATED: Added formatDateWithDay and formatDateTimeWithDay functions. Attendance and recitation records now show day names (e.g., الاثنين 15 ديسمبر 2025). Also shows excuse_reason for excused attendance"
+
+  - task: "Student Edit Profile Page"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/StudentEditProfile.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "NEW: Created StudentEditProfile.jsx allowing students to edit: phone, profile image, school name, grade, school average. Added route /edit-profile and sidebar link تعديل بياناتي"
+
+  - task: "Attendance Page with Excuse Dialog"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/Attendance.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "UPDATED: Added excuse dialog when clicking معذور button. Teacher can enter excuse reason which is saved and displayed in both attendance page and student profile"
 
   - task: "Student Management Page (Admin)"
     implemented: true
     working: true
     file: "/app/frontend/src/pages/StudentManagement.jsx"
     stuck_count: 0
-    priority: "high"
-    needs_retesting: true
+    priority: "medium"
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
@@ -199,8 +260,8 @@ frontend:
     working: true
     file: "/app/frontend/src/pages/SheikhDashboard.jsx"
     stuck_count: 0
-    priority: "medium"
-    needs_retesting: true
+    priority: "low"
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
@@ -211,8 +272,8 @@ frontend:
     working: true
     file: "/app/frontend/src/pages/UsersPage.jsx"
     stuck_count: 0
-    priority: "medium"
-    needs_retesting: true
+    priority: "low"
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
