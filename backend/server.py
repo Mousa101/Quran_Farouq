@@ -499,45 +499,114 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     description = ""
     
     if recitation_data.recitation_type == "new_memorization":
-        # حفظ جديد
-        if recitation_data.passed_minimum:
-            points = (recitation_data.pages_count or 1) * 15  # 15 نقطة لكل صفحة عند اجتياز الحد الأدنى
-            description = f"حفظ جديد: {recitation_data.pages_count} صفحة - اجتاز الحد الأدنى ✓"
-        else:
-            points = (recitation_data.pages_count or 1) * 5  # 5 نقاط لكل صفحة بدون اجتياز
-            description = f"حفظ جديد: {recitation_data.pages_count} صفحة"
+        # حفظ جديد - النظام الجديد مع المدى والتقييم
+        pages_count = 1
+        if recitation_data.page_from and recitation_data.page_to:
+            pages_count = recitation_data.page_to - recitation_data.page_from + 1
+        elif recitation_data.pages_count:
+            pages_count = recitation_data.pages_count
+        
+        # Base points for memorization
+        base_points = pages_count * 5
+        
+        # Bonus for rating (if rating >= 7, bonus points)
+        rating_bonus = 0
+        if recitation_data.rating:
+            if recitation_data.rating >= 9:
+                rating_bonus = pages_count * 10  # Excellent
+            elif recitation_data.rating >= 7:
+                rating_bonus = pages_count * 5  # Good
+            elif recitation_data.rating >= 5:
+                rating_bonus = pages_count * 2  # Average
+        
+        # Penalty for errors (reduce points)
+        error_penalty = 0
+        if recitation_data.error_count:
+            error_penalty = min(recitation_data.error_count * 2, base_points // 2)  # Max 50% penalty
+        
+        # Bonus for passing minimum
+        pass_bonus = pages_count * 5 if recitation_data.passed_minimum else 0
+        
+        points = base_points + rating_bonus + pass_bonus - error_penalty
+        points = max(points, 1)  # Minimum 1 point
+        
+        # Build description
+        juz_text = f"الجزء {recitation_data.juz_number}" if recitation_data.juz_number else ""
+        page_range = f"من صفحة {recitation_data.page_from} إلى {recitation_data.page_to}" if recitation_data.page_from and recitation_data.page_to else f"{pages_count} صفحة"
+        rating_text = f"- التقييم: {recitation_data.rating}/10" if recitation_data.rating else ""
+        error_text = f"- الأخطاء: {recitation_data.error_count}" if recitation_data.error_count else ""
+        pass_text = "✓ اجتاز" if recitation_data.passed_minimum else ""
+        
+        description = f"حفظ جديد: {juz_text} {page_range} {rating_text} {error_text} {pass_text}".strip()
     else:
-        # مراجعة
-        if recitation_data.review_type == "pages":
+        # مراجعة - النظام الجديد (أجزاء كاملة + صفحات جزئية)
+        juz_points = 0
+        partial_points = 0
+        
+        # Points for complete juz review
+        if recitation_data.review_juz:
+            juz_count = len(recitation_data.review_juz)
             if recitation_data.passed_review_minimum:
-                points = (recitation_data.review_pages or 1) * 10  # 10 نقاط لكل صفحة مراجعة
-                description = f"مراجعة: {recitation_data.review_pages} صفحة - اجتاز الحد الأدنى ✓"
+                juz_points = juz_count * 50  # 50 نقطة لكل جزء
             else:
-                points = (recitation_data.review_pages or 1) * 3
-                description = f"مراجعة: {recitation_data.review_pages} صفحة"
-        else:  # juz
-            juz_count = len(recitation_data.review_juz or [])
+                juz_points = juz_count * 15
+        
+        # Points for partial juz (pages)
+        if recitation_data.partial_review_pages and recitation_data.partial_review_pages > 0:
             if recitation_data.passed_review_minimum:
-                points = juz_count * 50  # 50 نقطة لكل جزء مراجعة
-                juz_names = [f"الجزء {j}" for j in (recitation_data.review_juz or [])]
-                description = f"مراجعة أجزاء: {', '.join(juz_names)} - اجتاز الحد الأدنى ✓"
+                partial_points = recitation_data.partial_review_pages * 10
             else:
-                points = juz_count * 15
-                juz_names = [f"الجزء {j}" for j in (recitation_data.review_juz or [])]
-                description = f"مراجعة أجزاء: {', '.join(juz_names)}"
+                partial_points = recitation_data.partial_review_pages * 3
+        
+        # Legacy support
+        if not recitation_data.review_juz and recitation_data.review_type == "pages":
+            if recitation_data.passed_review_minimum:
+                partial_points = (recitation_data.review_pages or 1) * 10
+            else:
+                partial_points = (recitation_data.review_pages or 1) * 3
+        
+        points = juz_points + partial_points
+        
+        # Build description
+        desc_parts = []
+        if recitation_data.review_juz and len(recitation_data.review_juz) > 0:
+            juz_list = ", ".join([str(j) for j in sorted(recitation_data.review_juz)])
+            desc_parts.append(f"مراجعة الأجزاء {juz_list}")
+        
+        if recitation_data.partial_review_pages and recitation_data.partial_review_pages > 0:
+            partial_juz = recitation_data.partial_review_juz or ""
+            if partial_juz:
+                desc_parts.append(f"و {recitation_data.partial_review_pages} صفحات من جزء {partial_juz}")
+            else:
+                desc_parts.append(f"و {recitation_data.partial_review_pages} صفحات")
+        
+        if recitation_data.passed_review_minimum:
+            desc_parts.append("✓ اجتاز")
+        
+        description = " ".join(desc_parts) if desc_parts else "مراجعة"
     
     recitation = Recitation(
         student_id=recitation_data.student_id,
         sheikh_id=current_user["user_id"],
         recitation_type=recitation_data.recitation_type,
-        pages_count=recitation_data.pages_count,
+        # New fields
+        juz_number=recitation_data.juz_number,
+        page_from=recitation_data.page_from,
+        page_to=recitation_data.page_to,
+        rating=recitation_data.rating,
+        error_count=recitation_data.error_count,
+        partial_review_juz=recitation_data.partial_review_juz,
+        partial_review_pages=recitation_data.partial_review_pages,
+        # Existing fields
         passed_minimum=recitation_data.passed_minimum,
-        review_type=recitation_data.review_type,
-        review_pages=recitation_data.review_pages,
         review_juz=recitation_data.review_juz,
         passed_review_minimum=recitation_data.passed_review_minimum,
         notes=recitation_data.notes,
-        points_earned=points
+        points_earned=points,
+        # Legacy
+        pages_count=recitation_data.pages_count,
+        review_type=recitation_data.review_type,
+        review_pages=recitation_data.review_pages
     )
     
     recitation_dict = recitation.model_dump()
