@@ -640,8 +640,23 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
 
 class RecitationUpdate(BaseModel):
     recitation_type: Optional[str] = None
-    pages_count: Optional[int] = None
+    # New memorization fields
+    juz_number: Optional[int] = None
+    page_from: Optional[int] = None
+    page_to: Optional[int] = None
+    rating: Optional[int] = None
+    error_count: Optional[int] = None
     passed_minimum: Optional[bool] = None
+    # Review fields
+    review_juz: Optional[List[int]] = None
+    partial_review_juz: Optional[int] = None
+    partial_review_pages: Optional[int] = None
+    passed_review_minimum: Optional[bool] = None
+    notes: Optional[str] = None
+    # Legacy
+    pages_count: Optional[int] = None
+    review_type: Optional[str] = None
+    review_pages: Optional[int] = None
     review_type: Optional[str] = None
     review_pages: Optional[int] = None
     review_juz: Optional[List[int]] = None
