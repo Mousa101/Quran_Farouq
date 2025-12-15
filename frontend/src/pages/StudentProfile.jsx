@@ -134,6 +134,70 @@ const StudentProfile = () => {
         </CardContent>
       </Card>
 
+      {/* Total Progress Card */}
+      {progressData && (
+        <Card className="glass-card border-emerald-500/30 bg-gradient-to-br from-emerald-500/5 to-blue-500/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg text-white flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-emerald-400" />
+              إجمالي التقدم في الحفظ
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Total Progress */}
+              <div className="col-span-2 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center">
+                <p className="text-4xl font-bold text-emerald-400">{progressData.total_progress?.total_pages || 0}</p>
+                <p className="text-slate-400 text-sm">صفحة إجمالية</p>
+                <p className="text-emerald-400 text-lg font-bold mt-2">
+                  {progressData.total_progress?.description || ''}
+                </p>
+                {/* Progress Bar */}
+                <div className="mt-3 h-3 bg-slate-700 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full transition-all"
+                    style={{ width: `${Math.min(progressData.total_progress?.percentage || 0, 100)}%` }}
+                  />
+                </div>
+                <p className="text-slate-400 text-xs mt-1">{progressData.total_progress?.percentage || 0}% من القرآن</p>
+              </div>
+
+              {/* Previous Memorization */}
+              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
+                <p className="text-slate-400 text-sm mb-2">الحفظ السابق</p>
+                <p className="text-2xl font-bold text-blue-400">{progressData.previous_memorization?.total_pages || 0} صفحة</p>
+                <p className="text-blue-300 text-sm mt-1">
+                  {progressData.previous_memorization?.juz_count || 0} جزء + {progressData.previous_memorization?.additional_pages || 0} صفحة
+                </p>
+              </div>
+
+              {/* New Memorization */}
+              <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                <p className="text-slate-400 text-sm mb-2">الحفظ الجديد</p>
+                <p className="text-2xl font-bold text-amber-400">{progressData.new_memorization?.total_pages || 0} صفحة</p>
+                <p className="text-amber-300 text-sm mt-1">
+                  {progressData.new_memorization?.recitation_count || 0} تسميع
+                </p>
+              </div>
+            </div>
+
+            {/* Tajweed Level */}
+            {progressData.tajweed_level && (
+              <div className="mt-4 flex items-center gap-2">
+                <span className="text-slate-400">مستوى التجويد:</span>
+                <Badge className={`${
+                  progressData.tajweed_level === 'متقدمة' ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' :
+                  progressData.tajweed_level === 'متوسطة' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' :
+                  'bg-slate-500/20 text-slate-300 border-slate-500/30'
+                }`}>
+                  {progressData.tajweed_level}
+                </Badge>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Personal Info & Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Personal Info */}
@@ -144,35 +208,53 @@ const StudentProfile = () => {
               المعلومات الشخصية
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
-              <Calendar className="w-5 h-5 text-slate-400" />
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50">
+              <Calendar className="w-4 h-4 text-slate-400" />
               <div>
                 <p className="text-xs text-slate-400">تاريخ الميلاد</p>
-                <p className="text-white">{formatDate(student.birth_date)} ({calculateAge(student.birth_date)})</p>
+                <p className="text-white text-sm">{formatDate(student.birth_date)} ({calculateAge(student.birth_date)})</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
-              <Home className="w-5 h-5 text-slate-400" />
+            <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50">
+              <Home className="w-4 h-4 text-slate-400" />
               <div>
                 <p className="text-xs text-slate-400">المسجد</p>
-                <p className="text-white">{student.mosque_name || '-'}</p>
+                <p className="text-white text-sm">{student.mosque_name || '-'}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
-              <School className="w-5 h-5 text-slate-400" />
+            <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50">
+              <School className="w-4 h-4 text-slate-400" />
               <div>
-                <p className="text-xs text-slate-400">المدرسة</p>
-                <p className="text-white">{student.school_name || '-'}</p>
+                <p className="text-xs text-slate-400">المدرسة / المعدل</p>
+                <p className="text-white text-sm">{student.school_name || '-'} {student.school_grade ? `(${student.school_grade})` : ''}</p>
               </div>
             </div>
-            {student.school_grade && (
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
-                <FileText className="w-5 h-5 text-slate-400" />
-                <div>
-                  <p className="text-xs text-slate-400">الصف / المعدل</p>
-                  <p className="text-white">{student.school_grade}</p>
-                </div>
+            
+            {/* Phone Numbers */}
+            {(student.student_phone || student.father_phone || student.mother_phone) && (
+              <div className="pt-2 border-t border-slate-700">
+                <p className="text-xs text-slate-400 flex items-center gap-1 mb-2">
+                  <Phone className="w-3 h-3" /> أرقام الهواتف
+                </p>
+                {student.student_phone && (
+                  <p className="text-white text-sm">الطالب: <span dir="ltr">{student.student_phone}</span></p>
+                )}
+                {student.father_phone && (
+                  <p className="text-white text-sm">الأب: <span dir="ltr">{student.father_phone}</span></p>
+                )}
+                {student.mother_phone && (
+                  <p className="text-white text-sm">الأم: <span dir="ltr">{student.mother_phone}</span></p>
+                )}
+              </div>
+            )}
+
+            {student.registration_date && (
+              <div className="pt-2 border-t border-slate-700">
+                <p className="text-xs text-slate-400">تاريخ التسجيل في المركز</p>
+                <p className="text-emerald-400 text-sm">{formatDate(student.registration_date)}</p>
+              </div>
+            )}
               </div>
             )}
           </CardContent>
