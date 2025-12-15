@@ -21,6 +21,7 @@ import StudentProfile from './pages/StudentProfile';
 import StudentManagement from './pages/StudentManagement';
 import GroupManagement from './pages/GroupManagement';
 import InitialAssessment from './pages/InitialAssessment';
+import StudentEditProfile from './pages/StudentEditProfile';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
