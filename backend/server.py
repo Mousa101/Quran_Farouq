@@ -65,12 +65,12 @@ class RegistrationCodeResponse(BaseModel):
 
 @api_router.post("/auth/generate-code")
 async def generate_registration_code(data: RegistrationCodeCreate, current_user: dict = Depends(get_current_user)):
-    """Generate registration code for sheikh/admin (admin only)"""
+    """Generate registration code for sheikh/admin/student (admin only)"""
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="فقط المدير يمكنه إنشاء أكواد التسجيل")
     
-    if data.role not in ["sheikh", "admin"]:
-        raise HTTPException(status_code=400, detail="الدور يجب أن يكون sheikh أو admin")
+    if data.role not in ["sheikh", "admin", "student"]:
+        raise HTTPException(status_code=400, detail="الدور يجب أن يكون sheikh أو admin أو student")
     
     # Generate 6-digit code
     import random
@@ -88,7 +88,8 @@ async def generate_registration_code(data: RegistrationCodeCreate, current_user:
     }
     await db.registration_codes.insert_one(code_doc)
     
-    return {"code": code, "role": data.role, "message": f"تم إنشاء كود تسجيل {data.role}"}
+    role_names = {"student": "طالب", "sheikh": "شيخ", "admin": "مدير"}
+    return {"code": code, "role": data.role, "message": f"تم إنشاء كود تسجيل {role_names.get(data.role, data.role)}"}
 
 @api_router.get("/auth/codes")
 async def get_registration_codes(current_user: dict = Depends(get_current_user)):
