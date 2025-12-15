@@ -26,7 +26,9 @@ code {
 }
 
 @layer base {
-    :root {
+    /* Dark theme (default) */
+    :root,
+    .dark {
         --background: 222.2 84% 4.9%;
         --foreground: 210 40% 98%;
         --card: 222.2 84% 4.9%;
@@ -59,6 +61,41 @@ code {
         --bronze: 25 95% 37%;
         --success: 142 70% 45%;
         --warning: 38 92% 50%;
+        
+        /* Theme specific */
+        --sidebar-bg: 222.2 84% 6%;
+        --card-bg: 222.2 47% 11%;
+        --text-primary: 210 40% 98%;
+        --text-secondary: 215 20.2% 65.1%;
+    }
+
+    /* Light theme */
+    .light {
+        --background: 0 0% 100%;
+        --foreground: 222.2 84% 4.9%;
+        --card: 0 0% 100%;
+        --card-foreground: 222.2 84% 4.9%;
+        --popover: 0 0% 100%;
+        --popover-foreground: 222.2 84% 4.9%;
+        --primary: 142.1 70.6% 45.3%;
+        --primary-foreground: 0 0% 100%;
+        --secondary: 210 40% 96.1%;
+        --secondary-foreground: 222.2 47.4% 11.2%;
+        --muted: 210 40% 96.1%;
+        --muted-foreground: 215.4 16.3% 46.9%;
+        --accent: 48 96% 53%;
+        --accent-foreground: 222.2 47.4% 11.2%;
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 40% 98%;
+        --border: 214.3 31.8% 91.4%;
+        --input: 214.3 31.8% 91.4%;
+        --ring: 142.4 71.8% 29.2%;
+        
+        /* Theme specific */
+        --sidebar-bg: 210 40% 96%;
+        --card-bg: 0 0% 100%;
+        --text-primary: 222.2 84% 4.9%;
+        --text-secondary: 215.4 16.3% 46.9%;
     }
 }
 
@@ -67,17 +104,67 @@ code {
         @apply border-border;
     }
     body {
-        @apply bg-background text-foreground;
+        @apply bg-background text-foreground transition-colors duration-300;
     }
 }
 
-/* Glassmorphism */
-.glass {
+/* Glassmorphism - Dark */
+.dark .glass {
     @apply backdrop-blur-xl bg-black/40 border border-white/10 shadow-2xl;
 }
 
-.glass-card {
+.dark .glass-card {
     @apply backdrop-blur-md bg-slate-900/60 border border-white/10 rounded-xl;
+}
+
+/* Glassmorphism - Light */
+.light .glass {
+    @apply backdrop-blur-xl bg-white/60 border border-slate-200 shadow-lg;
+}
+
+.light .glass-card {
+    @apply backdrop-blur-md bg-white/80 border border-slate-200 rounded-xl shadow-md;
+}
+
+/* Theme toggle specific styles */
+.dark .theme-text-primary {
+    @apply text-white;
+}
+
+.light .theme-text-primary {
+    @apply text-slate-900;
+}
+
+.dark .theme-text-secondary {
+    @apply text-slate-400;
+}
+
+.light .theme-text-secondary {
+    @apply text-slate-600;
+}
+
+.dark .theme-bg-card {
+    @apply bg-slate-800/50;
+}
+
+.light .theme-bg-card {
+    @apply bg-white;
+}
+
+.dark .theme-bg-input {
+    @apply bg-slate-800 border-slate-700;
+}
+
+.light .theme-bg-input {
+    @apply bg-white border-slate-300;
+}
+
+.dark .theme-sidebar {
+    @apply bg-slate-950/95 border-white/10;
+}
+
+.light .theme-sidebar {
+    @apply bg-slate-50 border-slate-200;
 }
 
 /* Glow effects */
@@ -139,7 +226,42 @@ code {
     animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* Scrollbar styling */
+/* Scrollbar styling - Dark */
+.dark::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.dark::-webkit-scrollbar-track {
+    @apply bg-slate-900;
+}
+
+.dark::-webkit-scrollbar-thumb {
+    @apply bg-emerald-900 rounded-full;
+}
+
+.dark::-webkit-scrollbar-thumb:hover {
+    @apply bg-emerald-700;
+}
+
+/* Scrollbar styling - Light */
+.light::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.light::-webkit-scrollbar-track {
+    @apply bg-slate-100;
+}
+
+.light::-webkit-scrollbar-thumb {
+    @apply bg-emerald-400 rounded-full;
+}
+
+.light::-webkit-scrollbar-thumb:hover {
+    @apply bg-emerald-500;
+}
+
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
