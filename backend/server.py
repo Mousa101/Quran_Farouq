@@ -979,9 +979,12 @@ async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict 
     
     if existing:
         # Update existing
+        update_data = {"status": attendance_data.status}
+        if attendance_data.excuse_reason:
+            update_data["excuse_reason"] = attendance_data.excuse_reason
         await db.attendance.update_one(
             {"id": existing["id"]},
-            {"$set": {"status": attendance_data.status}}
+            {"$set": update_data}
         )
         return {"message": "تم تحديث الحضور"}
     
@@ -990,7 +993,8 @@ async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict 
         sheikh_id=current_user["user_id"],
         group_id=student.get("group_id") or "",
         date=attendance_data.date,
-        status=attendance_data.status
+        status=attendance_data.status,
+        excuse_reason=attendance_data.excuse_reason
     )
     
     attendance_dict = attendance.model_dump()
