@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Calendar } from '../components/ui/calendar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { Label } from '../components/ui/label';
 import { UserCheck, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -16,9 +19,15 @@ const Attendance = () => {
   const [selectedGroup, setSelectedGroup] = useState('');
   const [students, setStudents] = useState([]);
   const [attendance, setAttendance] = useState({});
+  const [excuseReasons, setExcuseReasons] = useState({});
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  
+  // Excuse dialog state
+  const [excuseDialogOpen, setExcuseDialogOpen] = useState(false);
+  const [selectedStudentForExcuse, setSelectedStudentForExcuse] = useState(null);
+  const [excuseReason, setExcuseReason] = useState('');
 
   useEffect(() => {
     fetchGroups();
@@ -61,32 +70,61 @@ const Attendance = () => {
       
       // Convert to map
       const attendanceMap = {};
+      const reasonsMap = {};
       response.data.forEach(a => {
         attendanceMap[a.student_id] = a.status;
+        if (a.excuse_reason) {
+          reasonsMap[a.student_id] = a.excuse_reason;
+        }
       });
       setAttendance(attendanceMap);
+      setExcuseReasons(reasonsMap);
     } catch (error) {
       console.error('Error:', error);
     }
   };
 
-  const handleStatusChange = async (studentId, status) => {
+  const handleStatusChange = async (studentId, status, reason = null) => {
     setSaving(true);
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      await axios.post(`${API}/attendance`, {
+      const payload = {
         student_id: studentId,
         date: dateStr,
         status: status
-      });
+      };
+      
+      if (reason) {
+        payload.excuse_reason = reason;
+      }
+      
+      await axios.post(`${API}/attendance`, payload);
       
       setAttendance(prev => ({ ...prev, [studentId]: status }));
+      if (reason) {
+        setExcuseReasons(prev => ({ ...prev, [studentId]: reason }));
+      }
       toast.success('تم تسجيل الحضور');
     } catch (error) {
       toast.error('فشل تسجيل الحضور');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleExcusedClick = (student) => {
+    setSelectedStudentForExcuse(student);
+    setExcuseReason(excuseReasons[student.id] || '');
+    setExcuseDialogOpen(true);
+  };
+
+  const handleExcuseSubmit = async () => {
+    if (!selectedStudentForExcuse) return;
+    
+    await handleStatusChange(selectedStudentForExcuse.id, 'excused', excuseReason);
+    setExcuseDialogOpen(false);
+    setSelectedStudentForExcuse(null);
+    setExcuseReason('');
   };
 
   const getStatusIcon = (status) => {
@@ -182,42 +220,51 @@ const Attendance = () => {
                 {students.map((student) => (
                   <div
                     key={student.id}
-                    className="p-4 rounded-xl bg-slate-800/50 border border-white/5 flex items-center justify-between"
+                    className="p-4 rounded-xl bg-slate-800/50 border border-white/5"
                   >
-                    <div className="flex items-center gap-3">
-                      {getStatusIcon(attendance[student.id])}
-                      <span className="text-white font-medium">{student.name}</span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {getStatusIcon(attendance[student.id])}
+                        <span className="text-white font-medium">{student.name}</span>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleStatusChange(student.id, 'present')}
+                          className={`${getStatusStyle(attendance[student.id], 'present')} transition-all`}
+                          disabled={saving}
+                          data-testid={`present-${student.id}`}
+                        >
+                          حاضر
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleStatusChange(student.id, 'absent')}
+                          className={`${getStatusStyle(attendance[student.id], 'absent')} transition-all`}
+                          disabled={saving}
+                          data-testid={`absent-${student.id}`}
+                        >
+                          غائب
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleExcusedClick(student)}
+                          className={`${getStatusStyle(attendance[student.id], 'excused')} transition-all`}
+                          disabled={saving}
+                          data-testid={`excused-${student.id}`}
+                        >
+                          معذور
+                        </Button>
+                      </div>
                     </div>
                     
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => handleStatusChange(student.id, 'present')}
-                        className={`${getStatusStyle(attendance[student.id], 'present')} transition-all`}
-                        disabled={saving}
-                        data-testid={`present-${student.id}`}
-                      >
-                        حاضر
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleStatusChange(student.id, 'absent')}
-                        className={`${getStatusStyle(attendance[student.id], 'absent')} transition-all`}
-                        disabled={saving}
-                        data-testid={`absent-${student.id}`}
-                      >
-                        غائب
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleStatusChange(student.id, 'excused')}
-                        className={`${getStatusStyle(attendance[student.id], 'excused')} transition-all`}
-                        disabled={saving}
-                        data-testid={`excused-${student.id}`}
-                      >
-                        معذور
-                      </Button>
-                    </div>
+                    {/* Show excuse reason if exists */}
+                    {attendance[student.id] === 'excused' && excuseReasons[student.id] && (
+                      <div className="mt-2 p-2 rounded-lg bg-amber-500/10 text-amber-300 text-sm">
+                        <span className="font-medium">سبب العذر:</span> {excuseReasons[student.id]}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -257,6 +304,44 @@ const Attendance = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Excuse Reason Dialog */}
+      <Dialog open={excuseDialogOpen} onOpenChange={setExcuseDialogOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">
+              تسجيل عذر للطالب {selectedStudentForExcuse?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300">سبب العذر</Label>
+              <Input
+                value={excuseReason}
+                onChange={(e) => setExcuseReason(e.target.value)}
+                placeholder="مثال: مريض، سفر، ظروف عائلية..."
+                className="bg-slate-800 border-slate-700 text-white"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="ghost" 
+              onClick={() => setExcuseDialogOpen(false)}
+              className="text-slate-400"
+            >
+              إلغاء
+            </Button>
+            <Button 
+              onClick={handleExcuseSubmit}
+              className="bg-amber-600 hover:bg-amber-700"
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'تأكيد'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
