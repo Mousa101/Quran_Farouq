@@ -14,13 +14,17 @@ class StudentCreate(BaseModel):
     password: str
     name: str
     role: str = "student"
-    registration_code: Optional[str] = None
-    # New student fields
+    registration_code: str  # Required for students now
+    # Phone numbers
+    student_phone: Optional[str] = None
+    father_phone: Optional[str] = None
+    mother_phone: Optional[str] = None
+    # Other student fields
     mosque_name: Optional[str] = None
     school_name: Optional[str] = None
     school_grade: Optional[str] = None
     birth_date: Optional[str] = None
-    profile_image: Optional[str] = None  # Base64 image
+    profile_image: Optional[str] = None
 
 class UserCreate(UserBase):
     password: str
@@ -34,13 +38,23 @@ class User(UserBase):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     group_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    registration_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     is_active: bool = True
-    # New student fields
+    # Phone numbers
+    student_phone: Optional[str] = None
+    father_phone: Optional[str] = None
+    mother_phone: Optional[str] = None
+    # Student fields
     mosque_name: Optional[str] = None
     school_name: Optional[str] = None
     school_grade: Optional[str] = None
     birth_date: Optional[str] = None
     profile_image: Optional[str] = None
+    # Progress tracking (for students)
+    previous_memorization_juz: Optional[List[int]] = None  # الحفظ القديم
+    previous_memorization_pages: Optional[int] = None
+    tajweed_level: Optional[str] = None  # تمهيدية, متوسطة, متقدمة
+    initial_assessment_done: bool = False  # هل تم التقييم الأولي
 
 class UserResponse(BaseModel):
     id: str
@@ -48,21 +62,40 @@ class UserResponse(BaseModel):
     name: str
     role: str
     group_id: Optional[str] = None
+    student_phone: Optional[str] = None
+    father_phone: Optional[str] = None
+    mother_phone: Optional[str] = None
     mosque_name: Optional[str] = None
     school_name: Optional[str] = None
     school_grade: Optional[str] = None
     birth_date: Optional[str] = None
     profile_image: Optional[str] = None
+    registration_date: Optional[str] = None
+    previous_memorization_juz: Optional[List[int]] = None
+    previous_memorization_pages: Optional[int] = None
+    tajweed_level: Optional[str] = None
+    initial_assessment_done: bool = False
 
 # Student Profile Update (Admin only)
 class StudentProfileUpdate(BaseModel):
     name: Optional[str] = None
+    student_phone: Optional[str] = None
+    father_phone: Optional[str] = None
+    mother_phone: Optional[str] = None
     mosque_name: Optional[str] = None
     school_name: Optional[str] = None
     school_grade: Optional[str] = None
     birth_date: Optional[str] = None
     profile_image: Optional[str] = None
     group_id: Optional[str] = None
+
+# Initial Assessment by Sheikh
+class InitialAssessment(BaseModel):
+    student_id: str
+    previous_memorization_juz: List[int] = []  # أرقام الأجزاء المحفوظة سابقاً
+    previous_memorization_pages: int = 0  # صفحات إضافية
+    tajweed_level: str  # تمهيدية, متوسطة, متقدمة
+    notes: Optional[str] = None
 
 # Group Models
 class GroupCreate(BaseModel):
