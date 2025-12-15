@@ -678,43 +678,58 @@ async def update_recitation(recitation_id: str, data: RecitationUpdate, current_
     
     # Update fields
     update_data = {}
-    if data.recitation_type is not None:
-        update_data["recitation_type"] = data.recitation_type
-    if data.pages_count is not None:
-        update_data["pages_count"] = data.pages_count
-    if data.passed_minimum is not None:
-        update_data["passed_minimum"] = data.passed_minimum
-    if data.review_type is not None:
-        update_data["review_type"] = data.review_type
-    if data.review_pages is not None:
-        update_data["review_pages"] = data.review_pages
-    if data.review_juz is not None:
-        update_data["review_juz"] = data.review_juz
-    if data.passed_review_minimum is not None:
-        update_data["passed_review_minimum"] = data.passed_review_minimum
-    if data.notes is not None:
-        update_data["notes"] = data.notes
+    for field in ["recitation_type", "juz_number", "page_from", "page_to", "rating", 
+                  "error_count", "passed_minimum", "review_juz", "partial_review_juz",
+                  "partial_review_pages", "passed_review_minimum", "notes",
+                  "pages_count", "review_type", "review_pages"]:
+        value = getattr(data, field, None)
+        if value is not None:
+            update_data[field] = value
     
     # Calculate new points
     merged = {**recitation, **update_data}
     new_points = 0
+    
     if merged.get("recitation_type") == "new_memorization":
-        if merged.get("passed_minimum"):
-            new_points = (merged.get("pages_count") or 1) * 15
-        else:
-            new_points = (merged.get("pages_count") or 1) * 5
+        # Calculate pages
+        pages_count = 1
+        if merged.get("page_from") and merged.get("page_to"):
+            pages_count = merged["page_to"] - merged["page_from"] + 1
+        elif merged.get("pages_count"):
+            pages_count = merged["pages_count"]
+        
+        base_points = pages_count * 5
+        rating_bonus = 0
+        if merged.get("rating"):
+            if merged["rating"] >= 9:
+                rating_bonus = pages_count * 10
+            elif merged["rating"] >= 7:
+                rating_bonus = pages_count * 5
+            elif merged["rating"] >= 5:
+                rating_bonus = pages_count * 2
+        
+        error_penalty = 0
+        if merged.get("error_count"):
+            error_penalty = min(merged["error_count"] * 2, base_points // 2)
+        
+        pass_bonus = pages_count * 5 if merged.get("passed_minimum") else 0
+        new_points = max(base_points + rating_bonus + pass_bonus - error_penalty, 1)
     else:
-        if merged.get("review_type") == "pages":
-            if merged.get("passed_review_minimum"):
-                new_points = (merged.get("review_pages") or 1) * 10
-            else:
-                new_points = (merged.get("review_pages") or 1) * 3
-        else:
-            juz_count = len(merged.get("review_juz") or [])
-            if merged.get("passed_review_minimum"):
-                new_points = juz_count * 30
-            else:
-                new_points = juz_count * 10
+        # Review
+        juz_points = 0
+        if merged.get("review_juz"):
+            juz_count = len(merged["review_juz"])
+            juz_points = juz_count * 50 if merged.get("passed_review_minimum") else juz_count * 15
+        
+        partial_points = 0
+        if merged.get("partial_review_pages") and merged["partial_review_pages"] > 0:
+            partial_points = merged["partial_review_pages"] * 10 if merged.get("passed_review_minimum") else merged["partial_review_pages"] * 3
+        
+        # Legacy support
+        if not merged.get("review_juz") and merged.get("review_type") == "pages":
+            partial_points = (merged.get("review_pages") or 1) * 10 if merged.get("passed_review_minimum") else (merged.get("review_pages") or 1) * 3
+        
+        new_points = juz_points + partial_points
     
     update_data["points_earned"] = new_points
     
