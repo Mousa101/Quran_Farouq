@@ -49,6 +49,29 @@ const StudentProfile = () => {
     return new Date(dateStr).toLocaleDateString('ar-SA');
   };
 
+  // Format date with day name for records
+  const formatDateWithDay = (dateStr) => {
+    if (!dateStr) return '-';
+    try {
+      // Handle both ISO datetime and date-only formats
+      const date = dateStr.includes('T') ? parseISO(dateStr) : new Date(dateStr + 'T00:00:00');
+      return format(date, 'EEEE d MMMM yyyy', { locale: ar });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  // Format datetime with day name
+  const formatDateTimeWithDay = (dateStr) => {
+    if (!dateStr) return '-';
+    try {
+      const date = parseISO(dateStr);
+      return format(date, 'EEEE d MMMM yyyy - h:mm a', { locale: ar });
+    } catch {
+      return dateStr;
+    }
+  };
+
   const calculateAge = (birthDate) => {
     if (!birthDate) return '-';
     const today = new Date();
