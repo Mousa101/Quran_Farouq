@@ -185,6 +185,7 @@ class AttendanceCreate(BaseModel):
     student_id: str
     date: str
     status: str = Field(..., pattern="^(present|absent|excused)$")
+    excuse_reason: Optional[str] = None  # سبب العذر
 
 class Attendance(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -194,7 +195,17 @@ class Attendance(BaseModel):
     group_id: str
     date: str
     status: str
+    excuse_reason: Optional[str] = None  # سبب العذر
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# Student Self Update Model
+class StudentSelfUpdate(BaseModel):
+    student_phone: Optional[str] = None
+    profile_image: Optional[str] = None
+    registration_date: Optional[str] = None
+    school_name: Optional[str] = None
+    school_grade: Optional[str] = None
+    school_average: Optional[str] = None  # معدل الطالب
 
 # Activity Models
 class ActivityCreate(BaseModel):
