@@ -421,7 +421,7 @@ const StudentProfile = () => {
                         : 'bg-blue-500/20 text-blue-400'}>
                         {rec.recitation_type === 'new_memorization' ? 'حفظ جديد' : 'مراجعة'}
                       </Badge>
-                      <span className="text-xs text-slate-400">{formatDate(rec.created_at)}</span>
+                      <span className="text-xs text-slate-400">{formatDateTimeWithDay(rec.created_at)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="text-slate-300 text-sm">
