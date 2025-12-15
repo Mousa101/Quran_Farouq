@@ -11,6 +11,8 @@ import {
   CheckCircle, XCircle, Clock, FileText, AlertTriangle, School, Home, Phone, TrendingUp
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { format, parseISO } from 'date-fns';
+import { ar } from 'date-fns/locale';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
