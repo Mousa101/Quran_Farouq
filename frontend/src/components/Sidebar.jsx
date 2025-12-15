@@ -65,6 +65,7 @@ const Sidebar = () => {
       ...baseItems,
       { to: '/my-progress', icon: Trophy, label: 'تقدمي' },
       { to: '/my-points', icon: Star, label: 'نقاطي' },
+      { to: '/edit-profile', icon: UserCog, label: 'تعديل بياناتي' },
       { to: '/activities', icon: Calendar, label: 'الأنشطة' },
       { to: '/notifications', icon: Bell, label: 'الإشعارات' },
     ];
