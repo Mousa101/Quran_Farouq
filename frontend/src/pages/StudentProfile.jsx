@@ -251,8 +251,11 @@ const StudentProfile = () => {
             <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50">
               <School className="w-4 h-4 text-slate-400" />
               <div>
-                <p className="text-xs text-slate-400">المدرسة / المعدل</p>
+                <p className="text-xs text-slate-400">المدرسة / الصف</p>
                 <p className="text-white text-sm">{student.school_name || '-'} {student.school_grade ? `(${student.school_grade})` : ''}</p>
+                {student.school_average && (
+                  <p className="text-emerald-400 text-xs mt-1">المعدل: {student.school_average}</p>
+                )}
               </div>
             </div>
             
