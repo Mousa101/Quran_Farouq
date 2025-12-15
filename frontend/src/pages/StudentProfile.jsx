@@ -8,7 +8,7 @@ import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   User, BookOpen, UserCheck, Star, Trophy, Calendar, ArrowRight,
-  CheckCircle, XCircle, Clock, FileText, AlertTriangle, School, Home
+  CheckCircle, XCircle, Clock, FileText, AlertTriangle, School, Home, Phone, TrendingUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -19,16 +19,21 @@ const StudentProfile = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [profileData, setProfileData] = useState(null);
+  const [progressData, setProgressData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchProfile();
+    fetchData();
   }, [studentId]);
 
-  const fetchProfile = async () => {
+  const fetchData = async () => {
     try {
-      const response = await axios.get(`${API}/students/${studentId}/profile`);
-      setProfileData(response.data);
+      const [profileRes, progressRes] = await Promise.all([
+        axios.get(`${API}/students/${studentId}/profile`),
+        axios.get(`${API}/students/${studentId}/progress`)
+      ]);
+      setProfileData(profileRes.data);
+      setProgressData(progressRes.data);
     } catch (error) {
       console.error('Error:', error);
       toast.error('فشل في تحميل بيانات الطالب');
