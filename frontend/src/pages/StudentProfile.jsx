@@ -255,8 +255,6 @@ const StudentProfile = () => {
                 <p className="text-emerald-400 text-sm">{formatDate(student.registration_date)}</p>
               </div>
             )}
-              </div>
-            )}
           </CardContent>
         </Card>
 
