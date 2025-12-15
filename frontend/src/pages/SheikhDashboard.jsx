@@ -62,7 +62,7 @@ const SheikhDashboard = () => {
     <div className="space-y-8 animate-fadeIn" data-testid="sheikh-dashboard">
       {/* Welcome */}
       <div className="glass-card p-6 border border-white/10">
-        <h1 className="text-2xl font-bold text-white mb-2">مرحباً، الشيخ {user?.name}</h1>
+        <h1 className="text-2xl font-bold text-white mb-2"> المشرف {user?.name}</h1>
         <p className="text-slate-400">إدارة حلقات التحفيظ والطلاب</p>
       </div>
 
@@ -138,12 +138,7 @@ const SheikhDashboard = () => {
       <Card className="glass-card border-white/10">
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-xl font-bold text-white">مجموعاتي</CardTitle>
-          <Link to="/groups">
-            <Button size="sm" className="bg-emerald-500 hover:bg-emerald-600">
-              <Plus className="w-4 h-4 ml-2" />
-              إضافة مجموعة
-            </Button>
-          </Link>
+          
         </CardHeader>
         <CardContent>
           {groups.length === 0 ? (

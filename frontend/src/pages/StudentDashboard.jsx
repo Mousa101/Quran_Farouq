@@ -71,7 +71,7 @@ const StudentDashboard = () => {
       <div className="glass-card p-6 border border-white/10">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-white mb-2">مرحباً، {user?.name}</h1>
+            <h1 className="text-2xl font-bold text-white mb-2"> {user?.name}</h1>
             <p className="text-slate-400">تابع تقدمك في حفظ القرآن الكريم</p>
           </div>
           {myRank && (
