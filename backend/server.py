@@ -179,8 +179,8 @@ async def register(user_data: UserCreateWithCode):
     
     await db.users.insert_one(user_dict)
     
-    # Mark code as used if sheikh/admin (and code was provided)
-    if user_data.role in ["sheikh", "admin"] and user_data.registration_code:
+    # Mark code as used (and code was provided)
+    if user_data.registration_code:
         await db.registration_codes.update_one(
             {"code": user_data.registration_code},
             {"$set": {"used": True, "used_by": user.id, "used_at": datetime.now(timezone.utc).isoformat()}}
