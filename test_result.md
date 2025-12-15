@@ -281,37 +281,53 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "1.0"
-  test_sequence: 1
+  version: "1.1"
+  test_sequence: 2
   run_ui: true
 
 test_plan:
   current_focus:
-    - "Student Profile Page"
-    - "Student Management Page (Admin)"
-    - "Warning System API"
+    - "Student Edit Profile Page"
+    - "Attendance Page with Excuse Dialog"
+    - "Student Profile Page with Date+Day"
   stuck_tasks: []
-  test_all: true
+  test_all: false
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
     message: |
-      Implemented student profile and management features:
-      1. Created StudentProfile.jsx - shows complete student info with personal details, points, badges, attendance/recitation summaries, warnings, and detailed record tabs
-      2. Created StudentManagement.jsx - admin-only page for adding/deleting/moving students and issuing warnings
-      3. Added warning system backend with POST/GET/DELETE endpoints
-      4. Updated UsersPage and SheikhDashboard to have clickable student names
+      Implemented 4 new features:
+      
+      1. تتبع التقدم (Progress Tracking) - VERIFIED:
+         - Student profile now shows combined progress (previous memorization + new recitations)
+         - Shows total pages, juz count, percentage of Quran
+         - Tajweed level displayed
+      
+      2. تعديل بيانات الطالب (Student Self Edit) - NEW:
+         - Created /app/frontend/src/pages/StudentEditProfile.jsx
+         - Added PUT/GET /api/students/me/profile endpoints
+         - Students can edit: phone, profile image, school, grade, average
+         - Added sidebar link "تعديل بياناتي"
+      
+      3. سبب العذر (Excuse Reason) - UPDATED:
+         - Updated AttendanceCreate model with excuse_reason field
+         - Updated Attendance page with dialog for entering excuse reason
+         - Excuse reason displayed in student profile attendance tab
+      
+      4. التاريخ مع اليوم (Date with Day Name) - UPDATED:
+         - Updated StudentProfile.jsx with formatDateWithDay function
+         - Recitation records show: الاثنين 15 ديسمبر 2025 - 5:52 م
+         - Attendance records show: الجمعة 12 ديسمبر 2025
       
       Test credentials:
-      - Admin: testadmin@test.com / 123456
-      - Sheikh: testsheikh@test.com / 123456
-      - Student: teststudent@test.com / 123456
+      - Admin: test_admin@test.com / test123
+      - Sheikh: test_sheikh@test.com / test123
+      - Student: test_student@test.com / test123
       
       Test scenarios:
-      1. Login as admin → Navigate to إدارة الطلاب → View student profiles
-      2. Add a new student via the dialog
-      3. Issue a warning to a student
-      4. Change student group
-      5. Delete a student
-      6. Login as sheikh → View students in dashboard → Click to see profiles
+      1. Login as student → تعديل بياناتي → Edit phone/school/grade → Save
+      2. Login as sheikh → الحضور → Click معذور → Enter excuse reason → Confirm
+      3. Login as admin → View student profile → Check attendance tab for day names and excuse reasons
+      4. Login as admin → View student profile → Check recitation tab for day+time
+      5. Login as admin → View student profile → Check progress card at top
