@@ -69,6 +69,7 @@ class UserResponse(BaseModel):
     mosque_name: Optional[str] = None
     school_name: Optional[str] = None
     school_grade: Optional[str] = None
+    school_average: Optional[str] = None  # معدل الطالب
     birth_date: Optional[str] = None
     profile_image: Optional[str] = None
     registration_date: Optional[str] = None
