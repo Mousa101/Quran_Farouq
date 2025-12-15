@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Checkbox } from '../components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
-import { BookOpen, Plus, Loader2, CheckCircle, FileText, RotateCcw, Edit, Trash2 } from 'lucide-react';
+import { Slider } from '../components/ui/slider';
+import { BookOpen, Plus, Loader2, CheckCircle, FileText, RotateCcw, Edit, Trash2, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -28,11 +29,17 @@ const Recitations = () => {
   const initialFormData = {
     student_id: '',
     recitation_type: 'new_memorization',
-    pages_count: 1,
+    // New memorization fields
+    juz_number: 1,
+    page_from: 1,
+    page_to: 1,
+    rating: 7,
+    error_count: 0,
     passed_minimum: false,
-    review_type: 'pages',
-    review_pages: 1,
+    // Review fields
     review_juz: [],
+    partial_review_juz: null,
+    partial_review_pages: 0,
     passed_review_minimum: false,
     notes: ''
   };
@@ -71,7 +78,8 @@ const Recitations = () => {
       const response = await axios.get(`${API}/quran/juz`);
       setQuranJuz(response.data);
     } catch (error) {
-      console.error('Error fetching juz:', error);
+      // Use default juz list
+      setQuranJuz(Array.from({ length: 30 }, (_, i) => ({ number: i + 1, name: `الجزء ${i + 1}` })));
     }
   };
 
@@ -144,11 +152,15 @@ const Recitations = () => {
     setFormData({
       student_id: rec.student_id,
       recitation_type: rec.recitation_type,
-      pages_count: rec.pages_count || 1,
+      juz_number: rec.juz_number || 1,
+      page_from: rec.page_from || 1,
+      page_to: rec.page_to || 1,
+      rating: rec.rating || 7,
+      error_count: rec.error_count || 0,
       passed_minimum: rec.passed_minimum || false,
-      review_type: rec.review_type || 'pages',
-      review_pages: rec.review_pages || 1,
       review_juz: rec.review_juz || [],
+      partial_review_juz: rec.partial_review_juz || null,
+      partial_review_pages: rec.partial_review_pages || 0,
       passed_review_minimum: rec.passed_review_minimum || false,
       notes: rec.notes || ''
     });
@@ -164,10 +176,45 @@ const Recitations = () => {
     return student?.name || 'غير معروف';
   };
 
-  // Recitation Form Component (reused for create and edit)
+  const formatRecitationDetails = (rec) => {
+    if (rec.recitation_type === 'new_memorization') {
+      let details = [];
+      if (rec.juz_number) {
+        details.push(`الجزء ${rec.juz_number}`);
+      }
+      if (rec.page_from && rec.page_to) {
+        details.push(`صفحة ${rec.page_from} - ${rec.page_to}`);
+      } else if (rec.pages_count) {
+        details.push(`${rec.pages_count} صفحة`);
+      }
+      if (rec.rating) {
+        details.push(`التقييم: ${rec.rating}/10`);
+      }
+      if (rec.error_count) {
+        details.push(`الأخطاء: ${rec.error_count}`);
+      }
+      return details.join(' | ');
+    } else {
+      let details = [];
+      if (rec.review_juz && rec.review_juz.length > 0) {
+        details.push(`الأجزاء: ${rec.review_juz.sort((a,b) => a-b).join(', ')}`);
+      }
+      if (rec.partial_review_pages && rec.partial_review_pages > 0) {
+        const juzText = rec.partial_review_juz ? ` من جزء ${rec.partial_review_juz}` : '';
+        details.push(`${rec.partial_review_pages} صفحات${juzText}`);
+      }
+      // Legacy support
+      if (!rec.review_juz && rec.review_pages) {
+        details.push(`${rec.review_pages} صفحة مراجعة`);
+      }
+      return details.join(' و ') || 'مراجعة';
+    }
+  };
+
+  // Recitation Form Component
   const RecitationForm = ({ onSubmit, isEdit = false }) => (
     <form onSubmit={onSubmit} className="space-y-4 mt-4">
-      {/* Student Selection - disabled in edit mode */}
+      {/* Student Selection */}
       <div className="space-y-2">
         <Label className="text-slate-300">الطالب</Label>
         <Select 
@@ -175,7 +222,7 @@ const Recitations = () => {
           onValueChange={(v) => setFormData({ ...formData, student_id: v })}
           disabled={isEdit}
         >
-          <SelectTrigger className="bg-slate-800 border-slate-700 text-white" data-testid="recitation-student-select">
+          <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
             <SelectValue placeholder="اختر الطالب" />
           </SelectTrigger>
           <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
@@ -222,18 +269,90 @@ const Recitations = () => {
       {/* New Memorization Fields */}
       {formData.recitation_type === 'new_memorization' && (
         <div className="space-y-4 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+          {/* Juz Selection */}
           <div className="space-y-2">
-            <Label className="text-slate-300">عدد الصفحات المحفوظة</Label>
+            <Label className="text-slate-300">الجزء</Label>
+            <Select 
+              value={String(formData.juz_number)} 
+              onValueChange={(v) => setFormData({ ...formData, juz_number: parseInt(v) })}
+            >
+              <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                <SelectValue placeholder="اختر الجزء" />
+              </SelectTrigger>
+              <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
+                {Array.from({ length: 30 }, (_, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)} className="text-white">
+                    الجزء {i + 1}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Page Range */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300">من صفحة</Label>
+              <Input
+                type="number"
+                min="1"
+                max="20"
+                value={formData.page_from}
+                onChange={(e) => setFormData({ ...formData, page_from: parseInt(e.target.value) || 1 })}
+                className="bg-slate-800 border-slate-700 text-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-slate-300">إلى صفحة</Label>
+              <Input
+                type="number"
+                min="1"
+                max="20"
+                value={formData.page_to}
+                onChange={(e) => setFormData({ ...formData, page_to: parseInt(e.target.value) || 1 })}
+                className="bg-slate-800 border-slate-700 text-white"
+              />
+            </div>
+          </div>
+
+          {/* Rating */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-slate-300">تقييم التسميع</Label>
+              <span className="text-emerald-400 font-bold text-lg flex items-center gap-1">
+                <Star className="w-4 h-4" />
+                {formData.rating}/10
+              </span>
+            </div>
+            <Slider
+              value={[formData.rating]}
+              onValueChange={(v) => setFormData({ ...formData, rating: v[0] })}
+              min={1}
+              max={10}
+              step={1}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-slate-500">
+              <span>ضعيف</span>
+              <span>متوسط</span>
+              <span>ممتاز</span>
+            </div>
+          </div>
+
+          {/* Error Count */}
+          <div className="space-y-2">
+            <Label className="text-slate-300">عدد الأخطاء</Label>
             <Input
               type="number"
-              min="1"
-              max="20"
-              value={formData.pages_count}
-              onChange={(e) => setFormData({ ...formData, pages_count: parseInt(e.target.value) || 1 })}
+              min="0"
+              max="50"
+              value={formData.error_count}
+              onChange={(e) => setFormData({ ...formData, error_count: parseInt(e.target.value) || 0 })}
               className="bg-slate-800 border-slate-700 text-white"
             />
           </div>
           
+          {/* Passed Minimum */}
           <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
             <Checkbox
               id={isEdit ? "passed_min_edit" : "passed_min"}
@@ -252,67 +371,81 @@ const Recitations = () => {
       {/* Review Fields */}
       {formData.recitation_type === 'review' && (
         <div className="space-y-4 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20">
-          {/* Review Type */}
+          {/* Complete Juz Selection */}
           <div className="space-y-2">
-            <Label className="text-slate-300">نوع المراجعة</Label>
-            <RadioGroup 
-              value={formData.review_type} 
-              onValueChange={(v) => setFormData({ ...formData, review_type: v, review_juz: [] })}
-              className="flex gap-4"
-            >
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="pages" id={isEdit ? "pages-edit" : "pages"} />
-                <Label htmlFor={isEdit ? "pages-edit" : "pages"} className="text-white cursor-pointer">صفحات</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="juz" id={isEdit ? "juz-edit" : "juz"} />
-                <Label htmlFor={isEdit ? "juz-edit" : "juz"} className="text-white cursor-pointer">أجزاء</Label>
-              </div>
-            </RadioGroup>
+            <Label className="text-slate-300">الأجزاء المراجعة كاملة</Label>
+            <div className="grid grid-cols-6 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-800/50 rounded-lg">
+              {Array.from({ length: 30 }, (_, i) => i + 1).map((juz) => (
+                <div
+                  key={juz}
+                  onClick={() => handleJuzToggle(juz)}
+                  className={`p-2 text-center rounded-lg cursor-pointer transition-all text-sm ${
+                    formData.review_juz?.includes(juz)
+                      ? 'bg-blue-500 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  }`}
+                >
+                  {juz}
+                </div>
+              ))}
+            </div>
+            {formData.review_juz?.length > 0 && (
+              <p className="text-blue-400 text-sm">
+                الأجزاء المختارة: {formData.review_juz.sort((a,b) => a-b).join(', ')}
+              </p>
+            )}
           </div>
 
-          {/* Pages Review */}
-          {formData.review_type === 'pages' && (
-            <div className="space-y-2">
-              <Label className="text-slate-300">عدد صفحات المراجعة</Label>
-              <Input
-                type="number"
-                min="1"
-                max="100"
-                value={formData.review_pages}
-                onChange={(e) => setFormData({ ...formData, review_pages: parseInt(e.target.value) || 1 })}
-                className="bg-slate-800 border-slate-700 text-white"
-              />
-            </div>
-          )}
-
-          {/* Juz Review */}
-          {formData.review_type === 'juz' && (
-            <div className="space-y-2">
-              <Label className="text-slate-300">اختر الأجزاء المراجعة</Label>
-              <div className="grid grid-cols-5 gap-2 max-h-48 overflow-y-auto p-2 bg-slate-800/50 rounded-lg">
-                {quranJuz.map((juz) => (
-                  <div
-                    key={juz.number}
-                    onClick={() => handleJuzToggle(juz.number)}
-                    className={`p-2 text-center rounded-lg cursor-pointer transition-all text-sm ${
-                      formData.review_juz?.includes(juz.number)
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    }`}
-                  >
-                    {juz.number}
-                  </div>
-                ))}
+          {/* Partial Juz Review */}
+          <div className="p-3 rounded-lg bg-slate-800/30 border border-slate-700 space-y-3">
+            <Label className="text-slate-300 block">مراجعة جزئية (صفحات من جزء)</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-slate-400 text-sm">عدد الصفحات</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="20"
+                  value={formData.partial_review_pages || 0}
+                  onChange={(e) => setFormData({ ...formData, partial_review_pages: parseInt(e.target.value) || 0 })}
+                  className="bg-slate-800 border-slate-700 text-white"
+                  placeholder="0"
+                />
               </div>
-              {formData.review_juz?.length > 0 && (
-                <p className="text-blue-400 text-sm">
-                  الأجزاء المختارة: {formData.review_juz.sort((a,b) => a-b).join(', ')}
-                </p>
-              )}
+              <div className="space-y-2">
+                <Label className="text-slate-400 text-sm">من جزء</Label>
+                <Select 
+                  value={formData.partial_review_juz ? String(formData.partial_review_juz) : ""} 
+                  onValueChange={(v) => setFormData({ ...formData, partial_review_juz: v ? parseInt(v) : null })}
+                >
+                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                    <SelectValue placeholder="اختر الجزء" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
+                    {Array.from({ length: 30 }, (_, i) => (
+                      <SelectItem key={i + 1} value={String(i + 1)} className="text-white">
+                        الجزء {i + 1}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          {/* Preview */}
+          {(formData.review_juz?.length > 0 || formData.partial_review_pages > 0) && (
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <p className="text-blue-300 text-sm">
+                <span className="font-bold">الناتج: </span>
+                {formData.review_juz?.length > 0 && `مراجعة الأجزاء ${formData.review_juz.sort((a,b) => a-b).join(', ')}`}
+                {formData.review_juz?.length > 0 && formData.partial_review_pages > 0 && ' و '}
+                {formData.partial_review_pages > 0 && `${formData.partial_review_pages} صفحات${formData.partial_review_juz ? ` من جزء ${formData.partial_review_juz}` : ''}`}
+              </p>
             </div>
           )}
 
+          {/* Passed Review Minimum */}
           <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
             <Checkbox
               id={isEdit ? "passed_review_edit" : "passed_review"}
@@ -343,7 +476,6 @@ const Recitations = () => {
         type="submit"
         className="w-full bg-emerald-500 hover:bg-emerald-600"
         disabled={submitting || !formData.student_id}
-        data-testid="submit-recitation-btn"
       >
         {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : isEdit ? 'تحديث' : 'حفظ'}
       </Button>
@@ -368,7 +500,7 @@ const Recitations = () => {
         
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-emerald-500 hover:bg-emerald-600" data-testid="add-recitation-btn">
+            <Button className="bg-emerald-500 hover:bg-emerald-600">
               <Plus className="w-5 h-5 ml-2" />
               تسجيل تسميع
             </Button>
@@ -416,7 +548,6 @@ const Recitations = () => {
                         {rec.recitation_type === 'new_memorization' ? 'حفظ جديد' : 'مراجعة'}
                       </span>
                       
-                      {/* Edit Button */}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -426,7 +557,6 @@ const Recitations = () => {
                         <Edit className="w-4 h-4" />
                       </Button>
                       
-                      {/* Delete Button */}
                       <Button
                         size="sm"
                         variant="ghost"
@@ -441,43 +571,19 @@ const Recitations = () => {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap gap-3">
-                    {rec.recitation_type === 'new_memorization' && (
-                      <>
-                        <span className="text-slate-300 text-sm">
-                          {rec.pages_count} صفحة
-                        </span>
-                        {rec.passed_minimum && (
-                          <span className="text-emerald-400 text-sm flex items-center gap-1">
-                            <CheckCircle className="w-4 h-4" />
-                            اجتاز الحد الأدنى
-                          </span>
-                        )}
-                      </>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    <span className="text-slate-300">{formatRecitationDetails(rec)}</span>
+                    
+                    {(rec.passed_minimum || rec.passed_review_minimum) && (
+                      <span className={`flex items-center gap-1 ${
+                        rec.recitation_type === 'new_memorization' ? 'text-emerald-400' : 'text-blue-400'
+                      }`}>
+                        <CheckCircle className="w-4 h-4" />
+                        اجتاز
+                      </span>
                     )}
                     
-                    {rec.recitation_type === 'review' && (
-                      <>
-                        {rec.review_type === 'pages' && (
-                          <span className="text-slate-300 text-sm">
-                            مراجعة {rec.review_pages} صفحة
-                          </span>
-                        )}
-                        {rec.review_type === 'juz' && (
-                          <span className="text-slate-300 text-sm">
-                            مراجعة الأجزاء: {rec.review_juz?.join(', ')}
-                          </span>
-                        )}
-                        {rec.passed_review_minimum && (
-                          <span className="text-blue-400 text-sm flex items-center gap-1">
-                            <CheckCircle className="w-4 h-4" />
-                            اجتاز الحد الأدنى
-                          </span>
-                        )}
-                      </>
-                    )}
-                    
-                    <span className="text-amber-400 text-sm font-bold">
+                    <span className="text-amber-400 font-bold">
                       +{rec.points_earned} نقطة
                     </span>
                   </div>
@@ -515,9 +621,7 @@ const Recitations = () => {
             <DialogTitle className="text-white">تأكيد الحذف</DialogTitle>
           </DialogHeader>
           <div className="mt-4">
-            <p className="text-slate-300">
-              هل أنت متأكد من حذف هذا التسميع؟
-            </p>
+            <p className="text-slate-300">هل أنت متأكد من حذف هذا التسميع؟</p>
             <p className="text-red-400 text-sm mt-2">
               سيتم خصم {selectedRecitation?.points_earned || 0} نقطة من رصيد الطالب.
             </p>
