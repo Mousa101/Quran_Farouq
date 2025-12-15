@@ -1,12 +1,12 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { 
   LayoutDashboard, 
   Users, 
   Trophy, 
   Calendar, 
   Bell, 
-  Settings,
   LogOut,
   BookOpen,
   UserCheck,
@@ -16,12 +16,15 @@ import {
   Key,
   GraduationCap,
   ClipboardList,
-  UserCog
+  UserCog,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { Button } from './ui/button';
 
 const Sidebar = () => {
   const { user, logout } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -74,25 +77,27 @@ const Sidebar = () => {
   const navItems = getNavItems();
 
   return (
-    <aside className="fixed right-0 top-0 h-screen w-64 bg-slate-900/95 backdrop-blur-xl border-l border-white/10 flex flex-col z-50">
+    <aside className={`fixed right-0 top-0 h-screen w-64 backdrop-blur-xl flex flex-col z-50 transition-colors duration-300 ${
+      isDark ? 'bg-slate-900/95 border-l border-white/10' : 'bg-white/95 border-l border-slate-200'
+    }`}>
       {/* Logo */}
-      <div className="p-6 border-b border-white/10">
+      <div className={`p-6 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
             <BookOpen className="w-6 h-6 text-emerald-400" />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white font-cairo">مركز الفاروق</h1>
-            <p className="text-xs text-emerald-400">القرآني</p>
+            <h1 className={`text-lg font-bold font-cairo ${isDark ? 'text-white' : 'text-slate-900'}`}>مركز الفاروق</h1>
+            <p className="text-xs text-emerald-500">القرآني</p>
           </div>
         </div>
       </div>
 
       {/* User Info */}
-      <div className="p-4 border-b border-white/10">
-        <div className="glass-card p-3">
-          <p className="text-white font-medium">{user?.name}</p>
-          <p className="text-xs text-emerald-400">
+      <div className={`p-4 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+        <div className={`p-3 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
+          <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{user?.name}</p>
+          <p className="text-xs text-emerald-500">
             {user?.role === 'admin' && 'مدير'}
             {user?.role === 'sheikh' && 'شيخ'}
             {user?.role === 'student' && 'طالب'}
@@ -109,8 +114,10 @@ const Sidebar = () => {
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ${
                 isActive
-                  ? 'bg-emerald-500/20 text-emerald-400 glow-green'
-                  : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                  ? 'bg-emerald-500/20 text-emerald-500 glow-green'
+                  : isDark 
+                    ? 'text-slate-400 hover:bg-white/5 hover:text-white'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`
             }
           >
@@ -120,8 +127,33 @@ const Sidebar = () => {
         ))}
       </nav>
 
-      {/* Logout */}
-      <div className="p-4 border-t border-white/10">
+      {/* Theme Toggle & Logout */}
+      <div className={`p-4 border-t ${isDark ? 'border-white/10' : 'border-slate-200'} space-y-2`}>
+        {/* Theme Toggle */}
+        <Button
+          onClick={toggleTheme}
+          variant="ghost"
+          className={`w-full justify-start gap-3 ${
+            isDark 
+              ? 'text-amber-400 hover:text-amber-300 hover:bg-amber-500/10' 
+              : 'text-indigo-600 hover:text-indigo-700 hover:bg-indigo-500/10'
+          }`}
+          data-testid="theme-toggle-btn"
+        >
+          {isDark ? (
+            <>
+              <Sun className="w-5 h-5" />
+              <span>الوضع الفاتح</span>
+            </>
+          ) : (
+            <>
+              <Moon className="w-5 h-5" />
+              <span>الوضع الداكن</span>
+            </>
+          )}
+        </Button>
+
+        {/* Logout */}
         <Button
           onClick={handleLogout}
           variant="ghost"
