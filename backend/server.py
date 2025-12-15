@@ -657,11 +657,6 @@ class RecitationUpdate(BaseModel):
     pages_count: Optional[int] = None
     review_type: Optional[str] = None
     review_pages: Optional[int] = None
-    review_type: Optional[str] = None
-    review_pages: Optional[int] = None
-    review_juz: Optional[List[int]] = None
-    passed_review_minimum: Optional[bool] = None
-    notes: Optional[str] = None
 
 @api_router.put("/recitations/{recitation_id}")
 async def update_recitation(recitation_id: str, data: RecitationUpdate, current_user: dict = Depends(get_current_user)):
