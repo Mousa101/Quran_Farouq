@@ -50,6 +50,7 @@ const Sidebar = () => {
       return [
         ...baseItems,
         { to: '/groups', icon: UsersRound, label: 'مجموعاتي' },
+        { to: '/initial-assessment', icon: ClipboardList, label: 'تقييم الطلاب الجدد' },
         { to: '/tracking', icon: FileText, label: 'ورق المتابعة' },
         { to: '/recitations', icon: BookOpen, label: 'التسميع' },
         { to: '/attendance', icon: UserCheck, label: 'الحضور' },
