@@ -119,8 +119,12 @@ class UserCreateWithCode(BaseModel):
     name: str
     password: str
     role: str
-    registration_code: Optional[str] = None
-    # New student fields
+    registration_code: str  # Required for all roles
+    # Phone numbers
+    student_phone: Optional[str] = None
+    father_phone: Optional[str] = None
+    mother_phone: Optional[str] = None
+    # Student fields
     mosque_name: Optional[str] = None
     school_name: Optional[str] = None
     school_grade: Optional[str] = None
@@ -134,31 +138,33 @@ async def register(user_data: UserCreateWithCode):
     if existing:
         raise HTTPException(status_code=400, detail="البريد الإلكتروني مسجل مسبقاً")
     
-    # Validate role and registration code
-    if user_data.role in ["sheikh", "admin"]:
-        # Check if this is the first admin (allow without code)
-        admin_count = await db.users.count_documents({"role": "admin"})
-        is_first_admin = user_data.role == "admin" and admin_count == 0
+    # Check if this is the first admin (allow without code)
+    admin_count = await db.users.count_documents({"role": "admin"})
+    is_first_admin = user_data.role == "admin" and admin_count == 0
+    
+    if not is_first_admin:
+        # All roles require registration code
+        if not user_data.registration_code or user_data.registration_code.strip() == "":
+            raise HTTPException(status_code=400, detail="كود التسجيل مطلوب")
         
-        if not is_first_admin:
-            if not user_data.registration_code or user_data.registration_code.strip() == "":
-                raise HTTPException(status_code=400, detail="كود التسجيل مطلوب للشيخ والمدير")
-            
-            # Verify code
-            code_doc = await db.registration_codes.find_one({
-                "code": user_data.registration_code,
-                "role": user_data.role,
-                "used": False
-            })
-            
-            if not code_doc:
-                raise HTTPException(status_code=400, detail="كود التسجيل غير صحيح أو مستخدم")
+        # Verify code
+        code_doc = await db.registration_codes.find_one({
+            "code": user_data.registration_code,
+            "role": user_data.role,
+            "used": False
+        })
+        
+        if not code_doc:
+            raise HTTPException(status_code=400, detail="كود التسجيل غير صحيح أو مستخدم أو لا يتطابق مع الدور")
     
     # Create user with all fields
     user = User(
         email=user_data.email,
         name=user_data.name,
         role=user_data.role,
+        student_phone=user_data.student_phone,
+        father_phone=user_data.father_phone,
+        mother_phone=user_data.mother_phone,
         mosque_name=user_data.mosque_name,
         school_name=user_data.school_name,
         school_grade=user_data.school_grade,
@@ -169,6 +175,7 @@ async def register(user_data: UserCreateWithCode):
     user_dict = user.model_dump()
     user_dict["password_hash"] = get_password_hash(user_data.password)
     user_dict["created_at"] = user_dict["created_at"].isoformat()
+    user_dict["registration_date"] = user_dict["registration_date"].isoformat()
     
     await db.users.insert_one(user_dict)
     
