@@ -1299,6 +1299,55 @@ async def get_users(role: Optional[str] = None, current_user: dict = Depends(get
 
 # ============== STUDENT PROFILE & MANAGEMENT ==============
 
+# IMPORTANT: These /students/me routes must come BEFORE /students/{student_id} routes
+# to avoid "me" being treated as a student_id parameter
+
+@api_router.get("/students/me/profile")
+async def get_my_profile(current_user: dict = Depends(get_current_user)):
+    """Get own profile data (Student only)"""
+    if current_user["role"] != "student":
+        raise HTTPException(status_code=403, detail="هذه الخدمة للطلاب فقط")
+    
+    student_id = current_user["user_id"]
+    
+    # Get student info
+    student = await db.users.find_one({"id": student_id}, {"_id": 0, "password_hash": 0})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    return student
+
+@api_router.put("/students/me/profile")
+async def update_my_profile(data: StudentSelfUpdate, current_user: dict = Depends(get_current_user)):
+    """Update own profile (Student only - limited fields)"""
+    if current_user["role"] != "student":
+        raise HTTPException(status_code=403, detail="هذه الخدمة للطلاب فقط")
+    
+    student_id = current_user["user_id"]
+    
+    # Check if student exists
+    student = await db.users.find_one({"id": student_id, "role": "student"})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    # Build update dict - only allowed fields for student
+    update_data = {}
+    if data.student_phone is not None:
+        update_data["student_phone"] = data.student_phone
+    if data.profile_image is not None:
+        update_data["profile_image"] = data.profile_image
+    if data.school_name is not None:
+        update_data["school_name"] = data.school_name
+    if data.school_grade is not None:
+        update_data["school_grade"] = data.school_grade
+    if data.school_average is not None:
+        update_data["school_average"] = data.school_average
+    
+    if update_data:
+        await db.users.update_one({"id": student_id}, {"$set": update_data})
+    
+    return {"message": "تم تحديث بياناتك بنجاح"}
+
 @api_router.get("/students/{student_id}/profile")
 async def get_student_profile(student_id: str, current_user: dict = Depends(get_current_user)):
     """Get complete student profile with all records"""
