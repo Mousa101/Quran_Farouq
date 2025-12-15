@@ -99,19 +99,27 @@ class TrackingSheet(BaseModel):
     data: TrackingSheetData
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-# NEW Recitation Models - Updated
+# NEW Recitation Models - Updated with ranges and ratings
 class RecitationCreate(BaseModel):
     student_id: str
     recitation_type: str  # "new_memorization" or "review"
-    # For new memorization
-    pages_count: Optional[int] = None  # عدد الصفحات
+    # For new memorization - with range
+    juz_number: Optional[int] = None  # رقم الجزء (1-30)
+    page_from: Optional[int] = None  # من صفحة
+    page_to: Optional[int] = None  # إلى صفحة
+    rating: Optional[int] = None  # تقييم من 10
+    error_count: Optional[int] = None  # عدد الأخطاء
     passed_minimum: bool = False  # اجتاز الحد الأدنى
-    # For review
-    review_type: Optional[str] = None  # "pages" or "juz"
-    review_pages: Optional[int] = None  # عدد صفحات المراجعة
-    review_juz: Optional[List[int]] = None  # أرقام الأجزاء المراجعة (1-30)
+    # For review - combined juz and pages
+    review_juz: Optional[List[int]] = None  # أرقام الأجزاء المراجعة كاملة
+    partial_review_juz: Optional[int] = None  # جزء المراجعة الجزئية
+    partial_review_pages: Optional[int] = None  # عدد صفحات المراجعة الجزئية
     passed_review_minimum: bool = False  # اجتاز الحد الأدنى للمراجعة
     notes: Optional[str] = None
+    # Legacy fields (for backward compatibility)
+    pages_count: Optional[int] = None
+    review_type: Optional[str] = None
+    review_pages: Optional[int] = None
 
 class Recitation(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -119,14 +127,24 @@ class Recitation(BaseModel):
     student_id: str
     sheikh_id: str
     recitation_type: str
-    pages_count: Optional[int] = None
+    # New memorization fields
+    juz_number: Optional[int] = None
+    page_from: Optional[int] = None
+    page_to: Optional[int] = None
+    rating: Optional[int] = None
+    error_count: Optional[int] = None
     passed_minimum: bool = False
-    review_type: Optional[str] = None
-    review_pages: Optional[int] = None
+    # Review fields
     review_juz: Optional[List[int]] = None
+    partial_review_juz: Optional[int] = None
+    partial_review_pages: Optional[int] = None
     passed_review_minimum: bool = False
     notes: Optional[str] = None
     points_earned: int = 0
+    # Legacy fields
+    pages_count: Optional[int] = None
+    review_type: Optional[str] = None
+    review_pages: Optional[int] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Attendance Models
