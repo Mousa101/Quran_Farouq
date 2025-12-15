@@ -10,15 +10,48 @@ import { Checkbox } from '../components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
 import { Slider } from '../components/ui/slider';
-import { BookOpen, Plus, Loader2, CheckCircle, FileText, RotateCcw, Edit, Trash2, Star } from 'lucide-react';
+import { BookOpen, Plus, Loader2, CheckCircle, FileText, RotateCcw, Edit, Trash2, Star, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
+// Quran Juz page ranges (based on Madani Mushaf)
+const JUZ_PAGE_RANGES = {
+  1: { start: 1, end: 21, name: 'الجزء الأول' },
+  2: { start: 22, end: 41, name: 'الجزء الثاني' },
+  3: { start: 42, end: 61, name: 'الجزء الثالث' },
+  4: { start: 62, end: 81, name: 'الجزء الرابع' },
+  5: { start: 82, end: 101, name: 'الجزء الخامس' },
+  6: { start: 102, end: 121, name: 'الجزء السادس' },
+  7: { start: 122, end: 141, name: 'الجزء السابع' },
+  8: { start: 142, end: 161, name: 'الجزء الثامن' },
+  9: { start: 162, end: 181, name: 'الجزء التاسع' },
+  10: { start: 182, end: 201, name: 'الجزء العاشر' },
+  11: { start: 202, end: 221, name: 'الجزء الحادي عشر' },
+  12: { start: 222, end: 241, name: 'الجزء الثاني عشر' },
+  13: { start: 242, end: 261, name: 'الجزء الثالث عشر' },
+  14: { start: 262, end: 281, name: 'الجزء الرابع عشر' },
+  15: { start: 282, end: 301, name: 'الجزء الخامس عشر' },
+  16: { start: 302, end: 321, name: 'الجزء السادس عشر' },
+  17: { start: 322, end: 341, name: 'الجزء السابع عشر' },
+  18: { start: 342, end: 361, name: 'الجزء الثامن عشر' },
+  19: { start: 362, end: 381, name: 'الجزء التاسع عشر' },
+  20: { start: 382, end: 401, name: 'الجزء العشرون' },
+  21: { start: 402, end: 421, name: 'الجزء الحادي والعشرون' },
+  22: { start: 422, end: 441, name: 'الجزء الثاني والعشرون' },
+  23: { start: 442, end: 461, name: 'الجزء الثالث والعشرون' },
+  24: { start: 462, end: 481, name: 'الجزء الرابع والعشرون' },
+  25: { start: 482, end: 501, name: 'الجزء الخامس والعشرون' },
+  26: { start: 502, end: 521, name: 'الجزء السادس والعشرون' },
+  27: { start: 522, end: 541, name: 'الجزء السابع والعشرون' },
+  28: { start: 542, end: 561, name: 'الجزء الثامن والعشرون' },
+  29: { start: 562, end: 581, name: 'الجزء التاسع والعشرون' },
+  30: { start: 582, end: 604, name: 'الجزء الثلاثون' }
+};
+
 const Recitations = () => {
   const [recitations, setRecitations] = useState([]);
   const [students, setStudents] = useState([]);
-  const [quranJuz, setQuranJuz] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -26,30 +59,43 @@ const Recitations = () => {
   const [selectedRecitation, setSelectedRecitation] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   
-  const initialFormData = {
-    student_id: '',
-    recitation_type: 'new_memorization',
-    // New memorization fields
-    juz_number: 1,
-    page_from: 1,
-    page_to: 1,
-    rating: 7,
-    error_count: 0,
-    passed_minimum: false,
-    // Review fields
-    review_juz: [],
-    partial_review_juz: null,
-    partial_review_pages: 0,
-    passed_review_minimum: false,
-    notes: ''
+  const getInitialFormData = (juzNumber = 1) => {
+    const juzRange = JUZ_PAGE_RANGES[juzNumber];
+    return {
+      student_id: '',
+      recitation_type: 'new_memorization',
+      // New memorization fields
+      juz_number: juzNumber,
+      page_from: juzRange.start,
+      page_to: juzRange.start,
+      rating: 7,
+      error_count: 0,
+      passed_minimum: false,
+      // Review fields
+      review_juz: [],
+      partial_review_juz: null,
+      partial_review_pages: 0,
+      passed_review_minimum: false,
+      notes: ''
+    };
   };
 
-  const [formData, setFormData] = useState(initialFormData);
+  const [formData, setFormData] = useState(getInitialFormData());
 
   useEffect(() => {
     fetchData();
-    fetchQuranJuz();
   }, []);
+
+  // Handle Juz change - sync page numbers
+  const handleJuzChange = (newJuzNumber) => {
+    const juzRange = JUZ_PAGE_RANGES[newJuzNumber];
+    setFormData(prev => ({
+      ...prev,
+      juz_number: newJuzNumber,
+      page_from: juzRange.start,
+      page_to: juzRange.start
+    }));
+  };
 
   const fetchData = async () => {
     try {
@@ -70,16 +116,6 @@ const Recitations = () => {
       console.error('Error:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchQuranJuz = async () => {
-    try {
-      const response = await axios.get(`${API}/quran/juz`);
-      setQuranJuz(response.data);
-    } catch (error) {
-      // Use default juz list
-      setQuranJuz(Array.from({ length: 30 }, (_, i) => ({ number: i + 1, name: `الجزء ${i + 1}` })));
     }
   };
 
@@ -149,12 +185,13 @@ const Recitations = () => {
 
   const openEditDialog = (rec) => {
     setSelectedRecitation(rec);
+    const juzRange = JUZ_PAGE_RANGES[rec.juz_number || 1];
     setFormData({
       student_id: rec.student_id,
       recitation_type: rec.recitation_type,
       juz_number: rec.juz_number || 1,
-      page_from: rec.page_from || 1,
-      page_to: rec.page_to || 1,
+      page_from: rec.page_from || juzRange.start,
+      page_to: rec.page_to || juzRange.start,
       rating: rec.rating || 7,
       error_count: rec.error_count || 0,
       passed_minimum: rec.passed_minimum || false,
@@ -168,7 +205,7 @@ const Recitations = () => {
   };
 
   const resetForm = () => {
-    setFormData(initialFormData);
+    setFormData(getInitialFormData());
   };
 
   const getStudentName = (studentId) => {
@@ -211,276 +248,310 @@ const Recitations = () => {
     }
   };
 
+  // Get current Juz page range
+  const getCurrentJuzRange = () => {
+    return JUZ_PAGE_RANGES[formData.juz_number] || JUZ_PAGE_RANGES[1];
+  };
+
   // Recitation Form Component
-  const RecitationForm = ({ onSubmit, isEdit = false }) => (
-    <form onSubmit={onSubmit} className="space-y-4 mt-4">
-      {/* Student Selection */}
-      <div className="space-y-2">
-        <Label className="text-slate-300">الطالب</Label>
-        <Select 
-          value={formData.student_id} 
-          onValueChange={(v) => setFormData({ ...formData, student_id: v })}
-          disabled={isEdit}
-        >
-          <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-            <SelectValue placeholder="اختر الطالب" />
-          </SelectTrigger>
-          <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
-            {students.map((student) => (
-              <SelectItem key={student.id} value={student.id} className="text-white">
-                {student.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Recitation Type */}
-      <div className="space-y-3">
-        <Label className="text-slate-300">نوع التسميع</Label>
-        <RadioGroup 
-          value={formData.recitation_type} 
-          onValueChange={(v) => setFormData({ ...formData, recitation_type: v })}
-          className="grid grid-cols-2 gap-3"
-        >
-          <div>
-            <RadioGroupItem value="new_memorization" id={isEdit ? "new-edit" : "new"} className="peer sr-only" />
-            <Label
-              htmlFor={isEdit ? "new-edit" : "new"}
-              className="flex items-center gap-2 p-3 rounded-xl border-2 border-slate-700 cursor-pointer transition-all peer-data-[state=checked]:border-emerald-500 peer-data-[state=checked]:bg-emerald-500/10"
-            >
-              <FileText className="w-5 h-5 text-emerald-400" />
-              <span className="text-white">حفظ جديد</span>
-            </Label>
-          </div>
-          <div>
-            <RadioGroupItem value="review" id={isEdit ? "review-edit" : "review"} className="peer sr-only" />
-            <Label
-              htmlFor={isEdit ? "review-edit" : "review"}
-              className="flex items-center gap-2 p-3 rounded-xl border-2 border-slate-700 cursor-pointer transition-all peer-data-[state=checked]:border-blue-500 peer-data-[state=checked]:bg-blue-500/10"
-            >
-              <RotateCcw className="w-5 h-5 text-blue-400" />
-              <span className="text-white">مراجعة</span>
-            </Label>
-          </div>
-        </RadioGroup>
-      </div>
-
-      {/* New Memorization Fields */}
-      {formData.recitation_type === 'new_memorization' && (
-        <div className="space-y-4 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
-          {/* Juz Selection */}
-          <div className="space-y-2">
-            <Label className="text-slate-300">الجزء</Label>
-            <Select 
-              value={String(formData.juz_number)} 
-              onValueChange={(v) => setFormData({ ...formData, juz_number: parseInt(v) })}
-            >
-              <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                <SelectValue placeholder="اختر الجزء" />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
-                {Array.from({ length: 30 }, (_, i) => (
-                  <SelectItem key={i + 1} value={String(i + 1)} className="text-white">
-                    الجزء {i + 1}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Page Range */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-slate-300">من صفحة</Label>
-              <Input
-                type="number"
-                min="1"
-                max="20"
-                value={formData.page_from}
-                onChange={(e) => setFormData({ ...formData, page_from: parseInt(e.target.value) || 1 })}
-                className="bg-slate-800 border-slate-700 text-white"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-slate-300">إلى صفحة</Label>
-              <Input
-                type="number"
-                min="1"
-                max="20"
-                value={formData.page_to}
-                onChange={(e) => setFormData({ ...formData, page_to: parseInt(e.target.value) || 1 })}
-                className="bg-slate-800 border-slate-700 text-white"
-              />
-            </div>
-          </div>
-
-          {/* Rating */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-slate-300">تقييم التسميع</Label>
-              <span className="text-emerald-400 font-bold text-lg flex items-center gap-1">
-                <Star className="w-4 h-4" />
-                {formData.rating}/10
-              </span>
-            </div>
-            <Slider
-              value={[formData.rating]}
-              onValueChange={(v) => setFormData({ ...formData, rating: v[0] })}
-              min={1}
-              max={10}
-              step={1}
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-slate-500">
-              <span>ضعيف</span>
-              <span>متوسط</span>
-              <span>ممتاز</span>
-            </div>
-          </div>
-
-          {/* Error Count */}
-          <div className="space-y-2">
-            <Label className="text-slate-300">عدد الأخطاء</Label>
-            <Input
-              type="number"
-              min="0"
-              max="50"
-              value={formData.error_count}
-              onChange={(e) => setFormData({ ...formData, error_count: parseInt(e.target.value) || 0 })}
-              className="bg-slate-800 border-slate-700 text-white"
-            />
-          </div>
-          
-          {/* Passed Minimum */}
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
-            <Checkbox
-              id={isEdit ? "passed_min_edit" : "passed_min"}
-              checked={formData.passed_minimum}
-              onCheckedChange={(checked) => setFormData({ ...formData, passed_minimum: checked })}
-              className="border-emerald-500 data-[state=checked]:bg-emerald-500"
-            />
-            <Label htmlFor={isEdit ? "passed_min_edit" : "passed_min"} className="text-white cursor-pointer flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-400" />
-              اجتاز الحد الأدنى
-            </Label>
-          </div>
-        </div>
-      )}
-
-      {/* Review Fields */}
-      {formData.recitation_type === 'review' && (
-        <div className="space-y-4 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20">
-          {/* Complete Juz Selection */}
-          <div className="space-y-2">
-            <Label className="text-slate-300">الأجزاء المراجعة كاملة</Label>
-            <div className="grid grid-cols-6 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-800/50 rounded-lg">
-              {Array.from({ length: 30 }, (_, i) => i + 1).map((juz) => (
-                <div
-                  key={juz}
-                  onClick={() => handleJuzToggle(juz)}
-                  className={`p-2 text-center rounded-lg cursor-pointer transition-all text-sm ${
-                    formData.review_juz?.includes(juz)
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
-                >
-                  {juz}
-                </div>
+  const RecitationForm = ({ onSubmit, isEdit = false }) => {
+    const juzRange = getCurrentJuzRange();
+    
+    return (
+      <form onSubmit={onSubmit} className="space-y-4 mt-4">
+        {/* Student Selection */}
+        <div className="space-y-2">
+          <Label className="text-slate-300">الطالب</Label>
+          <Select 
+            value={formData.student_id} 
+            onValueChange={(v) => setFormData({ ...formData, student_id: v })}
+            disabled={isEdit}
+          >
+            <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+              <SelectValue placeholder="اختر الطالب" />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
+              {students.map((student) => (
+                <SelectItem key={student.id} value={student.id} className="text-white">
+                  {student.name}
+                </SelectItem>
               ))}
-            </div>
-            {formData.review_juz?.length > 0 && (
-              <p className="text-blue-400 text-sm">
-                الأجزاء المختارة: {formData.review_juz.sort((a,b) => a-b).join(', ')}
-              </p>
-            )}
-          </div>
+            </SelectContent>
+          </Select>
+        </div>
 
-          {/* Partial Juz Review */}
-          <div className="p-3 rounded-lg bg-slate-800/30 border border-slate-700 space-y-3">
-            <Label className="text-slate-300 block">مراجعة جزئية (صفحات من جزء)</Label>
+        {/* Recitation Type */}
+        <div className="space-y-3">
+          <Label className="text-slate-300">نوع التسميع</Label>
+          <RadioGroup 
+            value={formData.recitation_type} 
+            onValueChange={(v) => setFormData({ ...formData, recitation_type: v })}
+            className="grid grid-cols-2 gap-3"
+          >
+            <div>
+              <RadioGroupItem value="new_memorization" id={isEdit ? "new-edit" : "new"} className="peer sr-only" />
+              <Label
+                htmlFor={isEdit ? "new-edit" : "new"}
+                className="flex items-center gap-2 p-3 rounded-xl border-2 border-slate-700 cursor-pointer transition-all peer-data-[state=checked]:border-emerald-500 peer-data-[state=checked]:bg-emerald-500/10"
+              >
+                <FileText className="w-5 h-5 text-emerald-400" />
+                <span className="text-white">حفظ جديد</span>
+              </Label>
+            </div>
+            <div>
+              <RadioGroupItem value="review" id={isEdit ? "review-edit" : "review"} className="peer sr-only" />
+              <Label
+                htmlFor={isEdit ? "review-edit" : "review"}
+                className="flex items-center gap-2 p-3 rounded-xl border-2 border-slate-700 cursor-pointer transition-all peer-data-[state=checked]:border-blue-500 peer-data-[state=checked]:bg-blue-500/10"
+              >
+                <RotateCcw className="w-5 h-5 text-blue-400" />
+                <span className="text-white">مراجعة</span>
+              </Label>
+            </div>
+          </RadioGroup>
+        </div>
+
+        {/* New Memorization Fields */}
+        {formData.recitation_type === 'new_memorization' && (
+          <div className="space-y-4 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+            {/* Juz Selection */}
+            <div className="space-y-2">
+              <Label className="text-slate-300">الجزء</Label>
+              <Select 
+                value={String(formData.juz_number)} 
+                onValueChange={(v) => handleJuzChange(parseInt(v))}
+              >
+                <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                  <SelectValue placeholder="اختر الجزء" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
+                  {Array.from({ length: 30 }, (_, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)} className="text-white">
+                      الجزء {i + 1} (ص {JUZ_PAGE_RANGES[i + 1].start} - {JUZ_PAGE_RANGES[i + 1].end})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Page Range Info */}
+            <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2">
+              <Info className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+              <p className="text-emerald-300 text-sm">
+                {juzRange.name}: من صفحة {juzRange.start} إلى صفحة {juzRange.end}
+              </p>
+            </div>
+
+            {/* Page Range */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-slate-400 text-sm">عدد الصفحات</Label>
+                <Label className="text-slate-300">من صفحة</Label>
                 <Input
                   type="number"
-                  min="0"
-                  max="20"
-                  value={formData.partial_review_pages || 0}
-                  onChange={(e) => setFormData({ ...formData, partial_review_pages: parseInt(e.target.value) || 0 })}
+                  min={juzRange.start}
+                  max={juzRange.end}
+                  value={formData.page_from}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || juzRange.start;
+                    const bounded = Math.max(juzRange.start, Math.min(juzRange.end, val));
+                    setFormData({ ...formData, page_from: bounded });
+                  }}
                   className="bg-slate-800 border-slate-700 text-white"
-                  placeholder="0"
                 />
+                <p className="text-xs text-slate-500">الحد الأدنى: {juzRange.start}</p>
               </div>
               <div className="space-y-2">
-                <Label className="text-slate-400 text-sm">من جزء</Label>
-                <Select 
-                  value={formData.partial_review_juz ? String(formData.partial_review_juz) : ""} 
-                  onValueChange={(v) => setFormData({ ...formData, partial_review_juz: v ? parseInt(v) : null })}
-                >
-                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                    <SelectValue placeholder="اختر الجزء" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
-                    {Array.from({ length: 30 }, (_, i) => (
-                      <SelectItem key={i + 1} value={String(i + 1)} className="text-white">
-                        الجزء {i + 1}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="text-slate-300">إلى صفحة</Label>
+                <Input
+                  type="number"
+                  min={formData.page_from}
+                  max={juzRange.end}
+                  value={formData.page_to}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value) || formData.page_from;
+                    const bounded = Math.max(formData.page_from, Math.min(juzRange.end, val));
+                    setFormData({ ...formData, page_to: bounded });
+                  }}
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+                <p className="text-xs text-slate-500">الحد الأقصى: {juzRange.end}</p>
               </div>
             </div>
-          </div>
 
-          {/* Preview */}
-          {(formData.review_juz?.length > 0 || formData.partial_review_pages > 0) && (
-            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-              <p className="text-blue-300 text-sm">
-                <span className="font-bold">الناتج: </span>
-                {formData.review_juz?.length > 0 && `مراجعة الأجزاء ${formData.review_juz.sort((a,b) => a-b).join(', ')}`}
-                {formData.review_juz?.length > 0 && formData.partial_review_pages > 0 && ' و '}
-                {formData.partial_review_pages > 0 && `${formData.partial_review_pages} صفحات${formData.partial_review_juz ? ` من جزء ${formData.partial_review_juz}` : ''}`}
-              </p>
+            {/* Pages Count Display */}
+            <div className="text-center p-2 rounded-lg bg-slate-800/50">
+              <span className="text-emerald-400 font-bold">
+                عدد الصفحات: {Math.max(0, formData.page_to - formData.page_from + 1)} صفحة
+              </span>
             </div>
-          )}
 
-          {/* Passed Review Minimum */}
-          <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
-            <Checkbox
-              id={isEdit ? "passed_review_edit" : "passed_review"}
-              checked={formData.passed_review_minimum}
-              onCheckedChange={(checked) => setFormData({ ...formData, passed_review_minimum: checked })}
-              className="border-blue-500 data-[state=checked]:bg-blue-500"
-            />
-            <Label htmlFor={isEdit ? "passed_review_edit" : "passed_review"} className="text-white cursor-pointer flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-blue-400" />
-              اجتاز الحد الأدنى للمراجعة
-            </Label>
+            {/* Rating */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-slate-300">تقييم التسميع</Label>
+                <span className="text-emerald-400 font-bold text-lg flex items-center gap-1">
+                  <Star className="w-4 h-4" />
+                  {formData.rating}/10
+                </span>
+              </div>
+              <Slider
+                value={[formData.rating]}
+                onValueChange={(v) => setFormData({ ...formData, rating: v[0] })}
+                min={1}
+                max={10}
+                step={1}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-slate-500">
+                <span>ضعيف</span>
+                <span>متوسط</span>
+                <span>ممتاز</span>
+              </div>
+            </div>
+
+            {/* Error Count */}
+            <div className="space-y-2">
+              <Label className="text-slate-300">عدد الأخطاء</Label>
+              <Input
+                type="number"
+                min="0"
+                max="50"
+                value={formData.error_count}
+                onChange={(e) => setFormData({ ...formData, error_count: parseInt(e.target.value) || 0 })}
+                className="bg-slate-800 border-slate-700 text-white"
+              />
+            </div>
+            
+            {/* Passed Minimum */}
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
+              <Checkbox
+                id={isEdit ? "passed_min_edit" : "passed_min"}
+                checked={formData.passed_minimum}
+                onCheckedChange={(checked) => setFormData({ ...formData, passed_minimum: checked })}
+                className="border-emerald-500 data-[state=checked]:bg-emerald-500"
+              />
+              <Label htmlFor={isEdit ? "passed_min_edit" : "passed_min"} className="text-white cursor-pointer flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-emerald-400" />
+                اجتاز الحد الأدنى
+              </Label>
+            </div>
           </div>
+        )}
+
+        {/* Review Fields */}
+        {formData.recitation_type === 'review' && (
+          <div className="space-y-4 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20">
+            {/* Complete Juz Selection */}
+            <div className="space-y-2">
+              <Label className="text-slate-300">الأجزاء المراجعة كاملة</Label>
+              <div className="grid grid-cols-6 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-800/50 rounded-lg">
+                {Array.from({ length: 30 }, (_, i) => i + 1).map((juz) => (
+                  <div
+                    key={juz}
+                    onClick={() => handleJuzToggle(juz)}
+                    className={`p-2 text-center rounded-lg cursor-pointer transition-all text-sm ${
+                      formData.review_juz?.includes(juz)
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    {juz}
+                  </div>
+                ))}
+              </div>
+              {formData.review_juz?.length > 0 && (
+                <p className="text-blue-400 text-sm">
+                  الأجزاء المختارة: {formData.review_juz.sort((a,b) => a-b).join(', ')}
+                </p>
+              )}
+            </div>
+
+            {/* Partial Juz Review */}
+            <div className="p-3 rounded-lg bg-slate-800/30 border border-slate-700 space-y-3">
+              <Label className="text-slate-300 block">مراجعة جزئية (صفحات من جزء)</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-slate-400 text-sm">عدد الصفحات</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="20"
+                    value={formData.partial_review_pages || 0}
+                    onChange={(e) => setFormData({ ...formData, partial_review_pages: parseInt(e.target.value) || 0 })}
+                    className="bg-slate-800 border-slate-700 text-white"
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-slate-400 text-sm">من جزء</Label>
+                  <Select 
+                    value={formData.partial_review_juz ? String(formData.partial_review_juz) : ""} 
+                    onValueChange={(v) => setFormData({ ...formData, partial_review_juz: v ? parseInt(v) : null })}
+                  >
+                    <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
+                      <SelectValue placeholder="اختر الجزء" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
+                      {Array.from({ length: 30 }, (_, i) => (
+                        <SelectItem key={i + 1} value={String(i + 1)} className="text-white">
+                          الجزء {i + 1}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            {/* Preview */}
+            {(formData.review_juz?.length > 0 || formData.partial_review_pages > 0) && (
+              <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <p className="text-blue-300 text-sm">
+                  <span className="font-bold">الناتج: </span>
+                  {formData.review_juz?.length > 0 && `مراجعة الأجزاء ${formData.review_juz.sort((a,b) => a-b).join(', ')}`}
+                  {formData.review_juz?.length > 0 && formData.partial_review_pages > 0 && ' و '}
+                  {formData.partial_review_pages > 0 && `${formData.partial_review_pages} صفحات${formData.partial_review_juz ? ` من جزء ${formData.partial_review_juz}` : ''}`}
+                </p>
+              </div>
+            )}
+
+            {/* Passed Review Minimum */}
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-800/50">
+              <Checkbox
+                id={isEdit ? "passed_review_edit" : "passed_review"}
+                checked={formData.passed_review_minimum}
+                onCheckedChange={(checked) => setFormData({ ...formData, passed_review_minimum: checked })}
+                className="border-blue-500 data-[state=checked]:bg-blue-500"
+              />
+              <Label htmlFor={isEdit ? "passed_review_edit" : "passed_review"} className="text-white cursor-pointer flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-blue-400" />
+                اجتاز الحد الأدنى للمراجعة
+              </Label>
+            </div>
+          </div>
+        )}
+
+        {/* Notes */}
+        <div className="space-y-2">
+          <Label className="text-slate-300">ملاحظات (اختياري)</Label>
+          <Textarea
+            value={formData.notes}
+            onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+            className="bg-slate-800 border-slate-700 text-white"
+            placeholder="أي ملاحظات إضافية..."
+          />
         </div>
-      )}
 
-      {/* Notes */}
-      <div className="space-y-2">
-        <Label className="text-slate-300">ملاحظات (اختياري)</Label>
-        <Textarea
-          value={formData.notes}
-          onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-          className="bg-slate-800 border-slate-700 text-white"
-          placeholder="أي ملاحظات إضافية..."
-        />
-      </div>
-
-      <Button
-        type="submit"
-        className="w-full bg-emerald-500 hover:bg-emerald-600"
-        disabled={submitting || !formData.student_id}
-      >
-        {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : isEdit ? 'تحديث' : 'حفظ'}
-      </Button>
-    </form>
-  );
+        <Button
+          type="submit"
+          className="w-full bg-emerald-500 hover:bg-emerald-600"
+          disabled={submitting || !formData.student_id}
+        >
+          {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : isEdit ? 'تحديث' : 'حفظ'}
+        </Button>
+      </form>
+    );
+  };
 
   if (loading) {
     return (
@@ -498,7 +569,10 @@ const Recitations = () => {
           <p className="text-slate-400">تسجيل الحفظ الجديد والمراجعة</p>
         </div>
         
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) resetForm();
+        }}>
           <DialogTrigger asChild>
             <Button className="bg-emerald-500 hover:bg-emerald-600">
               <Plus className="w-5 h-5 ml-2" />
