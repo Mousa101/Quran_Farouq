@@ -15,7 +15,8 @@ import {
   Star,
   Key,
   GraduationCap,
-  ClipboardList
+  ClipboardList,
+  UserCog
 } from 'lucide-react';
 import { Button } from './ui/button';
 
