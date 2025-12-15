@@ -268,6 +268,17 @@ function AppRoutes() {
         }
       />
 
+      <Route
+        path="/edit-profile"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <StudentEditProfile />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Default Route */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
