@@ -454,16 +454,24 @@ const StudentProfile = () => {
             {attendance_records && attendance_records.length > 0 ? (
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {attendance_records.map((att) => (
-                  <div key={att.id} className="p-3 rounded-lg bg-slate-800/50 border border-white/5 flex items-center justify-between">
-                    <span className="text-slate-300">{att.date}</span>
-                    <Badge className={`${
-                      att.status === 'present' ? 'bg-emerald-500/20 text-emerald-400' :
-                      att.status === 'absent' ? 'bg-red-500/20 text-red-400' :
-                      'bg-amber-500/20 text-amber-400'
-                    }`}>
-                      {att.status === 'present' ? 'حاضر' :
-                       att.status === 'absent' ? 'غائب' : 'عذر'}
-                    </Badge>
+                  <div key={att.id} className="p-3 rounded-lg bg-slate-800/50 border border-white/5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-300">{formatDateWithDay(att.date)}</span>
+                      <Badge className={`${
+                        att.status === 'present' ? 'bg-emerald-500/20 text-emerald-400' :
+                        att.status === 'absent' ? 'bg-red-500/20 text-red-400' :
+                        'bg-amber-500/20 text-amber-400'
+                      }`}>
+                        {att.status === 'present' ? 'حاضر' :
+                         att.status === 'absent' ? 'غائب' : 'معذور'}
+                      </Badge>
+                    </div>
+                    {/* Show excuse reason if exists */}
+                    {att.status === 'excused' && att.excuse_reason && (
+                      <div className="mt-2 text-xs text-amber-300 bg-amber-500/10 p-2 rounded">
+                        <span className="font-medium">سبب العذر:</span> {att.excuse_reason}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
