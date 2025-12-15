@@ -6,7 +6,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
-import { BookOpen, Mail, Lock, User, Loader2, GraduationCap, Shield, Users, Key, Building, Calendar, Image } from 'lucide-react';
+import { BookOpen, Mail, Lock, User, Loader2, GraduationCap, Shield, Users, Key, Phone, Image } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Register = () => {
@@ -16,6 +16,11 @@ const Register = () => {
     password: '',
     role: 'student',
     registrationCode: '',
+    // Phone numbers
+    studentPhone: '',
+    fatherPhone: '',
+    motherPhone: '',
+    // Student fields
     mosqueName: '',
     schoolName: '',
     schoolGrade: '',
@@ -44,8 +49,9 @@ const Register = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if ((formData.role === 'sheikh' || formData.role === 'admin') && !formData.registrationCode.trim()) {
-      toast.error('كود التسجيل مطلوب للشيخ والمدير');
+    // All roles require code now
+    if (!formData.registrationCode.trim()) {
+      toast.error('كود التسجيل مطلوب');
       return;
     }
     
@@ -62,7 +68,10 @@ const Register = () => {
         formData.schoolName,
         formData.schoolGrade,
         formData.birthDate,
-        formData.profileImage
+        formData.profileImage,
+        formData.studentPhone,
+        formData.fatherPhone,
+        formData.motherPhone
       );
       toast.success(`مرحباً ${user.name}، تم إنشاء حسابك بنجاح`);
       navigate('/dashboard');
@@ -74,12 +83,11 @@ const Register = () => {
   };
 
   const roles = [
-    { value: 'student', label: 'طالب', icon: GraduationCap, needsCode: false },
-    { value: 'sheikh', label: 'شيخ', icon: Users, needsCode: true },
-    { value: 'admin', label: 'مدير', icon: Shield, needsCode: true },
+    { value: 'student', label: 'طالب', icon: GraduationCap },
+    { value: 'sheikh', label: 'شيخ', icon: Users },
+    { value: 'admin', label: 'مدير', icon: Shield },
   ];
 
-  const needsCode = formData.role === 'sheikh' || formData.role === 'admin';
   const isStudent = formData.role === 'student';
 
   return (
@@ -131,17 +139,35 @@ const Register = () => {
                       >
                         <r.icon className="w-5 h-5 mb-1 text-slate-400" />
                         <span className="text-xs font-medium text-white">{r.label}</span>
-                        {r.needsCode && <span className="text-[10px] text-amber-400">يحتاج كود</span>}
                       </Label>
                     </div>
                   ))}
                 </RadioGroup>
               </div>
 
+              {/* Registration Code - Required for ALL */}
+              <div className="space-y-1">
+                <Label className="text-slate-300 text-sm flex items-center gap-1">
+                  <Key className="w-3 h-3 text-amber-400" />
+                  كود التسجيل <span className="text-red-400">*</span>
+                </Label>
+                <Input
+                  type="text"
+                  placeholder="الكود من 6 أرقام (من الإدارة)"
+                  value={formData.registrationCode}
+                  onChange={(e) => handleChange('registrationCode', e.target.value)}
+                  className="h-9 text-sm bg-slate-800/50 border-amber-500/50 text-white text-center tracking-widest"
+                  maxLength={6}
+                  required
+                  data-testid="registration-code-input"
+                />
+                <p className="text-xs text-amber-400/80">احصل على كود التسجيل من إدارة المركز</p>
+              </div>
+
               {/* Basic Info */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-slate-300 text-sm">الاسم</Label>
+                  <Label className="text-slate-300 text-sm">الاسم <span className="text-red-400">*</span></Label>
                   <div className="relative">
                     <User className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <Input
@@ -156,7 +182,7 @@ const Register = () => {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-slate-300 text-sm">البريد</Label>
+                  <Label className="text-slate-300 text-sm">البريد <span className="text-red-400">*</span></Label>
                   <div className="relative">
                     <Mail className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <Input
@@ -174,7 +200,7 @@ const Register = () => {
               </div>
 
               <div className="space-y-1">
-                <Label className="text-slate-300 text-sm">كلمة المرور</Label>
+                <Label className="text-slate-300 text-sm">كلمة المرور <span className="text-red-400">*</span></Label>
                 <div className="relative">
                   <Lock className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <Input
@@ -190,31 +216,48 @@ const Register = () => {
                 </div>
               </div>
 
-              {/* Registration Code for Sheikh/Admin */}
-              {needsCode && (
-                <div className="space-y-1 animate-fadeIn">
-                  <Label className="text-slate-300 text-sm flex items-center gap-1">
-                    <Key className="w-3 h-3 text-amber-400" />
-                    كود التسجيل
-                  </Label>
-                  <Input
-                    type="text"
-                    placeholder="الكود من 6 أرقام"
-                    value={formData.registrationCode}
-                    onChange={(e) => handleChange('registrationCode', e.target.value)}
-                    className="h-9 text-sm bg-slate-800/50 border-amber-500/50 text-white text-center tracking-widest"
-                    maxLength={6}
-                    required
-                    data-testid="registration-code-input"
-                  />
-                </div>
-              )}
-
               {/* Student Extra Fields */}
               {isStudent && (
                 <div className="space-y-3 p-3 rounded-lg bg-slate-800/30 border border-slate-700/50 animate-fadeIn">
-                  <p className="text-xs text-emerald-400 font-medium">معلومات الطالب (اختياري)</p>
+                  <p className="text-xs text-emerald-400 font-medium">معلومات الطالب</p>
                   
+                  {/* Phone Numbers */}
+                  <div className="space-y-2">
+                    <Label className="text-slate-400 text-xs flex items-center gap-1">
+                      <Phone className="w-3 h-3" />
+                      أرقام الهواتف
+                    </Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <Input
+                        type="tel"
+                        placeholder="هاتف الطالب"
+                        value={formData.studentPhone}
+                        onChange={(e) => handleChange('studentPhone', e.target.value)}
+                        className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
+                        dir="ltr"
+                        data-testid="student-phone-input"
+                      />
+                      <Input
+                        type="tel"
+                        placeholder="هاتف الأب"
+                        value={formData.fatherPhone}
+                        onChange={(e) => handleChange('fatherPhone', e.target.value)}
+                        className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
+                        dir="ltr"
+                        data-testid="father-phone-input"
+                      />
+                      <Input
+                        type="tel"
+                        placeholder="هاتف الأم"
+                        value={formData.motherPhone}
+                        onChange={(e) => handleChange('motherPhone', e.target.value)}
+                        className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
+                        dir="ltr"
+                        data-testid="mother-phone-input"
+                      />
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <Label className="text-slate-400 text-xs">المسجد</Label>
