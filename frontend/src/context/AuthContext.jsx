@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
     return userData;
   };
 
-  const register = async (name, email, password, role, registrationCode = '', mosqueName = '', schoolName = '', schoolGrade = '', birthDate = '', profileImage = '') => {
+  const register = async (name, email, password, role, registrationCode = '', mosqueName = '', schoolName = '', schoolGrade = '', birthDate = '', profileImage = '', studentPhone = '', fatherPhone = '', motherPhone = '') => {
     const response = await axios.post(`${API}/auth/register`, {
       name,
       email,
@@ -54,7 +54,10 @@ export const AuthProvider = ({ children }) => {
       school_name: schoolName || null,
       school_grade: schoolGrade || null,
       birth_date: birthDate || null,
-      profile_image: profileImage || null
+      profile_image: profileImage || null,
+      student_phone: studentPhone || null,
+      father_phone: fatherPhone || null,
+      mother_phone: motherPhone || null
     });
     const { token: newToken, user: userData } = response.data;
     
