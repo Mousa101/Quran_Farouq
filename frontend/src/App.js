@@ -256,6 +256,17 @@ function AppRoutes() {
         }
       />
 
+      <Route
+        path="/initial-assessment"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <InitialAssessment />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Default Route */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
