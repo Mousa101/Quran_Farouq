@@ -1,95 +1,174 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
-import { BookOpen, Mail, Lock, User, Loader2, GraduationCap, Shield, Users, Key, Phone, Image } from 'lucide-react';
+import { BookOpen, Mail, Lock, User, Loader2, Phone, Calendar, School, Home, CheckCircle, Key, Image } from 'lucide-react';
 import { toast } from 'sonner';
+import axios from 'axios';
+
+const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const Register = () => {
+  const navigate = useNavigate();
+  const [step, setStep] = useState(1); // 1: Registration, 2: Waiting/Activation
+  const [loading, setLoading] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [activationCode, setActivationCode] = useState('');
+  
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    role: 'student',
-    registrationCode: '',
-    // Phone numbers
+    confirmPassword: '',
+    mosqueName: '',
+    schoolName: '',
+    birthDate: '',
+    schoolGrade: '',
     studentPhone: '',
     fatherPhone: '',
     motherPhone: '',
-    // Student fields
-    mosqueName: '',
-    schoolName: '',
-    schoolGrade: '',
-    birthDate: '',
     profileImage: ''
   });
-  const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
-  const navigate = useNavigate();
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        handleChange('profileImage', event.target.result.split(',')[1]);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // All roles require code now
-    if (!formData.registrationCode.trim()) {
-      toast.error('كود التسجيل مطلوب');
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('كلمات المرور غير متطابقة');
+      return;
+    }
+    
+    if (formData.password.length < 6) {
+      toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
       return;
     }
     
     setLoading(true);
-
+    
     try {
-      const user = await register(
-        formData.name, 
-        formData.email, 
-        formData.password, 
-        formData.role, 
-        formData.registrationCode,
-        formData.mosqueName,
-        formData.schoolName,
-        formData.schoolGrade,
-        formData.birthDate,
-        formData.profileImage,
-        formData.studentPhone,
-        formData.fatherPhone,
-        formData.motherPhone
-      );
-      toast.success(`مرحباً ${user.name}، تم إنشاء حسابك بنجاح`);
-      navigate('/dashboard');
+      const response = await axios.post(`${API}/auth/student-register`, {
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        confirm_password: formData.confirmPassword,
+        mosque_name: formData.mosqueName,
+        school_name: formData.schoolName,
+        school_grade: formData.schoolGrade,
+        birth_date: formData.birthDate,
+        student_phone: formData.studentPhone,
+        father_phone: formData.fatherPhone,
+        mother_phone: formData.motherPhone,
+        profile_image: formData.profileImage
+      });
+      
+      toast.success('تم تسجيل بياناتك بنجاح');
+      setRegisteredEmail(formData.email);
+      setStep(2);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'فشل إنشاء الحساب');
+      toast.error(error.response?.data?.detail || 'فشل التسجيل');
     } finally {
       setLoading(false);
     }
   };
 
-  const roles = [
-    { value: 'student', label: 'طالب', icon: GraduationCap },
-    { value: 'sheikh', label: 'شيخ', icon: Users },
-    { value: 'admin', label: 'مدير', icon: Shield },
-  ];
+  const handleActivate = async (e) => {
+    e.preventDefault();
+    
+    if (activationCode.length !== 6) {
+      toast.error('كود التفعيل يجب أن يكون 6 أرقام');
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      const response = await axios.post(`${API}/auth/activate`, {
+        email: registeredEmail,
+        activation_code: activationCode
+      });
+      
+      // Save token and redirect
+      localStorage.setItem('token', response.data.token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+      
+      toast.success('تم تفعيل حسابك بنجاح!');
+      window.location.href = '/dashboard';
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'كود التفعيل غير صحيح');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const isStudent = formData.role === 'student';
+  // Step 2: Waiting for activation
+  if (step === 2) {
+    return (
+      <div className="min-h-screen bg-background pattern-overlay flex items-center justify-center p-4">
+        <Card className="w-full max-w-md glass-card animate-fadeIn">
+          <CardHeader className="text-center space-y-4">
+            <div className="w-20 h-20 mx-auto rounded-full bg-amber-500/20 flex items-center justify-center">
+              <Key className="w-10 h-10 text-amber-400" />
+            </div>
+            <CardTitle className="text-2xl font-bold text-white font-cairo">
+              في انتظار التفعيل
+            </CardTitle>
+            <CardDescription className="text-slate-400">
+              تم تسجيل بياناتك بنجاح!
+              <br />
+              يرجى التواصل مع إدارة المركز للحصول على كود التفعيل
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleActivate} className="space-y-6">
+              <div className="p-4 rounded-xl bg-slate-800/50 border border-slate-700">
+                <p className="text-sm text-slate-400 mb-2">بريدك الإلكتروني:</p>
+                <p className="text-emerald-400 font-medium">{registeredEmail}</p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label className="text-slate-300">كود التفعيل</Label>
+                <Input
+                  type="text"
+                  placeholder="أدخل الكود من 6 أرقام"
+                  value={activationCode}
+                  onChange={(e) => setActivationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="text-center text-2xl tracking-[0.5em] bg-slate-800 border-emerald-500/50 text-white h-14"
+                  maxLength={6}
+                />
+              </div>
+              
+              <Button
+                type="submit"
+                className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl"
+                disabled={loading || activationCode.length !== 6}
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                  <>
+                    <CheckCircle className="w-5 h-5 ml-2" />
+                    تفعيل الحساب
+                  </>
+                )}
+              </Button>
+            </form>
+            
+            <div className="mt-6 text-center">
+              <Link to="/login" className="text-slate-400 hover:text-white text-sm">
+                العودة لتسجيل الدخول
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
+  // Step 1: Registration Form
   return (
     <div className="min-h-screen bg-background pattern-overlay flex">
       {/* Left side - Image */}
@@ -116,73 +195,34 @@ const Register = () => {
 
       {/* Right side - Register Form */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 overflow-y-auto">
-        <Card className="w-full max-w-md glass-card animate-fadeIn my-4">
+        <Card className="w-full max-w-lg glass-card animate-fadeIn my-4">
           <CardHeader className="text-center space-y-2 pb-4">
             <div className="lg:hidden w-14 h-14 mx-auto mb-2 rounded-xl bg-emerald-500/20 flex items-center justify-center">
               <BookOpen className="w-7 h-7 text-emerald-400" />
             </div>
-            <CardTitle className="text-xl font-bold text-white font-cairo">إنشاء حساب</CardTitle>
-            <CardDescription className="text-slate-400 text-sm">أنشئ حسابك للبدء</CardDescription>
+            <CardTitle className="text-xl font-bold text-white font-cairo">تسجيل طالب جديد</CardTitle>
+            <CardDescription className="text-slate-400 text-sm">أدخل بياناتك للتسجيل في المركز</CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Role Selection */}
-              <div className="space-y-2">
-                <Label className="text-slate-300 text-sm">نوع الحساب</Label>
-                <RadioGroup value={formData.role} onValueChange={(v) => handleChange('role', v)} className="grid grid-cols-3 gap-2">
-                  {roles.map((r) => (
-                    <div key={r.value}>
-                      <RadioGroupItem value={r.value} id={r.value} className="peer sr-only" data-testid={`role-${r.value}`} />
-                      <Label
-                        htmlFor={r.value}
-                        className="flex flex-col items-center justify-center p-2 rounded-lg border-2 border-slate-700 bg-slate-800/30 cursor-pointer transition-all peer-data-[state=checked]:border-emerald-500 peer-data-[state=checked]:bg-emerald-500/10 hover:bg-slate-800/50"
-                      >
-                        <r.icon className="w-5 h-5 mb-1 text-slate-400" />
-                        <span className="text-xs font-medium text-white">{r.label}</span>
-                      </Label>
-                    </div>
-                  ))}
-                </RadioGroup>
-              </div>
-
-              {/* Registration Code - Required for ALL */}
-              <div className="space-y-1">
-                <Label className="text-slate-300 text-sm flex items-center gap-1">
-                  <Key className="w-3 h-3 text-amber-400" />
-                  كود التسجيل <span className="text-red-400">*</span>
-                </Label>
-                <Input
-                  type="text"
-                  placeholder="الكود من 6 أرقام (من الإدارة)"
-                  value={formData.registrationCode}
-                  onChange={(e) => handleChange('registrationCode', e.target.value)}
-                  className="h-9 text-sm bg-slate-800/50 border-amber-500/50 text-white text-center tracking-widest"
-                  maxLength={6}
-                  required
-                  data-testid="registration-code-input"
-                />
-                <p className="text-xs text-amber-400/80">احصل على كود التسجيل من إدارة المركز</p>
-              </div>
-
               {/* Basic Info */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-slate-300 text-sm">الاسم <span className="text-red-400">*</span></Label>
+                  <Label className="text-slate-300 text-sm">الاسم الكامل <span className="text-red-400">*</span></Label>
                   <div className="relative">
                     <User className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <Input
                       type="text"
-                      placeholder="الاسم الكامل"
+                      placeholder="الاسم الرباعي"
                       value={formData.name}
                       onChange={(e) => handleChange('name', e.target.value)}
                       className="pr-8 h-9 text-sm bg-slate-800/50 border-slate-700 text-white"
                       required
-                      data-testid="register-name-input"
                     />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-slate-300 text-sm">البريد <span className="text-red-400">*</span></Label>
+                  <Label className="text-slate-300 text-sm">البريد الإلكتروني <span className="text-red-400">*</span></Label>
                   <div className="relative">
                     <Mail className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <Input
@@ -193,151 +233,177 @@ const Register = () => {
                       className="pr-8 h-9 text-sm bg-slate-800/50 border-slate-700 text-white text-left"
                       dir="ltr"
                       required
-                      data-testid="register-email-input"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-slate-300 text-sm">كلمة المرور <span className="text-red-400">*</span></Label>
-                <div className="relative">
-                  <Lock className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              {/* Password */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-slate-300 text-sm">كلمة المرور <span className="text-red-400">*</span></Label>
+                  <div className="relative">
+                    <Lock className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Input
+                      type="password"
+                      placeholder="••••••••"
+                      value={formData.password}
+                      onChange={(e) => handleChange('password', e.target.value)}
+                      className="pr-8 h-9 text-sm bg-slate-800/50 border-slate-700 text-white"
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-slate-300 text-sm">تأكيد كلمة المرور <span className="text-red-400">*</span></Label>
+                  <div className="relative">
+                    <Lock className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Input
+                      type="password"
+                      placeholder="••••••••"
+                      value={formData.confirmPassword}
+                      onChange={(e) => handleChange('confirmPassword', e.target.value)}
+                      className="pr-8 h-9 text-sm bg-slate-800/50 border-slate-700 text-white"
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Phone Numbers */}
+              <div className="space-y-2">
+                <Label className="text-slate-400 text-xs flex items-center gap-1">
+                  <Phone className="w-3 h-3" />
+                  أرقام الهواتف
+                </Label>
+                <div className="grid grid-cols-3 gap-2">
                   <Input
-                    type="password"
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={(e) => handleChange('password', e.target.value)}
-                    className="pr-8 h-9 text-sm bg-slate-800/50 border-slate-700 text-white"
-                    required
-                    minLength={6}
-                    data-testid="register-password-input"
+                    type="tel"
+                    placeholder="هاتف الطالب"
+                    value={formData.studentPhone}
+                    onChange={(e) => handleChange('studentPhone', e.target.value)}
+                    className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
+                    dir="ltr"
+                  />
+                  <Input
+                    type="tel"
+                    placeholder="هاتف الأب"
+                    value={formData.fatherPhone}
+                    onChange={(e) => handleChange('fatherPhone', e.target.value)}
+                    className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
+                    dir="ltr"
+                  />
+                  <Input
+                    type="tel"
+                    placeholder="هاتف الأم"
+                    value={formData.motherPhone}
+                    onChange={(e) => handleChange('motherPhone', e.target.value)}
+                    className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
+                    dir="ltr"
                   />
                 </div>
               </div>
 
-              {/* Student Extra Fields */}
-              {isStudent && (
-                <div className="space-y-3 p-3 rounded-lg bg-slate-800/30 border border-slate-700/50 animate-fadeIn">
-                  <p className="text-xs text-emerald-400 font-medium">معلومات الطالب</p>
-                  
-                  {/* Phone Numbers */}
-                  <div className="space-y-2">
-                    <Label className="text-slate-400 text-xs flex items-center gap-1">
-                      <Phone className="w-3 h-3" />
-                      أرقام الهواتف
-                    </Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Input
-                        type="tel"
-                        placeholder="هاتف الطالب"
-                        value={formData.studentPhone}
-                        onChange={(e) => handleChange('studentPhone', e.target.value)}
-                        className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
-                        dir="ltr"
-                        data-testid="student-phone-input"
-                      />
-                      <Input
-                        type="tel"
-                        placeholder="هاتف الأب"
-                        value={formData.fatherPhone}
-                        onChange={(e) => handleChange('fatherPhone', e.target.value)}
-                        className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
-                        dir="ltr"
-                        data-testid="father-phone-input"
-                      />
-                      <Input
-                        type="tel"
-                        placeholder="هاتف الأم"
-                        value={formData.motherPhone}
-                        onChange={(e) => handleChange('motherPhone', e.target.value)}
-                        className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
-                        dir="ltr"
-                        data-testid="mother-phone-input"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-slate-400 text-xs">المسجد</Label>
-                      <Input
-                        type="text"
-                        placeholder="اسم المسجد"
-                        value={formData.mosqueName}
-                        onChange={(e) => handleChange('mosqueName', e.target.value)}
-                        className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
-                        data-testid="mosque-input"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-slate-400 text-xs">تاريخ الميلاد</Label>
-                      <Input
-                        type="date"
-                        value={formData.birthDate}
-                        onChange={(e) => handleChange('birthDate', e.target.value)}
-                        className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
-                        data-testid="birthdate-input"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <Label className="text-slate-400 text-xs">المدرسة</Label>
-                      <Input
-                        type="text"
-                        placeholder="اسم المدرسة"
-                        value={formData.schoolName}
-                        onChange={(e) => handleChange('schoolName', e.target.value)}
-                        className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
-                        data-testid="school-input"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-slate-400 text-xs">المعدل</Label>
-                      <Input
-                        type="text"
-                        placeholder="مثال: 95%"
-                        value={formData.schoolGrade}
-                        onChange={(e) => handleChange('schoolGrade', e.target.value)}
-                        className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
-                        data-testid="grade-input"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-slate-400 text-xs flex items-center gap-1">
-                      <Image className="w-3 h-3" />
-                      صورة شخصية
-                    </Label>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white file:bg-emerald-500/20 file:text-emerald-400 file:border-0 file:text-xs"
-                      data-testid="profile-image-input"
-                    />
-                  </div>
+              {/* Mosque & Birth Date */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-slate-400 text-xs flex items-center gap-1">
+                    <Home className="w-3 h-3" />
+                    المسجد
+                  </Label>
+                  <Input
+                    type="text"
+                    placeholder="اسم المسجد"
+                    value={formData.mosqueName}
+                    onChange={(e) => handleChange('mosqueName', e.target.value)}
+                    className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
+                  />
                 </div>
-              )}
+                <div className="space-y-1">
+                  <Label className="text-slate-400 text-xs flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    تاريخ الميلاد
+                  </Label>
+                  <Input
+                    type="date"
+                    value={formData.birthDate}
+                    onChange={(e) => handleChange('birthDate', e.target.value)}
+                    className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
+                  />
+                </div>
+              </div>
+
+              {/* School & Grade */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-slate-400 text-xs flex items-center gap-1">
+                    <School className="w-3 h-3" />
+                    المدرسة
+                  </Label>
+                  <Input
+                    type="text"
+                    placeholder="اسم المدرسة"
+                    value={formData.schoolName}
+                    onChange={(e) => handleChange('schoolName', e.target.value)}
+                    className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-slate-400 text-xs">الصف الدراسي</Label>
+                  <Input
+                    type="text"
+                    placeholder="مثال: الصف السادس"
+                    value={formData.schoolGrade}
+                    onChange={(e) => handleChange('schoolGrade', e.target.value)}
+                    className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
+                  />
+                </div>
+              </div>
+
+              {/* Profile Image URL */}
+              <div className="space-y-1">
+                <Label className="text-slate-400 text-xs flex items-center gap-1">
+                  <Image className="w-3 h-3" />
+                  رابط الصورة الشخصية (اختياري)
+                </Label>
+                <Input
+                  type="url"
+                  placeholder="https://example.com/photo.jpg"
+                  value={formData.profileImage}
+                  onChange={(e) => handleChange('profileImage', e.target.value)}
+                  className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
+                  dir="ltr"
+                />
+              </div>
+
+              {/* Notice */}
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                <p className="text-xs text-amber-300">
+                  <strong>ملاحظة:</strong> بعد التسجيل، ستحتاج للحصول على كود التفعيل من إدارة المركز لتتمكن من استخدام حسابك.
+                </p>
+              </div>
 
               <Button
                 type="submit"
                 className="w-full h-10 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl"
                 disabled={loading}
-                data-testid="register-submit-btn"
               >
-                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'إنشاء الحساب'}
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'تسجيل البيانات'}
               </Button>
             </form>
 
             <div className="mt-4 text-center">
               <p className="text-slate-400 text-sm">
                 لديك حساب؟{' '}
-                <Link to="/login" className="text-emerald-400 hover:text-emerald-300 font-medium" data-testid="login-link">
+                <Link to="/login" className="text-emerald-400 hover:text-emerald-300 font-medium">
                   سجل الدخول
+                </Link>
+              </p>
+              <p className="text-slate-500 text-xs mt-2">
+                <Link to="/activate" className="text-emerald-400 hover:text-emerald-300">
+                  لديك كود تفعيل؟
                 </Link>
               </p>
             </div>
