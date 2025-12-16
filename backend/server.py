@@ -20,7 +20,8 @@ from models import (
     NotificationCreate, Notification,
     StudentScore, WeeklyRanking,
     StudentProfileUpdate, StudentCreate, QURAN_JUZ,
-    InitialAssessment, StudentSelfUpdate
+    InitialAssessment, StudentSelfUpdate,
+    StudentRegistrationRequest, ActivationRequest
 )
 
 class BaseModel(PydanticBaseModel):
