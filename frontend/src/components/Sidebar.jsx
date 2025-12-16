@@ -18,7 +18,8 @@ import {
   ClipboardList,
   UserCog,
   Sun,
-  Moon
+  Moon,
+  UserPlus
 } from 'lucide-react';
 import { Button } from './ui/button';
 
