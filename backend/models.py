@@ -9,6 +9,28 @@ class UserBase(BaseModel):
     name: str
     role: str = Field(..., pattern="^(student|sheikh|admin)$")
 
+# Student Registration Request (before activation)
+class StudentRegistrationRequest(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    confirm_password: str
+    # Phone numbers
+    student_phone: Optional[str] = None
+    father_phone: Optional[str] = None
+    mother_phone: Optional[str] = None
+    # Other student fields
+    mosque_name: Optional[str] = None
+    school_name: Optional[str] = None
+    school_grade: Optional[str] = None  # الصف الدراسي
+    birth_date: Optional[str] = None
+    profile_image: Optional[str] = None
+
+# Activation request
+class ActivationRequest(BaseModel):
+    email: EmailStr
+    activation_code: str
+
 class StudentCreate(BaseModel):
     email: EmailStr
     password: str
@@ -39,7 +61,9 @@ class User(UserBase):
     group_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     registration_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    is_active: bool = True
+    is_active: bool = False  # Changed to False - needs activation
+    is_activated: bool = False  # New field for activation status
+    activation_code: Optional[str] = None  # Code for activation
     # Phone numbers
     student_phone: Optional[str] = None
     father_phone: Optional[str] = None
@@ -63,6 +87,7 @@ class UserResponse(BaseModel):
     name: str
     role: str
     group_id: Optional[str] = None
+    is_activated: bool = False
     student_phone: Optional[str] = None
     father_phone: Optional[str] = None
     mother_phone: Optional[str] = None
