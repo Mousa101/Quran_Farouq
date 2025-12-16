@@ -232,6 +232,17 @@ function AppRoutes() {
       />
 
       <Route
+        path="/pending-students"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <PendingStudents />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/student/:studentId"
         element={
           <ProtectedRoute>
