@@ -5,6 +5,7 @@ import { Toaster } from './components/ui/sonner';
 import Sidebar from './components/Sidebar';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Activate from './pages/Activate';
 import AdminDashboard from './pages/AdminDashboard';
 import SheikhDashboard from './pages/SheikhDashboard';
 import StudentDashboard from './pages/StudentDashboard';
@@ -23,6 +24,7 @@ import StudentManagement from './pages/StudentManagement';
 import GroupManagement from './pages/GroupManagement';
 import InitialAssessment from './pages/InitialAssessment';
 import StudentEditProfile from './pages/StudentEditProfile';
+import PendingStudents from './pages/PendingStudents';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
