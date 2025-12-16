@@ -215,6 +215,13 @@ async def login(credentials: UserLogin):
     if not verify_password(credentials.password, user.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
     
+    # Check if student account is activated
+    if user.get("role") == "student" and not user.get("is_activated", True):
+        raise HTTPException(
+            status_code=403, 
+            detail="حسابك غير مفعل بعد. يرجى إدخال كود التفعيل من الإدارة"
+        )
+    
     token = create_access_token({
         "user_id": user["id"],
         "email": user["email"],
@@ -229,9 +236,113 @@ async def login(credentials: UserLogin):
             email=user["email"],
             name=user["name"],
             role=user["role"],
-            group_id=user.get("group_id")
+            group_id=user.get("group_id"),
+            is_activated=user.get("is_activated", True)
         )
     }
+
+# ============== NEW STUDENT REGISTRATION FLOW ==============
+
+@api_router.post("/auth/student-register")
+async def student_register(data: StudentRegistrationRequest):
+    """Student registration - creates pending account needing activation"""
+    # Validate passwords match
+    if data.password != data.confirm_password:
+        raise HTTPException(status_code=400, detail="كلمات المرور غير متطابقة")
+    
+    # Check if email exists
+    existing = await db.users.find_one({"email": data.email})
+    if existing:
+        raise HTTPException(status_code=400, detail="البريد الإلكتروني مسجل مسبقاً")
+    
+    # Generate activation code (6 digits)
+    import random
+    activation_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+    
+    # Create student user (not activated)
+    user = User(
+        email=data.email,
+        name=data.name,
+        role="student",
+        is_active=False,
+        is_activated=False,
+        activation_code=activation_code,
+        student_phone=data.student_phone,
+        father_phone=data.father_phone,
+        mother_phone=data.mother_phone,
+        mosque_name=data.mosque_name,
+        school_name=data.school_name,
+        school_grade=data.school_grade,
+        birth_date=data.birth_date,
+        profile_image=data.profile_image
+    )
+    
+    user_dict = user.model_dump()
+    user_dict["password_hash"] = get_password_hash(data.password)
+    user_dict["created_at"] = user_dict["created_at"].isoformat()
+    user_dict["registration_date"] = user_dict["registration_date"].isoformat()
+    
+    await db.users.insert_one(user_dict)
+    
+    return {
+        "message": "تم تسجيل بياناتك بنجاح. حسابك غير مفعل حالياً.",
+        "detail": "يرجى التواصل مع إدارة المركز للحصول على كود التفعيل",
+        "email": data.email
+    }
+
+@api_router.post("/auth/activate")
+async def activate_account(data: ActivationRequest):
+    """Activate student account with code"""
+    user = await db.users.find_one({"email": data.email}, {"_id": 0})
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="البريد الإلكتروني غير مسجل")
+    
+    if user.get("is_activated", True):
+        raise HTTPException(status_code=400, detail="الحساب مفعل بالفعل")
+    
+    if user.get("activation_code") != data.activation_code:
+        raise HTTPException(status_code=400, detail="كود التفعيل غير صحيح")
+    
+    # Activate the account
+    await db.users.update_one(
+        {"email": data.email},
+        {"$set": {"is_activated": True, "is_active": True, "activation_code": None}}
+    )
+    
+    # Create token for auto-login
+    token = create_access_token({
+        "user_id": user["id"],
+        "email": user["email"],
+        "name": user["name"],
+        "role": user["role"]
+    })
+    
+    return {
+        "message": "تم تفعيل حسابك بنجاح!",
+        "token": token,
+        "user": UserResponse(
+            id=user["id"],
+            email=user["email"],
+            name=user["name"],
+            role=user["role"],
+            group_id=user.get("group_id"),
+            is_activated=True
+        )
+    }
+
+@api_router.get("/admin/pending-students")
+async def get_pending_students(current_user: dict = Depends(get_current_user)):
+    """Get students pending activation (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    
+    pending = await db.users.find(
+        {"role": "student", "is_activated": False},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(100)
+    
+    return pending
 
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
