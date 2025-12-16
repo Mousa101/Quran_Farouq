@@ -93,6 +93,10 @@ function AppRoutes() {
         path="/register" 
         element={user ? <Navigate to="/dashboard" replace /> : <Register />} 
       />
+      <Route 
+        path="/activate" 
+        element={user ? <Navigate to="/dashboard" replace /> : <Activate />} 
+      />
 
       {/* Protected Routes */}
       <Route
