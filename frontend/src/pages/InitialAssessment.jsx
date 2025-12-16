@@ -233,10 +233,16 @@ const InitialAssessment = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-800 border-slate-700">
+                  <SelectItem value="تلاوة عامة" className="text-white">
+                    <div className="flex items-center gap-2">
+                      <Star className="w-4 h-4 text-slate-500" />
+                      تلاوة عامة
+                    </div>
+                  </SelectItem>
                   <SelectItem value="تمهيدية" className="text-white">
                     <div className="flex items-center gap-2">
                       <Star className="w-4 h-4 text-slate-400" />
-                      تمهيدية (مبتدئ)
+                      تمهيدية
                     </div>
                   </SelectItem>
                   <SelectItem value="متوسطة" className="text-white">
@@ -252,6 +258,37 @@ const InitialAssessment = () => {
                       <Star className="w-4 h-4 text-amber-400" />
                       <Star className="w-4 h-4 text-amber-400" />
                       متقدمة
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="إجازة" className="text-white">
+                    <div className="flex items-center gap-2">
+                      <Star className="w-4 h-4 text-emerald-400" />
+                      <Star className="w-4 h-4 text-emerald-400" />
+                      <Star className="w-4 h-4 text-emerald-400" />
+                      <Star className="w-4 h-4 text-emerald-400" />
+                      إجازة
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="اتقان" className="text-white">
+                    <div className="flex items-center gap-2">
+                      <Star className="w-4 h-4 text-purple-400" />
+                      <Star className="w-4 h-4 text-purple-400" />
+                      <Star className="w-4 h-4 text-purple-400" />
+                      <Star className="w-4 h-4 text-purple-400" />
+                      <Star className="w-4 h-4 text-purple-400" />
+                      اتقان
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="سند غيبي" className="text-white">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-amber-500" />
+                      سند غيبي
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="روايات أخرى" className="text-white">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-cyan-400" />
+                      روايات أخرى
                     </div>
                   </SelectItem>
                 </SelectContent>
