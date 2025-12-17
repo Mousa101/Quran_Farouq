@@ -1279,7 +1279,13 @@ async def get_weekly_rankings(
             {"_id": 0}
         ).to_list(100)
         
-        recitation_score = sum(r["quality_score"] for r in recitations) / max(len(recitations), 1) * 10
+        # Calculate recitation score from rating or points
+        recitation_score = 0
+        if recitations:
+            total_rating = sum(r.get("rating", 0) or 0 for r in recitations if r.get("rating"))
+            rated_count = sum(1 for r in recitations if r.get("rating"))
+            if rated_count > 0:
+                recitation_score = (total_rating / rated_count) * 10  # Scale to 100
         
         # Get attendance
         attendance = await db.attendance.find(
