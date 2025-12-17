@@ -3,7 +3,11 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Progress } from '../components/ui/progress';
-import { Star, Trophy, Award, Target, Zap, Crown, Medal, Gift } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { 
+  Star, Trophy, Award, Target, Zap, Crown, Medal, Gift,
+  BookMarked, Hand, Sunrise, Moon, Clock, Users, CheckCircle
+} from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -13,6 +17,7 @@ const MyPoints = () => {
   const [transactions, setTransactions] = useState([]);
   const [leaderboard, setLeaderboard] = useState([]);
   const [allBadges, setAllBadges] = useState([]);
+  const [studentStats, setStudentStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,17 +26,19 @@ const MyPoints = () => {
 
   const fetchData = async () => {
     try {
-      const [pointsRes, transactionsRes, leaderboardRes, badgesRes] = await Promise.all([
+      const [pointsRes, transactionsRes, leaderboardRes, badgesRes, statsRes] = await Promise.all([
         axios.get(`${API}/points/my-points`),
         axios.get(`${API}/points/transactions`),
         axios.get(`${API}/points/leaderboard`),
-        axios.get(`${API}/badges/all`)
+        axios.get(`${API}/badges/all`),
+        axios.get(`${API}/statistics/student/${user?.id}`)
       ]);
       
       setPointsData(pointsRes.data);
       setTransactions(transactionsRes.data);
       setLeaderboard(leaderboardRes.data);
       setAllBadges(badgesRes.data);
+      setStudentStats(statsRes.data);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -96,7 +103,7 @@ const MyPoints = () => {
   const myRankIndex = leaderboard.findIndex(l => l.student_id === user?.id);
 
   return (
-    <div className="space-y-8 animate-fadeIn" data-testid="my-points-page">
+    <div className="space-y-6 animate-fadeIn" data-testid="my-points-page">
       <div>
         <h1 className="text-2xl font-bold text-white">نقاطي وشاراتي</h1>
         <p className="text-slate-400">تابع إنجازاتك ومكافآتك</p>
@@ -136,52 +143,115 @@ const MyPoints = () => {
         {/* Points Breakdown */}
         <Card className="glass-card border-white/10 lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-xl font-bold text-white">تفاصيل النقاط</CardTitle>
+            <CardTitle className="text-xl font-bold text-white">تفاصيل النقاط الكلي</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center">
-                <Award className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
-                <p className="text-2xl font-bold text-white">{pointsData?.attendance_points || 0}</p>
-                <p className="text-emerald-400 text-sm">نقاط الحضور</p>
-              </div>
-              <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-center">
-                <Target className="w-8 h-8 mx-auto text-blue-400 mb-2" />
-                <p className="text-2xl font-bold text-white">{pointsData?.recitation_points || 0}</p>
-                <p className="text-blue-400 text-sm">نقاط التسميع</p>
-              </div>
-              <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30 text-center">
-                <Zap className="w-8 h-8 mx-auto text-purple-400 mb-2" />
-                <p className="text-2xl font-bold text-white">{pointsData?.tracking_points || 0}</p>
-                <p className="text-purple-400 text-sm">نقاط المتابعة</p>
-              </div>
-            </div>
-
-            {/* Recent Transactions */}
-            <h4 className="text-lg font-bold text-white mb-3">آخر النقاط المكتسبة</h4>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {transactions.length === 0 ? (
-                <p className="text-slate-400 text-center py-4">لا توجد نقاط بعد</p>
-              ) : (
-                transactions.slice(0, 5).map((tx) => (
-                  <div
-                    key={tx.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={`px-2 py-1 rounded-lg text-xs font-bold ${getCategoryColor(tx.category)}`}>
-                        {getCategoryLabel(tx.category)}
-                      </span>
-                      <span className="text-slate-300 text-sm">{tx.description}</span>
-                    </div>
-                    <span className="text-emerald-400 font-bold">+{tx.points}</span>
+            <Tabs defaultValue="summary" className="w-full">
+              <TabsList className="grid grid-cols-2 mb-4 bg-slate-800/50">
+                <TabsTrigger value="summary" className="data-[state=active]:bg-emerald-500/20">
+                  ملخص النقاط
+                </TabsTrigger>
+                <TabsTrigger value="tracking" className="data-[state=active]:bg-purple-500/20">
+                  نقاط المتابعة
+                </TabsTrigger>
+              </TabsList>
+              
+              {/* Summary Tab */}
+              <TabsContent value="summary">
+                <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center">
+                    <CheckCircle className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
+                    <p className="text-2xl font-bold text-white">{pointsData?.attendance_points || 0}</p>
+                    <p className="text-emerald-400 text-sm">نقاط الحضور</p>
                   </div>
-                ))
-              )}
-            </div>
+                  <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 text-center">
+                    <Target className="w-8 h-8 mx-auto text-blue-400 mb-2" />
+                    <p className="text-2xl font-bold text-white">{pointsData?.recitation_points || 0}</p>
+                    <p className="text-blue-400 text-sm">نقاط التسميع</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30 text-center">
+                    <Zap className="w-8 h-8 mx-auto text-purple-400 mb-2" />
+                    <p className="text-2xl font-bold text-white">{pointsData?.tracking_points || 0}</p>
+                    <p className="text-purple-400 text-sm">نقاط المتابعة</p>
+                  </div>
+                </div>
+              </TabsContent>
+              
+              {/* Tracking Breakdown Tab */}
+              <TabsContent value="tracking">
+                <div className="space-y-4">
+                  <p className="text-slate-400 text-sm mb-3">تفصيل نقاط ورق المتابعة</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div className="p-3 rounded-xl bg-emerald-500/10 text-center">
+                      <BookMarked className="w-6 h-6 mx-auto text-emerald-400 mb-1" />
+                      <p className="text-xl font-bold text-white">{studentStats?.tracking?.total_prayers || 0}</p>
+                      <p className="text-emerald-400 text-xs">الصلوات المفروضة</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-purple-500/10 text-center">
+                      <Hand className="w-6 h-6 mx-auto text-purple-400 mb-1" />
+                      <p className="text-xl font-bold text-white">{studentStats?.tracking?.total_adhkar || 0}</p>
+                      <p className="text-purple-400 text-xs">أذكار بعد الصلاة</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-blue-500/10 text-center">
+                      <Sunrise className="w-6 h-6 mx-auto text-blue-400 mb-1" />
+                      <p className="text-xl font-bold text-white">{studentStats?.tracking?.total_sunnah || 0}</p>
+                      <p className="text-blue-400 text-xs">السنن الرواتب</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-indigo-500/10 text-center">
+                      <Moon className="w-6 h-6 mx-auto text-indigo-400 mb-1" />
+                      <p className="text-xl font-bold text-white">{studentStats?.tracking?.total_witr || 0}</p>
+                      <p className="text-indigo-400 text-xs">صلاة الوتر</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-amber-500/10 text-center">
+                      <Clock className="w-6 h-6 mx-auto text-amber-400 mb-1" />
+                      <p className="text-xl font-bold text-white">{studentStats?.tracking?.total_quran_time || 0}</p>
+                      <p className="text-amber-400 text-xs">دقائق مع القرآن</p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-pink-500/10 text-center">
+                      <Users className="w-6 h-6 mx-auto text-pink-400 mb-1" />
+                      <p className="text-xl font-bold text-white">{studentStats?.tracking?.total_family_recitation || 0}</p>
+                      <p className="text-pink-400 text-xs">التسميع للأهل</p>
+                    </div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-slate-800/50 text-center mt-4">
+                    <p className="text-slate-400 text-sm">عدد أوراق المتابعة المسلمة</p>
+                    <p className="text-2xl font-bold text-purple-400">{studentStats?.tracking?.sheets_count || 0}</p>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
+
+      {/* Recent Transactions */}
+      <Card className="glass-card border-white/10">
+        <CardHeader>
+          <CardTitle className="text-xl font-bold text-white">آخر النقاط المكتسبة</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {transactions.length === 0 ? (
+              <p className="text-slate-400 text-center py-8">لا توجد نقاط بعد</p>
+            ) : (
+              transactions.slice(0, 10).map((tx) => (
+                <div
+                  key={tx.id}
+                  className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 hover:bg-slate-800 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`px-2 py-1 rounded-lg text-xs font-bold ${getCategoryColor(tx.category)}`}>
+                      {getCategoryLabel(tx.category)}
+                    </span>
+                    <span className="text-slate-300 text-sm">{tx.description}</span>
+                  </div>
+                  <span className="text-emerald-400 font-bold">+{tx.points}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Badges */}
       <Card className="glass-card border-white/10">
