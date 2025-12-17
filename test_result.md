@@ -279,17 +279,187 @@ frontend:
         agent: "main"
         comment: "Student names are clickable for admin/sheikh to view profiles"
 
+  - task: "Curriculum Management API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "NEW: Created CRUD APIs for curriculum management. POST/GET/PUT/DELETE /api/curriculum. Curriculum entries API for manual plans. PDF upload support."
+
+  - task: "Schedule Management API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "NEW: Created CRUD APIs for schedule management. POST/GET/PUT/DELETE /api/schedule. Schedule slots API for daily schedule. Activate schedule feature."
+
+  - task: "Sheikh Rankings API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "NEW: GET /api/rankings/sheikh-students - Returns ranked list of students in sheikh's groups with points, attendance, recitations"
+
+  - task: "Admin Rankings API with Filters"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "NEW: GET /api/rankings/admin?filter_type=groups|students|attendance|recitations - Admin ranking with 4 different filters"
+
+frontend:
+  - task: "Curriculum Management Page (Admin)"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/CurriculumManagement.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "NEW: Admin can create curriculum (manual or PDF). Add entries with title, date, topic, goal, references, results. Sheikh can view only."
+
+  - task: "Schedule Management Page (Admin)"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/ScheduleManagement.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "NEW: Admin can create schedules with daily slots. Each slot has day, start/end time, subject, group. Activate feature. Sheikh can view only."
+
+  - task: "Sheikh Rankings Page"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/SheikhRankings.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "NEW: Sheikh can view ranked list of their students. Shows podium (top 3), stats summary, full ranking table with points, attendance, recitations, pages."
+
+  - task: "Admin Rankings Page with Filters"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/AdminRankings.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "NEW: Admin can view rankings with 4 filters: المجموعات, الأفراد, الحضور, التسميع. Podium for top 3 groups. Detailed tables for each filter type."
+
+  - task: "Student Profile Page with Date+Day"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/StudentProfile.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "UPDATED: Added formatDateWithDay and formatDateTimeWithDay functions. Attendance and recitation records now show day names (e.g., الاثنين 15 ديسمبر 2025). Also shows excuse_reason for excused attendance"
+
+  - task: "Student Edit Profile Page"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/StudentEditProfile.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "NEW: Created StudentEditProfile.jsx allowing students to edit: phone, profile image, school name, grade, school average. Added route /edit-profile and sidebar link تعديل بياناتي"
+
+  - task: "Attendance Page with Excuse Dialog"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/Attendance.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "UPDATED: Added excuse dialog when clicking معذور button. Teacher can enter excuse reason which is saved and displayed in both attendance page and student profile"
+
+  - task: "Student Management Page (Admin)"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/StudentManagement.jsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Admin page with add/delete/change group/issue warning functionality"
+
+  - task: "Clickable Student Names (Sheikh Dashboard)"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/SheikhDashboard.jsx"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Added 'My Students' section with clickable links to student profiles"
+
+  - task: "Clickable Student Names (Users Page)"
+    implemented: true
+    working: true
+    file: "/app/frontend/src/pages/UsersPage.jsx"
+    stuck_count: 0
+    priority: "low"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Student names are clickable for admin/sheikh to view profiles"
+
 metadata:
   created_by: "main_agent"
-  version: "1.1"
-  test_sequence: 2
+  version: "1.2"
+  test_sequence: 3
   run_ui: true
 
 test_plan:
   current_focus:
-    - "Student Edit Profile Page"
-    - "Attendance Page with Excuse Dialog"
-    - "Student Profile Page with Date+Day"
+    - "Curriculum Management (Admin + Sheikh View)"
+    - "Schedule Management (Admin + Sheikh View)"
+    - "Sheikh Rankings Page"
+    - "Admin Rankings with Filters"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -297,7 +467,7 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
-      Implemented 4 new features:
+      Implemented Sheikh and Admin new features as requested:
       
       1. تتبع التقدم (Progress Tracking) - VERIFIED:
          - Student profile now shows combined progress (previous memorization + new recitations)
