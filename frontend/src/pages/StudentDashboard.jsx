@@ -19,14 +19,12 @@ const StudentDashboard = () => {
   const [rankings, setRankings] = useState({ scores: [] });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
+    if (!user?.id) return;
+    
     try {
       const [statsRes, activitiesRes, rankingsRes] = await Promise.all([
-        axios.get(`${API}/statistics/student/${user?.id}`),
+        axios.get(`${API}/statistics/student/${user.id}`),
         axios.get(`${API}/activities`),
         axios.get(`${API}/rankings/weekly`)
       ]);
@@ -40,6 +38,10 @@ const StudentDashboard = () => {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchData();
+  }, [user?.id]);
 
   const getMyRank = () => {
     const myScore = rankings.scores.find(s => s.student_id === user?.id);
