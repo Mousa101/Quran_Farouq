@@ -21,7 +21,9 @@ from models import (
     StudentScore, WeeklyRanking,
     StudentProfileUpdate, StudentCreate, QURAN_JUZ,
     InitialAssessment, StudentSelfUpdate,
-    StudentRegistrationRequest, ActivationRequest
+    StudentRegistrationRequest, ActivationRequest,
+    CurriculumCreate, Curriculum, CurriculumEntryCreate, CurriculumEntry,
+    ScheduleCreate, Schedule, ScheduleSlotCreate, ScheduleSlot
 )
 
 class BaseModel(PydanticBaseModel):
