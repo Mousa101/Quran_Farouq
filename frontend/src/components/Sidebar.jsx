@@ -19,7 +19,10 @@ import {
   UserCog,
   Sun,
   Moon,
-  UserPlus
+  UserPlus,
+  BookMarked,
+  CalendarDays,
+  TrendingUp
 } from 'lucide-react';
 import { Button } from './ui/button';
 
