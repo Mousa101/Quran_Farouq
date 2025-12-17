@@ -2084,6 +2084,630 @@ async def award_bonus_points(
     
     return {"message": "تم منح النقاط بنجاح", **result}
 
+# ============== CURRICULUM MANAGEMENT (Admin) ==============
+
+@api_router.post("/curriculum")
+async def create_curriculum(data: CurriculumCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new curriculum (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إدارة المنهج")
+    
+    curriculum = Curriculum(
+        name=data.name,
+        description=data.description,
+        type=data.type,
+        pdf_url=data.pdf_url,
+        created_by=current_user["user_id"]
+    )
+    
+    curriculum_dict = curriculum.model_dump()
+    curriculum_dict["created_at"] = curriculum_dict["created_at"].isoformat()
+    curriculum_dict["updated_at"] = curriculum_dict["updated_at"].isoformat()
+    
+    await db.curriculum.insert_one(curriculum_dict)
+    
+    return {"message": "تم إنشاء المنهج بنجاح", "curriculum_id": curriculum.id}
+
+@api_router.get("/curriculum")
+async def get_all_curriculum(current_user: dict = Depends(get_current_user)):
+    """Get all curriculum (Admin, Sheikh)"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    curricula = await db.curriculum.find({}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    
+    # Get entries count for each curriculum
+    for c in curricula:
+        entries_count = await db.curriculum_entries.count_documents({"curriculum_id": c["id"]})
+        c["entries_count"] = entries_count
+    
+    return curricula
+
+@api_router.get("/curriculum/{curriculum_id}")
+async def get_curriculum(curriculum_id: str, current_user: dict = Depends(get_current_user)):
+    """Get curriculum with entries"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    curriculum = await db.curriculum.find_one({"id": curriculum_id}, {"_id": 0})
+    if not curriculum:
+        raise HTTPException(status_code=404, detail="المنهج غير موجود")
+    
+    # Get all entries
+    entries = await db.curriculum_entries.find(
+        {"curriculum_id": curriculum_id},
+        {"_id": 0}
+    ).sort("order", 1).to_list(200)
+    
+    curriculum["entries"] = entries
+    return curriculum
+
+@api_router.put("/curriculum/{curriculum_id}")
+async def update_curriculum(curriculum_id: str, data: CurriculumCreate, current_user: dict = Depends(get_current_user)):
+    """Update curriculum (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تعديل المنهج")
+    
+    curriculum = await db.curriculum.find_one({"id": curriculum_id})
+    if not curriculum:
+        raise HTTPException(status_code=404, detail="المنهج غير موجود")
+    
+    update_data = {
+        "name": data.name,
+        "description": data.description,
+        "type": data.type,
+        "pdf_url": data.pdf_url,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.curriculum.update_one({"id": curriculum_id}, {"$set": update_data})
+    return {"message": "تم تحديث المنهج بنجاح"}
+
+@api_router.delete("/curriculum/{curriculum_id}")
+async def delete_curriculum(curriculum_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete curriculum (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف المنهج")
+    
+    result = await db.curriculum.delete_one({"id": curriculum_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="المنهج غير موجود")
+    
+    # Delete all entries
+    await db.curriculum_entries.delete_many({"curriculum_id": curriculum_id})
+    
+    return {"message": "تم حذف المنهج بنجاح"}
+
+# Curriculum Entries
+@api_router.post("/curriculum/{curriculum_id}/entries")
+async def add_curriculum_entry(curriculum_id: str, data: CurriculumEntryCreate, current_user: dict = Depends(get_current_user)):
+    """Add entry to curriculum (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إضافة خطط للمنهج")
+    
+    # Verify curriculum exists
+    curriculum = await db.curriculum.find_one({"id": curriculum_id})
+    if not curriculum:
+        raise HTTPException(status_code=404, detail="المنهج غير موجود")
+    
+    # Get current max order
+    last_entry = await db.curriculum_entries.find_one(
+        {"curriculum_id": curriculum_id},
+        sort=[("order", -1)]
+    )
+    next_order = (last_entry["order"] + 1) if last_entry else 0
+    
+    entry = CurriculumEntry(
+        curriculum_id=curriculum_id,
+        title=data.title,
+        date=data.date,
+        topic=data.topic,
+        goal=data.goal,
+        references=data.references,
+        results=data.results,
+        order=next_order
+    )
+    
+    entry_dict = entry.model_dump()
+    entry_dict["created_at"] = entry_dict["created_at"].isoformat()
+    
+    await db.curriculum_entries.insert_one(entry_dict)
+    
+    return {"message": "تم إضافة الخطة بنجاح", "entry_id": entry.id}
+
+@api_router.put("/curriculum/entries/{entry_id}")
+async def update_curriculum_entry(entry_id: str, data: CurriculumEntryCreate, current_user: dict = Depends(get_current_user)):
+    """Update curriculum entry (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تعديل الخطط")
+    
+    result = await db.curriculum_entries.update_one(
+        {"id": entry_id},
+        {"$set": {
+            "title": data.title,
+            "date": data.date,
+            "topic": data.topic,
+            "goal": data.goal,
+            "references": data.references,
+            "results": data.results
+        }}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="الخطة غير موجودة")
+    
+    return {"message": "تم تحديث الخطة بنجاح"}
+
+@api_router.delete("/curriculum/entries/{entry_id}")
+async def delete_curriculum_entry(entry_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete curriculum entry (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف الخطط")
+    
+    result = await db.curriculum_entries.delete_one({"id": entry_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="الخطة غير موجودة")
+    
+    return {"message": "تم حذف الخطة بنجاح"}
+
+# ============== SCHEDULE MANAGEMENT (Admin) ==============
+
+@api_router.post("/schedule")
+async def create_schedule(data: ScheduleCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new schedule (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إدارة الجداول")
+    
+    schedule = Schedule(
+        name=data.name,
+        description=data.description,
+        start_date=data.start_date,
+        end_date=data.end_date,
+        created_by=current_user["user_id"]
+    )
+    
+    schedule_dict = schedule.model_dump()
+    schedule_dict["created_at"] = schedule_dict["created_at"].isoformat()
+    schedule_dict["updated_at"] = schedule_dict["updated_at"].isoformat()
+    
+    await db.schedules.insert_one(schedule_dict)
+    
+    return {"message": "تم إنشاء الجدول بنجاح", "schedule_id": schedule.id}
+
+@api_router.get("/schedule")
+async def get_all_schedules(current_user: dict = Depends(get_current_user)):
+    """Get all schedules (Admin, Sheikh)"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    schedules = await db.schedules.find({}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    
+    # Get slots count for each schedule
+    for s in schedules:
+        slots_count = await db.schedule_slots.count_documents({"schedule_id": s["id"]})
+        s["slots_count"] = slots_count
+    
+    return schedules
+
+@api_router.get("/schedule/active")
+async def get_active_schedule(current_user: dict = Depends(get_current_user)):
+    """Get the active schedule with all slots"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    schedule = await db.schedules.find_one({"is_active": True}, {"_id": 0})
+    if not schedule:
+        return None
+    
+    # Get all slots
+    slots = await db.schedule_slots.find(
+        {"schedule_id": schedule["id"]},
+        {"_id": 0}
+    ).to_list(200)
+    
+    schedule["slots"] = slots
+    return schedule
+
+@api_router.get("/schedule/{schedule_id}")
+async def get_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
+    """Get schedule with slots"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    schedule = await db.schedules.find_one({"id": schedule_id}, {"_id": 0})
+    if not schedule:
+        raise HTTPException(status_code=404, detail="الجدول غير موجود")
+    
+    # Get all slots
+    slots = await db.schedule_slots.find(
+        {"schedule_id": schedule_id},
+        {"_id": 0}
+    ).to_list(200)
+    
+    schedule["slots"] = slots
+    return schedule
+
+@api_router.put("/schedule/{schedule_id}")
+async def update_schedule(schedule_id: str, data: ScheduleCreate, current_user: dict = Depends(get_current_user)):
+    """Update schedule (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تعديل الجدول")
+    
+    schedule = await db.schedules.find_one({"id": schedule_id})
+    if not schedule:
+        raise HTTPException(status_code=404, detail="الجدول غير موجود")
+    
+    update_data = {
+        "name": data.name,
+        "description": data.description,
+        "start_date": data.start_date,
+        "end_date": data.end_date,
+        "updated_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.schedules.update_one({"id": schedule_id}, {"$set": update_data})
+    return {"message": "تم تحديث الجدول بنجاح"}
+
+@api_router.put("/schedule/{schedule_id}/activate")
+async def activate_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
+    """Set schedule as active (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تفعيل الجدول")
+    
+    # Deactivate all schedules
+    await db.schedules.update_many({}, {"$set": {"is_active": False}})
+    
+    # Activate selected schedule
+    result = await db.schedules.update_one(
+        {"id": schedule_id},
+        {"$set": {"is_active": True}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="الجدول غير موجود")
+    
+    return {"message": "تم تفعيل الجدول بنجاح"}
+
+@api_router.delete("/schedule/{schedule_id}")
+async def delete_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete schedule (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف الجدول")
+    
+    result = await db.schedules.delete_one({"id": schedule_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="الجدول غير موجود")
+    
+    # Delete all slots
+    await db.schedule_slots.delete_many({"schedule_id": schedule_id})
+    
+    return {"message": "تم حذف الجدول بنجاح"}
+
+# Schedule Slots
+@api_router.post("/schedule/{schedule_id}/slots")
+async def add_schedule_slot(schedule_id: str, data: ScheduleSlotCreate, current_user: dict = Depends(get_current_user)):
+    """Add slot to schedule (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إضافة حصص للجدول")
+    
+    # Verify schedule exists
+    schedule = await db.schedules.find_one({"id": schedule_id})
+    if not schedule:
+        raise HTTPException(status_code=404, detail="الجدول غير موجود")
+    
+    slot = ScheduleSlot(
+        schedule_id=schedule_id,
+        day=data.day,
+        start_time=data.start_time,
+        end_time=data.end_time,
+        subject=data.subject,
+        description=data.description,
+        group_id=data.group_id
+    )
+    
+    slot_dict = slot.model_dump()
+    slot_dict["created_at"] = slot_dict["created_at"].isoformat()
+    
+    await db.schedule_slots.insert_one(slot_dict)
+    
+    return {"message": "تم إضافة الحصة بنجاح", "slot_id": slot.id}
+
+@api_router.put("/schedule/slots/{slot_id}")
+async def update_schedule_slot(slot_id: str, data: ScheduleSlotCreate, current_user: dict = Depends(get_current_user)):
+    """Update schedule slot (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تعديل الحصص")
+    
+    result = await db.schedule_slots.update_one(
+        {"id": slot_id},
+        {"$set": {
+            "day": data.day,
+            "start_time": data.start_time,
+            "end_time": data.end_time,
+            "subject": data.subject,
+            "description": data.description,
+            "group_id": data.group_id
+        }}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="الحصة غير موجودة")
+    
+    return {"message": "تم تحديث الحصة بنجاح"}
+
+@api_router.delete("/schedule/slots/{slot_id}")
+async def delete_schedule_slot(slot_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete schedule slot (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف الحصص")
+    
+    result = await db.schedule_slots.delete_one({"id": slot_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="الحصة غير موجودة")
+    
+    return {"message": "تم حذف الحصة بنجاح"}
+
+# ============== RANKINGS & STATISTICS ==============
+
+@api_router.get("/rankings/sheikh-students")
+async def get_sheikh_students_ranking(current_user: dict = Depends(get_current_user)):
+    """Get ranking of students in sheikh's groups"""
+    if current_user["role"] != "sheikh":
+        raise HTTPException(status_code=403, detail="فقط للمشايخ")
+    
+    # Get sheikh's groups
+    groups = await db.groups.find({"sheikh_id": current_user["user_id"]}, {"_id": 0}).to_list(20)
+    group_ids = [g["id"] for g in groups]
+    
+    if not group_ids:
+        return {"students": [], "groups": []}
+    
+    # Get all students in these groups
+    students = await db.users.find(
+        {"group_id": {"$in": group_ids}, "role": "student"},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(500)
+    
+    rankings = []
+    for student in students:
+        # Get points
+        points_data = await db.student_points.find_one({"student_id": student["id"]}, {"_id": 0})
+        total_points = points_data.get("total_points", 0) if points_data else 0
+        
+        # Get attendance stats
+        total_attendance = await db.attendance.count_documents({"student_id": student["id"]})
+        present_attendance = await db.attendance.count_documents({"student_id": student["id"], "status": "present"})
+        attendance_rate = round((present_attendance / total_attendance * 100), 1) if total_attendance > 0 else 0
+        
+        # Get recitation stats
+        recitations = await db.recitations.find({"student_id": student["id"]}, {"_id": 0}).to_list(1000)
+        total_recitations = len(recitations)
+        total_pages = sum(r.get("page_to", 0) - r.get("page_from", 0) + 1 for r in recitations if r.get("page_from") and r.get("page_to"))
+        
+        # Get group name
+        group = next((g for g in groups if g["id"] == student.get("group_id")), None)
+        
+        rankings.append({
+            "student_id": student["id"],
+            "student_name": student["name"],
+            "group_id": student.get("group_id"),
+            "group_name": group["name"] if group else "بدون مجموعة",
+            "total_points": total_points,
+            "attendance_rate": attendance_rate,
+            "total_recitations": total_recitations,
+            "total_pages": total_pages,
+            "level": points_data.get("level", 1) if points_data else 1
+        })
+    
+    # Sort by points
+    rankings.sort(key=lambda x: x["total_points"], reverse=True)
+    
+    # Add rank position
+    for i, r in enumerate(rankings):
+        r["rank"] = i + 1
+    
+    return {"students": rankings, "groups": groups}
+
+@api_router.get("/rankings/admin")
+async def get_admin_rankings(
+    filter_type: str = "groups",  # groups, students, attendance, recitations
+    current_user: dict = Depends(get_current_user)
+):
+    """Get rankings for admin with different filters"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    
+    if filter_type == "groups":
+        # Get all groups with their stats
+        groups = await db.groups.find({}, {"_id": 0}).to_list(100)
+        
+        group_rankings = []
+        for group in groups:
+            # Get students in group
+            students = await db.users.find(
+                {"group_id": group["id"], "role": "student"},
+                {"_id": 0, "id": 1}
+            ).to_list(500)
+            student_ids = [s["id"] for s in students]
+            
+            # Get total points for group
+            points_data = await db.student_points.find(
+                {"student_id": {"$in": student_ids}},
+                {"_id": 0, "total_points": 1}
+            ).to_list(500)
+            total_points = sum(p.get("total_points", 0) for p in points_data)
+            avg_points = round(total_points / len(students), 1) if students else 0
+            
+            # Get attendance rate
+            total_attendance = await db.attendance.count_documents({"student_id": {"$in": student_ids}})
+            present_attendance = await db.attendance.count_documents({"student_id": {"$in": student_ids}, "status": "present"})
+            attendance_rate = round((present_attendance / total_attendance * 100), 1) if total_attendance > 0 else 0
+            
+            # Get sheikh name
+            sheikh = await db.users.find_one({"id": group.get("sheikh_id")}, {"_id": 0, "name": 1})
+            
+            group_rankings.append({
+                "group_id": group["id"],
+                "group_name": group["name"],
+                "sheikh_name": sheikh["name"] if sheikh else "غير معين",
+                "student_count": len(students),
+                "total_points": total_points,
+                "avg_points": avg_points,
+                "attendance_rate": attendance_rate
+            })
+        
+        # Sort by total points
+        group_rankings.sort(key=lambda x: x["total_points"], reverse=True)
+        
+        for i, g in enumerate(group_rankings):
+            g["rank"] = i + 1
+        
+        return {"type": "groups", "data": group_rankings}
+    
+    elif filter_type == "students":
+        # Get all students with points
+        students = await db.users.find(
+            {"role": "student"},
+            {"_id": 0, "password_hash": 0}
+        ).to_list(1000)
+        
+        student_rankings = []
+        for student in students:
+            points_data = await db.student_points.find_one({"student_id": student["id"]}, {"_id": 0})
+            total_points = points_data.get("total_points", 0) if points_data else 0
+            
+            # Get group name
+            group = await db.groups.find_one({"id": student.get("group_id")}, {"_id": 0, "name": 1})
+            
+            student_rankings.append({
+                "student_id": student["id"],
+                "student_name": student["name"],
+                "group_name": group["name"] if group else "بدون مجموعة",
+                "total_points": total_points,
+                "level": points_data.get("level", 1) if points_data else 1
+            })
+        
+        student_rankings.sort(key=lambda x: x["total_points"], reverse=True)
+        
+        for i, s in enumerate(student_rankings):
+            s["rank"] = i + 1
+        
+        return {"type": "students", "data": student_rankings}
+    
+    elif filter_type == "attendance":
+        # Get all students sorted by attendance rate
+        students = await db.users.find(
+            {"role": "student"},
+            {"_id": 0, "id": 1, "name": 1, "group_id": 1}
+        ).to_list(1000)
+        
+        attendance_rankings = []
+        for student in students:
+            total = await db.attendance.count_documents({"student_id": student["id"]})
+            present = await db.attendance.count_documents({"student_id": student["id"], "status": "present"})
+            excused = await db.attendance.count_documents({"student_id": student["id"], "status": "excused"})
+            absent = await db.attendance.count_documents({"student_id": student["id"], "status": "absent"})
+            rate = round((present / total * 100), 1) if total > 0 else 0
+            
+            group = await db.groups.find_one({"id": student.get("group_id")}, {"_id": 0, "name": 1})
+            
+            attendance_rankings.append({
+                "student_id": student["id"],
+                "student_name": student["name"],
+                "group_name": group["name"] if group else "بدون مجموعة",
+                "total_days": total,
+                "present_days": present,
+                "excused_days": excused,
+                "absent_days": absent,
+                "attendance_rate": rate
+            })
+        
+        attendance_rankings.sort(key=lambda x: x["attendance_rate"], reverse=True)
+        
+        for i, a in enumerate(attendance_rankings):
+            a["rank"] = i + 1
+        
+        return {"type": "attendance", "data": attendance_rankings}
+    
+    elif filter_type == "recitations":
+        # Get all students sorted by recitation performance
+        students = await db.users.find(
+            {"role": "student"},
+            {"_id": 0, "id": 1, "name": 1, "group_id": 1}
+        ).to_list(1000)
+        
+        recitation_rankings = []
+        for student in students:
+            recitations = await db.recitations.find(
+                {"student_id": student["id"]},
+                {"_id": 0}
+            ).to_list(1000)
+            
+            total_recitations = len(recitations)
+            new_memorization = len([r for r in recitations if r.get("recitation_type") == "new_memorization"])
+            reviews = len([r for r in recitations if r.get("recitation_type") == "review"])
+            total_pages = sum(r.get("page_to", 0) - r.get("page_from", 0) + 1 for r in recitations if r.get("page_from") and r.get("page_to"))
+            total_points = sum(r.get("points_earned", 0) for r in recitations)
+            
+            group = await db.groups.find_one({"id": student.get("group_id")}, {"_id": 0, "name": 1})
+            
+            recitation_rankings.append({
+                "student_id": student["id"],
+                "student_name": student["name"],
+                "group_name": group["name"] if group else "بدون مجموعة",
+                "total_recitations": total_recitations,
+                "new_memorization": new_memorization,
+                "reviews": reviews,
+                "total_pages": total_pages,
+                "total_points": total_points
+            })
+        
+        recitation_rankings.sort(key=lambda x: x["total_pages"], reverse=True)
+        
+        for i, r in enumerate(recitation_rankings):
+            r["rank"] = i + 1
+        
+        return {"type": "recitations", "data": recitation_rankings}
+    
+    return {"type": filter_type, "data": []}
+
+# ============== PDF UPLOAD FOR CURRICULUM ==============
+
+from fastapi import File, UploadFile
+import base64
+
+@api_router.post("/curriculum/{curriculum_id}/upload-pdf")
+async def upload_curriculum_pdf(curriculum_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    """Upload PDF file for curriculum (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه رفع الملفات")
+    
+    # Verify curriculum exists
+    curriculum = await db.curriculum.find_one({"id": curriculum_id})
+    if not curriculum:
+        raise HTTPException(status_code=404, detail="المنهج غير موجود")
+    
+    # Validate file type
+    if not file.filename.endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="يجب أن يكون الملف بصيغة PDF")
+    
+    # Read and encode file
+    content = await file.read()
+    encoded = base64.b64encode(content).decode('utf-8')
+    
+    # Update curriculum with PDF data
+    await db.curriculum.update_one(
+        {"id": curriculum_id},
+        {"$set": {
+            "pdf_url": f"data:application/pdf;base64,{encoded}",
+            "pdf_filename": file.filename,
+            "type": "pdf",
+            "updated_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"message": "تم رفع الملف بنجاح", "filename": file.filename}
+
 # Include the router
 app.include_router(api_router)
 
