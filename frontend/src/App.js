@@ -301,6 +301,50 @@ function AppRoutes() {
         }
       />
 
+      <Route
+        path="/curriculum"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <CurriculumManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/schedule"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ScheduleManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/sheikh-rankings"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <SheikhRankings />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin-rankings"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <AdminRankings />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Default Route */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
