@@ -321,6 +321,88 @@ class PointsTransaction(BaseModel):
     description: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# ============== CURRICULUM & SCHEDULE MODELS ==============
+
+# Curriculum Entry (Manual Entry)
+class CurriculumEntryCreate(BaseModel):
+    title: str  # العنوان
+    date: str  # التاريخ
+    topic: str  # الموضوع
+    goal: str  # الهدف
+    references: Optional[str] = None  # المراجع
+    results: Optional[str] = None  # النتائج
+
+class CurriculumEntry(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    curriculum_id: str  # Reference to parent curriculum
+    title: str
+    date: str
+    topic: str
+    goal: str
+    references: Optional[str] = None
+    results: Optional[str] = None
+    order: int = 0  # For sorting
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# Main Curriculum Model
+class CurriculumCreate(BaseModel):
+    name: str  # اسم المنهج
+    description: Optional[str] = None
+    type: str = "manual"  # "manual" or "pdf"
+    pdf_url: Optional[str] = None  # URL for PDF file
+
+class Curriculum(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    description: Optional[str] = None
+    type: str = "manual"  # "manual" or "pdf"
+    pdf_url: Optional[str] = None
+    pdf_filename: Optional[str] = None
+    created_by: str  # Admin ID
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# Schedule Models
+class ScheduleSlotCreate(BaseModel):
+    day: str  # السبت، الأحد، etc.
+    start_time: str  # وقت البداية HH:MM
+    end_time: str  # وقت النهاية HH:MM
+    subject: str  # الدرس/الموضوع
+    description: Optional[str] = None
+    group_id: Optional[str] = None  # Optional: specific group
+
+class ScheduleSlot(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    schedule_id: str  # Reference to parent schedule
+    day: str
+    start_time: str
+    end_time: str
+    subject: str
+    description: Optional[str] = None
+    group_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ScheduleCreate(BaseModel):
+    name: str  # اسم الجدول
+    description: Optional[str] = None
+    start_date: str  # تاريخ البداية
+    end_date: Optional[str] = None  # تاريخ النهاية
+
+class Schedule(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    description: Optional[str] = None
+    start_date: str
+    end_date: Optional[str] = None
+    is_active: bool = True
+    created_by: str  # Admin ID
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # Quran Juz names for reference
 QURAN_JUZ = [
     "الجزء الأول", "الجزء الثاني", "الجزء الثالث", "الجزء الرابع", "الجزء الخامس",
