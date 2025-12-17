@@ -5,9 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Progress } from '../components/ui/progress';
 import { Badge } from '../components/ui/badge';
 import { 
-  BookOpen, Clock, Users, Trophy, Calendar, CheckCircle, XCircle, 
-  User, Phone, School, Home, Star, AlertTriangle, Bell, Award,
-  Sunrise, Moon, BookMarked, Hand
+  BookOpen, Clock, Users, Trophy, Calendar, CheckCircle, 
+  User, Phone, School, Home, Star, AlertTriangle, Award,
+  Sunrise, Moon, BookMarked, Hand, Mail, Cake, MapPin
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -76,6 +76,27 @@ const StudentDashboard = () => {
     return colors[level] || 'bg-slate-500/20 text-slate-400';
   };
 
+  const calculateAge = (birthDate) => {
+    if (!birthDate) return null;
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('ar-SA', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -84,9 +105,11 @@ const StudentDashboard = () => {
     );
   }
 
+  const studentAge = calculateAge(stats?.student?.birth_date);
+
   return (
     <div className="space-y-6 animate-fadeIn" data-testid="student-dashboard">
-      {/* Welcome & Profile Header */}
+      {/* Welcome & Points Header */}
       <div className="glass-card p-6 border border-white/10">
         <div className="flex flex-col lg:flex-row lg:items-center gap-6">
           {/* Profile Image & Name */}
@@ -111,10 +134,10 @@ const StudentDashboard = () => {
                     {stats.student.tajweed_level}
                   </Badge>
                 )}
-                {stats?.student?.school_name && (
+                {studentAge && (
                   <Badge className="bg-blue-500/20 text-blue-400">
-                    <School className="w-3 h-3 ml-1" />
-                    {stats.student.school_name}
+                    <Cake className="w-3 h-3 ml-1" />
+                    {studentAge} سنة
                   </Badge>
                 )}
               </div>
@@ -144,6 +167,134 @@ const StudentDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Personal Info Card - Detailed */}
+      <Card className="glass-card border-white/10">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+            <User className="w-5 h-5 text-emerald-400" />
+            بياناتي الشخصية
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Name */}
+            <div className="p-4 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                  <User className="w-5 h-5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs">الاسم الكامل</p>
+                  <p className="text-white font-bold">{stats?.student?.name || user?.name || '-'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Email */}
+            <div className="p-4 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                  <Mail className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs">البريد الإلكتروني</p>
+                  <p className="text-white font-medium text-sm" dir="ltr">{stats?.student?.email || user?.email || '-'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Age & Birth Date */}
+            <div className="p-4 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-pink-500/20 flex items-center justify-center">
+                  <Cake className="w-5 h-5 text-pink-400" />
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs">العمر / تاريخ الميلاد</p>
+                  <p className="text-white font-bold">
+                    {studentAge ? `${studentAge} سنة` : '-'}
+                    {stats?.student?.birth_date && (
+                      <span className="text-slate-400 text-xs font-normal mr-2">
+                        ({formatDate(stats.student.birth_date)})
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* School */}
+            <div className="p-4 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                  <School className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs">المدرسة / الصف</p>
+                  <p className="text-white font-bold">{stats?.student?.school_name || '-'}</p>
+                  {stats?.student?.school_grade && (
+                    <p className="text-amber-400 text-xs">{stats.student.school_grade}</p>
+                  )}
+                  {stats?.student?.school_average && (
+                    <p className="text-emerald-400 text-xs">المعدل: {stats.student.school_average}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Mosque */}
+            <div className="p-4 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                  <Home className="w-5 h-5 text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs">المسجد</p>
+                  <p className="text-white font-bold">{stats?.student?.mosque_name || '-'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Registration Date */}
+            <div className="p-4 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-cyan-400" />
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs">تاريخ التسجيل في المركز</p>
+                  <p className="text-white font-bold">{formatDate(stats?.student?.registration_date)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Phone Numbers */}
+            <div className="p-4 rounded-xl bg-slate-800/50 border border-white/5 md:col-span-2 lg:col-span-3">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                  <Phone className="w-5 h-5 text-green-400" />
+                </div>
+                <p className="text-slate-400 text-sm">أرقام الهواتف</p>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center p-3 rounded-lg bg-slate-900/50">
+                  <p className="text-slate-400 text-xs mb-1">هاتف الطالب</p>
+                  <p className="text-emerald-400 font-bold" dir="ltr">{stats?.student?.student_phone || '-'}</p>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-slate-900/50">
+                  <p className="text-slate-400 text-xs mb-1">هاتف الأب</p>
+                  <p className="text-blue-400 font-bold" dir="ltr">{stats?.student?.father_phone || '-'}</p>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-slate-900/50">
+                  <p className="text-slate-400 text-xs mb-1">هاتف الأم</p>
+                  <p className="text-pink-400 font-bold" dir="ltr">{stats?.student?.mother_phone || '-'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Memorization & Tajweed */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -177,12 +328,28 @@ const StudentDashboard = () => {
                 <div className="p-3 rounded-lg bg-slate-800/50 text-center">
                   <p className="text-slate-400 text-xs">الحفظ السابق</p>
                   <p className="text-white font-bold">{stats?.memorization?.total_previous || 0} صفحة</p>
+                  {stats?.memorization?.previous_juz?.length > 0 && (
+                    <p className="text-slate-500 text-xs">({stats.memorization.previous_juz.length} جزء)</p>
+                  )}
                 </div>
                 <div className="p-3 rounded-lg bg-emerald-500/10 text-center">
                   <p className="text-emerald-400 text-xs">الحفظ الجديد</p>
                   <p className="text-emerald-400 font-bold">{stats?.memorization?.new_pages || 0} صفحة</p>
                 </div>
               </div>
+              
+              {/* Tajweed Level */}
+              {stats?.student?.tajweed_level && (
+                <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-300">مستوى التجويد</span>
+                    <Badge className={`${getTajweedBadgeColor(stats.student.tajweed_level)} text-lg px-4 py-1`}>
+                      <Star className="w-4 h-4 ml-2" />
+                      {stats.student.tajweed_level}
+                    </Badge>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -205,10 +372,13 @@ const StudentDashboard = () => {
                 </div>
                 <Progress 
                   value={stats?.attendance?.percentage || 0} 
-                  className="h-2 bg-slate-700"
+                  className="h-3 bg-slate-700"
                 />
                 <div className="flex gap-4 mt-2 text-xs">
-                  <span className="text-emerald-400">حضور: {stats?.attendance?.present || 0}</span>
+                  <span className="text-emerald-400 flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" />
+                    حضور: {stats?.attendance?.present || 0}
+                  </span>
                   <span className="text-red-400">غياب: {stats?.attendance?.absent || 0}</span>
                   <span className="text-amber-400">عذر: {stats?.attendance?.excused || 0}</span>
                 </div>
@@ -218,11 +388,14 @@ const StudentDashboard = () => {
               <div className="pt-3 border-t border-slate-700">
                 <div className="flex justify-between mb-2">
                   <span className="text-slate-400 text-sm">متوسط تقييم التسميع</span>
-                  <span className="text-amber-400 font-bold">{stats?.recitation?.average_rating || 0}/10</span>
+                  <span className="text-amber-400 font-bold flex items-center gap-1">
+                    <Star className="w-4 h-4" />
+                    {stats?.recitation?.average_rating || 0}/10
+                  </span>
                 </div>
                 <Progress 
                   value={(stats?.recitation?.average_rating || 0) * 10} 
-                  className="h-2 bg-slate-700"
+                  className="h-3 bg-slate-700"
                 />
                 <div className="flex gap-4 mt-2 text-xs">
                   <span className="text-slate-400">عدد التسميعات: {stats?.recitation?.recitations_count || 0}</span>
@@ -243,7 +416,7 @@ const StudentDashboard = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div className="p-4 rounded-xl bg-emerald-500/10 text-center">
               <BookMarked className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
               <p className="text-2xl font-bold text-white">{stats?.tracking?.total_prayers || 0}</p>
@@ -304,56 +477,6 @@ const StudentDashboard = () => {
           </CardContent>
         </Card>
       )}
-
-      {/* Personal Info */}
-      <Card className="glass-card border-white/10">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
-            <User className="w-5 h-5 text-slate-400" />
-            بياناتي الشخصية
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {stats?.student?.school_name && (
-              <div className="p-3 rounded-lg bg-slate-800/50">
-                <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
-                  <School className="w-3 h-3" />
-                  المدرسة
-                </div>
-                <p className="text-white text-sm">{stats.student.school_name}</p>
-              </div>
-            )}
-            {stats?.student?.school_grade && (
-              <div className="p-3 rounded-lg bg-slate-800/50">
-                <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
-                  <BookOpen className="w-3 h-3" />
-                  الصف
-                </div>
-                <p className="text-white text-sm">{stats.student.school_grade}</p>
-              </div>
-            )}
-            {stats?.student?.mosque_name && (
-              <div className="p-3 rounded-lg bg-slate-800/50">
-                <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
-                  <Home className="w-3 h-3" />
-                  المسجد
-                </div>
-                <p className="text-white text-sm">{stats.student.mosque_name}</p>
-              </div>
-            )}
-            {stats?.student?.student_phone && (
-              <div className="p-3 rounded-lg bg-slate-800/50">
-                <div className="flex items-center gap-2 text-slate-400 text-xs mb-1">
-                  <Phone className="w-3 h-3" />
-                  رقم الهاتف
-                </div>
-                <p className="text-white text-sm" dir="ltr">{stats.student.student_phone}</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Upcoming Activities */}
       {activities.length > 0 && (
