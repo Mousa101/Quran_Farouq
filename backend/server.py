@@ -1329,44 +1329,96 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
     if current_user["role"] == "student" and current_user["user_id"] != student_id:
         raise HTTPException(status_code=403, detail="غير مصرح لك")
     
+    # Get student data
+    student = await db.users.find_one({"id": student_id}, {"_id": 0, "password_hash": 0})
+    
     # Get all data
     tracking = await db.tracking_sheets.find({"student_id": student_id}, {"_id": 0}).to_list(100)
     recitations = await db.recitations.find({"student_id": student_id}, {"_id": 0}).to_list(100)
     attendance = await db.attendance.find({"student_id": student_id}, {"_id": 0}).to_list(1000)
+    warnings = await db.warnings.find({"student_id": student_id}, {"_id": 0}).to_list(100)
     
-    total_prayers = sum(t["data"]["prayers_count"] for t in tracking)
-    total_quran_time = sum(t["data"]["quran_sitting_minutes"] for t in tracking)
-    total_family_recitation = sum(t["data"]["family_recitation_count"] for t in tracking)
+    # Tracking stats
+    total_prayers = sum(t["data"].get("prayers_count", 0) for t in tracking)
+    total_quran_time = sum(t["data"].get("quran_sitting_minutes", 0) for t in tracking)
+    total_family_recitation = sum(t["data"].get("family_recitation_count", 0) for t in tracking)
+    
+    # Detailed tracking breakdown
+    total_adhkar = sum(t["data"].get("adhkar_after_prayer", 0) for t in tracking)
+    total_sunnah = sum(t["data"].get("sunnah_prayers", 0) for t in tracking)
+    total_witr = sum(t["data"].get("witr_prayer", 0) for t in tracking)
+    total_duha = sum(t["data"].get("duha_prayer", 0) for t in tracking)
     
     # New recitation calculations
     total_new_pages = sum(r.get("pages_count", 0) or 0 for r in recitations if r.get("recitation_type") == "new_memorization")
     total_review_pages = sum(r.get("review_pages", 0) or 0 for r in recitations if r.get("review_type") == "pages")
     passed_count = sum(1 for r in recitations if r.get("passed_minimum") or r.get("passed_review_minimum"))
-    total_points = sum(r.get("points_earned", 0) for r in recitations)
+    total_recitation_points = sum(r.get("points_earned", 0) for r in recitations)
+    avg_rating = sum(r.get("rating", 0) or 0 for r in recitations if r.get("rating")) / max(len([r for r in recitations if r.get("rating")]), 1)
     
     present_count = sum(1 for a in attendance if a["status"] == "present")
     absent_count = sum(1 for a in attendance if a["status"] == "absent")
+    excused_count = sum(1 for a in attendance if a["status"] == "excused")
+    
+    # Calculate total memorization (previous + new)
+    previous_juz = student.get("previous_memorization_juz") or []
+    previous_pages = student.get("previous_memorization_pages") or 0
+    total_previous = (len(previous_juz) * 20) + previous_pages
+    total_memorized = total_previous + total_new_pages
     
     return {
+        "student": {
+            "name": student.get("name"),
+            "email": student.get("email"),
+            "profile_image": student.get("profile_image"),
+            "school_name": student.get("school_name"),
+            "school_grade": student.get("school_grade"),
+            "mosque_name": student.get("mosque_name"),
+            "tajweed_level": student.get("tajweed_level"),
+            "student_phone": student.get("student_phone"),
+            "father_phone": student.get("father_phone"),
+            "mother_phone": student.get("mother_phone"),
+            "registration_date": student.get("registration_date"),
+            "initial_assessment_done": student.get("initial_assessment_done", False)
+        },
+        "memorization": {
+            "previous_juz": previous_juz,
+            "previous_pages": previous_pages,
+            "total_previous": total_previous,
+            "new_pages": total_new_pages,
+            "total_memorized": total_memorized,
+            "percentage": round((total_memorized / 604) * 100, 1)
+        },
         "tracking": {
             "total_prayers": total_prayers,
             "total_quran_time": total_quran_time,
             "total_family_recitation": total_family_recitation,
+            "total_adhkar": total_adhkar,
+            "total_sunnah": total_sunnah,
+            "total_witr": total_witr,
+            "total_duha": total_duha,
             "sheets_count": len(tracking)
         },
         "recitation": {
             "total_new_pages": total_new_pages,
             "total_review_pages": total_review_pages,
             "passed_count": passed_count,
-            "total_points": total_points,
-            "recitations_count": len(recitations)
+            "total_points": total_recitation_points,
+            "recitations_count": len(recitations),
+            "average_rating": round(avg_rating, 1)
         },
         "attendance": {
             "present": present_count,
             "absent": absent_count,
+            "excused": excused_count,
             "total": len(attendance),
-            "percentage": round(present_count / max(len(attendance), 1) * 100, 2)
-        }
+            "percentage": round(present_count / max(len(attendance), 1) * 100, 1)
+        },
+        "warnings": {
+            "count": len(warnings),
+            "list": warnings[-5:]  # Last 5 warnings
+        },
+        "total_points": student.get("points", 0)
     }
 
 @api_router.get("/statistics/overview")
