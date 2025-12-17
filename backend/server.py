@@ -1373,11 +1373,13 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
             "profile_image": student.get("profile_image"),
             "school_name": student.get("school_name"),
             "school_grade": student.get("school_grade"),
+            "school_average": student.get("school_average"),
             "mosque_name": student.get("mosque_name"),
             "tajweed_level": student.get("tajweed_level"),
             "student_phone": student.get("student_phone"),
             "father_phone": student.get("father_phone"),
             "mother_phone": student.get("mother_phone"),
+            "birth_date": student.get("birth_date"),
             "registration_date": student.get("registration_date"),
             "initial_assessment_done": student.get("initial_assessment_done", False)
         },
