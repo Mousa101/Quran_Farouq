@@ -25,6 +25,10 @@ import GroupManagement from './pages/GroupManagement';
 import InitialAssessment from './pages/InitialAssessment';
 import StudentEditProfile from './pages/StudentEditProfile';
 import PendingStudents from './pages/PendingStudents';
+import CurriculumManagement from './pages/CurriculumManagement';
+import ScheduleManagement from './pages/ScheduleManagement';
+import SheikhRankings from './pages/SheikhRankings';
+import AdminRankings from './pages/AdminRankings';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
