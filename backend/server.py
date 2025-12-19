@@ -13,7 +13,7 @@ from pydantic import BaseModel as PydanticBaseModel
 from models import (
     UserCreate, UserLogin, User, UserResponse, 
     GroupCreate, Group,
-    TrackingSheetCreate, TrackingSheet, TrackingSheetData,
+    TrackingSheetCreate, TrackingSheet, TrackingSheetData, TrackingSheetManualCreate,
     RecitationCreate, Recitation,
     AttendanceCreate, Attendance,
     ActivityCreate, Activity,
