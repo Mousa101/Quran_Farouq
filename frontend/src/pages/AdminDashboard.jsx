@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { useTheme } from '../context/ThemeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Users, BookOpen, Calendar, Trophy, TrendingUp } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { 
+  Users, BookOpen, Calendar, Trophy, TrendingUp, 
+  GraduationCap, UserCheck, Target, Eye, Medal,
+  ArrowUpRight, UserPlus, Clock
+} from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const AdminDashboard = () => {
-  const [stats, setStats] = useState({
-    total_students: 0,
-    total_sheikhs: 0,
-    total_groups: 0,
-    total_activities: 0
-  });
-  const [rankings, setRankings] = useState({ scores: [], gold: null, silver: null, bronze: null });
+  const { isDark } = useTheme();
+  const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,12 +23,8 @@ const AdminDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [statsRes, rankingsRes] = await Promise.all([
-        axios.get(`${API}/statistics/overview`),
-        axios.get(`${API}/rankings/weekly`)
-      ]);
-      setStats(statsRes.data);
-      setRankings(rankingsRes.data);
+      const res = await axios.get(`${API}/admin/dashboard-stats`);
+      setDashboardData(res.data);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -34,46 +32,11 @@ const AdminDashboard = () => {
     }
   };
 
-  const statCards = [
-    { label: 'الطلاب', value: stats.total_students, icon: Users, color: 'emerald' },
-    { label: 'الشيوخ', value: stats.total_sheikhs, icon: BookOpen, color: 'blue' },
-    { label: 'المجموعات', value: stats.total_groups, icon: Users, color: 'purple' },
-    { label: 'الأنشطة', value: stats.total_activities, icon: Calendar, color: 'amber' },
-  ];
-
-  const getRankStyle = (rank) => {
-    switch (rank) {
-      case 'gold':
-        return 'border-amber-500 bg-amber-500/10 glow-gold';
-      case 'silver':
-        return 'border-slate-400 bg-slate-400/10 glow-silver';
-      case 'bronze':
-        return 'border-orange-600 bg-orange-600/10 glow-bronze';
-      default:
-        return 'border-slate-700 bg-slate-800/50';
-    }
-  };
-
   const getRankBadge = (rank) => {
-    switch (rank) {
-      case 'gold':
-        return 'badge-gold';
-      case 'silver':
-        return 'badge-silver';
-      case 'bronze':
-        return 'badge-bronze';
-      default:
-        return 'bg-slate-700 text-slate-300';
-    }
-  };
-
-  const getRankLabel = (rank) => {
-    switch (rank) {
-      case 'gold': return 'ذهبي';
-      case 'silver': return 'فضي';
-      case 'bronze': return 'برونزي';
-      default: return 'مشارك';
-    }
+    if (rank === 1) return { bg: 'bg-amber-500/20', text: 'text-amber-400', icon: '🥇' };
+    if (rank === 2) return { bg: 'bg-slate-400/20', text: 'text-slate-300', icon: '🥈' };
+    if (rank === 3) return { bg: 'bg-orange-500/20', text: 'text-orange-400', icon: '🥉' };
+    return { bg: 'bg-slate-700/50', text: 'text-slate-400', icon: rank };
   };
 
   if (loading) {
@@ -84,130 +47,316 @@ const AdminDashboard = () => {
     );
   }
 
+  const summary = dashboardData?.summary || {};
+  const topGroups = dashboardData?.top_groups || [];
+  const topStudents = dashboardData?.top_students || [];
+  const sheikhs = dashboardData?.sheikhs || [];
+
   return (
-    <div className="space-y-8 animate-fadeIn" data-testid="admin-dashboard">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((stat, index) => (
-          <Card key={index} className="glass-card border-white/10 hover:border-emerald-500/30 transition-all duration-300">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-slate-400 text-sm">{stat.label}</p>
-                  <p className="text-3xl font-bold text-white mt-1">{stat.value}</p>
-                </div>
-                <div className={`w-12 h-12 rounded-xl bg-${stat.color}-500/20 flex items-center justify-center`}>
-                  <stat.icon className={`w-6 h-6 text-${stat.color}-400`} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+    <div className="space-y-6 animate-fadeIn">
+      {/* Welcome Header */}
+      <div className={`p-6 rounded-xl ${isDark ? 'glass-card border border-white/10' : 'bg-white border border-slate-200 shadow-sm'}`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>مرحباً بك في لوحة التحكم</h1>
+            <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>نظرة شاملة على أداء المركز</p>
+          </div>
+          <div className="flex gap-2">
+            <Link to="/admin-rankings">
+              <Button variant="outline" className={isDark ? 'border-white/10 hover:bg-white/5' : ''}>
+                <TrendingUp className="w-4 h-4 ml-2" />
+                الترتيب التفصيلي
+              </Button>
+            </Link>
+            <Link to="/pending-students">
+              <Button className="bg-emerald-600 hover:bg-emerald-700">
+                <UserPlus className="w-4 h-4 ml-2" />
+                طلبات التسجيل ({summary.pending_students || 0})
+              </Button>
+            </Link>
+          </div>
+        </div>
       </div>
 
-      {/* Rankings Section */}
-      <Card className="glass-card border-white/10">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الطلاب</p>
+                <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_students}</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                <GraduationCap className="w-6 h-6 text-emerald-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المشايخ</p>
+                <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_sheikhs}</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
+                <BookOpen className="w-6 h-6 text-blue-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المجموعات</p>
+                <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_groups}</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
+                <Users className="w-6 h-6 text-purple-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>إجمالي النقاط</p>
+                <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_points}</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                <Trophy className="w-6 h-6 text-amber-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Weekly Stats */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                <UserCheck className="w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>حضور هذا الأسبوع</p>
+                <p className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.week_attendance} مرة</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                <BookOpen className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>صفحات هذا الأسبوع</p>
+                <p className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.week_pages} صفحة</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Top Groups */}
+        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <Users className="w-5 h-5 text-purple-400" />
+              ترتيب المجموعات
+            </CardTitle>
+            <Link to="/admin-rankings?filter=groups">
+              <Button variant="ghost" size="sm" className="text-emerald-400">
+                عرض الكل <ArrowUpRight className="w-4 h-4 mr-1" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {topGroups.length === 0 ? (
+              <p className={`text-center py-4 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا توجد مجموعات</p>
+            ) : (
+              <div className="space-y-3">
+                {topGroups.map((group, index) => {
+                  const badge = getRankBadge(index + 1);
+                  return (
+                    <div
+                      key={group.group_id}
+                      className={`p-3 rounded-lg flex items-center justify-between ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${badge.bg} ${badge.text}`}>
+                          {badge.icon}
+                        </span>
+                        <div>
+                          <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{group.group_name}</p>
+                          <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{group.sheikh_name} • {group.student_count} طالب</p>
+                        </div>
+                      </div>
+                      <div className="text-left">
+                        <p className="text-emerald-400 font-bold">{group.total_points}</p>
+                        <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>نقطة</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Top Students */}
+        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <Trophy className="w-5 h-5 text-amber-400" />
+              أفضل الطلاب
+            </CardTitle>
+            <Link to="/admin-rankings?filter=students">
+              <Button variant="ghost" size="sm" className="text-emerald-400">
+                عرض الكل <ArrowUpRight className="w-4 h-4 mr-1" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {topStudents.length === 0 ? (
+              <p className={`text-center py-4 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا يوجد طلاب</p>
+            ) : (
+              <div className="space-y-3">
+                {topStudents.slice(0, 5).map((student, index) => {
+                  const badge = getRankBadge(index + 1);
+                  return (
+                    <div
+                      key={student.student_id}
+                      className={`p-3 rounded-lg flex items-center justify-between ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${badge.bg} ${badge.text}`}>
+                          {badge.icon}
+                        </span>
+                        <div>
+                          <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{student.student_name}</p>
+                          <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{student.group_name}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-emerald-400 font-bold">{student.total_points} نقطة</span>
+                        <Link to={`/student/${student.student_id}`}>
+                          <Button variant="ghost" size="sm" className="text-slate-400 hover:text-emerald-400">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Sheikhs List */}
+      <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
         <CardHeader>
-          <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
-            <Trophy className="w-6 h-6 text-amber-400" />
-            الحافز الجماعي - الترتيب الأسبوعي
+          <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <BookOpen className="w-5 h-5 text-blue-400" />
+            بيانات المشايخ
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {/* Top 3 Podium */}
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            {/* Silver - 2nd */}
-            <div className="flex flex-col items-center pt-8">
-              {rankings.silver && (
-                <Card className={`w-full border-2 ${getRankStyle('silver')} transition-all duration-300`}>
-                  <CardContent className="p-4 text-center">
-                    <div className="w-16 h-16 mx-auto rounded-full bg-slate-400/20 flex items-center justify-center mb-3">
-                      <span className="text-2xl font-bold text-slate-300">2</span>
-                    </div>
-                    <h3 className="text-lg font-bold text-white">{rankings.silver.student_name}</h3>
-                    <p className="text-slate-400 text-sm">{rankings.silver.total_score} نقطة</p>
-                    <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold ${getRankBadge('silver')}`}>
-                      فضي
-                    </span>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {/* Gold - 1st */}
-            <div className="flex flex-col items-center">
-              {rankings.gold && (
-                <Card className={`w-full border-2 ${getRankStyle('gold')} transition-all duration-300`}>
-                  <CardContent className="p-4 text-center">
-                    <div className="w-20 h-20 mx-auto rounded-full bg-amber-500/20 flex items-center justify-center mb-3">
-                      <Trophy className="w-10 h-10 text-amber-400" />
-                    </div>
-                    <h3 className="text-xl font-bold text-white">{rankings.gold.student_name}</h3>
-                    <p className="text-slate-400">{rankings.gold.total_score} نقطة</p>
-                    <span className={`inline-block mt-2 px-4 py-1 rounded-full text-sm font-bold ${getRankBadge('gold')}`}>
-                      ذهبي
-                    </span>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {/* Bronze - 3rd */}
-            <div className="flex flex-col items-center pt-12">
-              {rankings.bronze && (
-                <Card className={`w-full border-2 ${getRankStyle('bronze')} transition-all duration-300`}>
-                  <CardContent className="p-4 text-center">
-                    <div className="w-14 h-14 mx-auto rounded-full bg-orange-600/20 flex items-center justify-center mb-3">
-                      <span className="text-xl font-bold text-orange-400">3</span>
-                    </div>
-                    <h3 className="text-lg font-bold text-white">{rankings.bronze.student_name}</h3>
-                    <p className="text-slate-400 text-sm">{rankings.bronze.total_score} نقطة</p>
-                    <span className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold ${getRankBadge('bronze')}`}>
-                      برونزي
-                    </span>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </div>
-
-          {/* Full Rankings Table */}
-          <div className="bg-slate-800/30 rounded-xl overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="px-6 py-4 text-right text-sm font-medium text-slate-400">الترتيب</th>
-                  <th className="px-6 py-4 text-right text-sm font-medium text-slate-400">الطالب</th>
-                  <th className="px-6 py-4 text-right text-sm font-medium text-slate-400">المتابعة</th>
-                  <th className="px-6 py-4 text-right text-sm font-medium text-slate-400">التسميع</th>
-                  <th className="px-6 py-4 text-right text-sm font-medium text-slate-400">الحضور</th>
-                  <th className="px-6 py-4 text-right text-sm font-medium text-slate-400">المجموع</th>
-                  <th className="px-6 py-4 text-right text-sm font-medium text-slate-400">المركز</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rankings.scores.map((score, index) => (
-                  <tr key={score.student_id} className="border-b border-white/5 hover:bg-white/5">
-                    <td className="px-6 py-4 text-white font-bold">{index + 1}</td>
-                    <td className="px-6 py-4 text-white">{score.student_name}</td>
-                    <td className="px-6 py-4 text-slate-300">{score.tracking_score}</td>
-                    <td className="px-6 py-4 text-slate-300">{score.recitation_score}</td>
-                    <td className="px-6 py-4 text-slate-300">{score.attendance_score}%</td>
-                    <td className="px-6 py-4 text-emerald-400 font-bold">{score.total_score}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${getRankBadge(score.rank)}`}>
-                        {getRankLabel(score.rank)}
-                      </span>
-                    </td>
+          {sheikhs.length === 0 ? (
+            <p className={`text-center py-4 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا يوجد مشايخ</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className={`border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الشيخ</th>
+                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>البريد</th>
+                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المجموعات</th>
+                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الطلاب</th>
+                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>التسميعات</th>
+                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {rankings.scores.length === 0 && (
-              <div className="text-center py-12 text-slate-400">
-                لا توجد بيانات للعرض
-              </div>
-            )}
+                </thead>
+                <tbody>
+                  {sheikhs.map((sheikh) => (
+                    <tr key={sheikh.sheikh_id} className={`border-b ${isDark ? 'border-white/5 hover:bg-white/5' : 'border-slate-100 hover:bg-slate-50'}`}>
+                      <td className={`px-4 py-3 font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{sheikh.sheikh_name}</td>
+                      <td className={`px-4 py-3 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{sheikh.email}</td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 rounded-full text-xs bg-purple-500/20 text-purple-400">
+                          {sheikh.groups_count} مجموعة
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 rounded-full text-xs bg-emerald-500/20 text-emerald-400">
+                          {sheikh.students_count} طالب
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-400">
+                          {sheikh.recitations_count} تسميع
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link to={`/users?sheikh=${sheikh.sheikh_id}`}>
+                          <Button variant="ghost" size="sm" className="text-emerald-400 hover:text-emerald-300">
+                            <Eye className="w-4 h-4" />
+                          </Button>
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Points System Info */}
+      <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+        <CardHeader>
+          <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <Target className="w-5 h-5 text-emerald-400" />
+            نظام النقاط
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
+              <UserCheck className="w-8 h-8 mx-auto mb-2 text-emerald-400" />
+              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الحضور</p>
+              <p className="text-2xl font-bold text-emerald-400">10 نقاط</p>
+            </div>
+            <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-blue-50 border border-blue-200'}`}>
+              <BookOpen className="w-8 h-8 mx-auto mb-2 text-blue-400" />
+              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الحد الأدنى</p>
+              <p className="text-2xl font-bold text-blue-400">20 نقطة</p>
+            </div>
+            <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-purple-500/10 border border-purple-500/30' : 'bg-purple-50 border border-purple-200'}`}>
+              <Calendar className="w-8 h-8 mx-auto mb-2 text-purple-400" />
+              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>ورقة المتابعة</p>
+              <p className="text-2xl font-bold text-purple-400">63 نقطة</p>
+              <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>الحد الأقصى</p>
+            </div>
+            <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
+              <Trophy className="w-8 h-8 mx-auto mb-2 text-amber-400" />
+              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الإجمالي الأسبوعي</p>
+              <p className="text-2xl font-bold text-amber-400">93+ نقطة</p>
+            </div>
           </div>
         </CardContent>
       </Card>
