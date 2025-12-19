@@ -23,7 +23,11 @@ from models import (
     InitialAssessment, StudentSelfUpdate,
     StudentRegistrationRequest, ActivationRequest,
     CurriculumCreate, Curriculum, CurriculumEntryCreate, CurriculumEntry,
-    ScheduleCreate, Schedule, ScheduleSlotCreate, ScheduleSlot
+    ScheduleCreate, Schedule, ScheduleSlotCreate, ScheduleSlot,
+    FeeCreate, Fee,
+    HomeworkCreate, Homework, HomeworkSubmission,
+    AdminExamCreate, AdminExam,
+    TajweedExamCreate, TajweedExam
 )
 
 class BaseModel(PydanticBaseModel):
