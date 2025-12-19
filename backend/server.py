@@ -2777,6 +2777,203 @@ async def get_admin_rankings(
 from fastapi import File, UploadFile
 import base64
 
+# ============== ADMIN COMPREHENSIVE STATISTICS ==============
+
+@api_router.get("/admin/dashboard-stats")
+async def get_admin_dashboard_stats(current_user: dict = Depends(get_current_user)):
+    """Get comprehensive statistics for admin dashboard"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    
+    # Basic counts
+    total_students = await db.users.count_documents({"role": "student", "is_active": True})
+    total_sheikhs = await db.users.count_documents({"role": "sheikh"})
+    total_groups = await db.groups.count_documents({})
+    pending_students = await db.users.count_documents({"role": "student", "is_active": False})
+    
+    # Calculate total points
+    all_points = await db.student_points.find({}, {"_id": 0, "total_points": 1}).to_list(1000)
+    total_points = sum(p.get("total_points", 0) for p in all_points)
+    
+    # Attendance stats (this week)
+    from datetime import timedelta
+    today = datetime.now(timezone.utc)
+    week_start = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
+    
+    week_attendance = await db.attendance.count_documents({"date": {"$gte": week_start}, "status": "present"})
+    
+    # Recitation stats
+    total_recitations = await db.recitations.count_documents({})
+    week_recitations = await db.recitations.find({"created_at": {"$gte": week_start}}, {"_id": 0}).to_list(1000)
+    week_pages = sum(
+        (r.get("page_to", 0) - r.get("page_from", 0) + 1) 
+        for r in week_recitations 
+        if r.get("page_from") and r.get("page_to")
+    )
+    
+    # Top groups by points
+    groups = await db.groups.find({}, {"_id": 0}).to_list(100)
+    group_stats = []
+    for group in groups:
+        students = await db.users.find(
+            {"group_id": group["id"], "role": "student"},
+            {"_id": 0, "id": 1}
+        ).to_list(500)
+        student_ids = [s["id"] for s in students]
+        
+        points_data = await db.student_points.find(
+            {"student_id": {"$in": student_ids}},
+            {"_id": 0, "total_points": 1}
+        ).to_list(500)
+        group_points = sum(p.get("total_points", 0) for p in points_data)
+        
+        sheikh = await db.users.find_one({"id": group.get("sheikh_id")}, {"_id": 0, "name": 1})
+        
+        group_stats.append({
+            "group_id": group["id"],
+            "group_name": group["name"],
+            "sheikh_name": sheikh["name"] if sheikh else "غير معين",
+            "student_count": len(students),
+            "total_points": group_points
+        })
+    
+    group_stats.sort(key=lambda x: x["total_points"], reverse=True)
+    
+    # Top students
+    students = await db.users.find(
+        {"role": "student", "is_active": True},
+        {"_id": 0, "id": 1, "name": 1, "group_id": 1}
+    ).to_list(1000)
+    
+    top_students = []
+    for student in students:
+        points_data = await db.student_points.find_one({"student_id": student["id"]}, {"_id": 0})
+        total = points_data.get("total_points", 0) if points_data else 0
+        
+        group = await db.groups.find_one({"id": student.get("group_id")}, {"_id": 0, "name": 1})
+        
+        top_students.append({
+            "student_id": student["id"],
+            "student_name": student["name"],
+            "group_name": group["name"] if group else "بدون مجموعة",
+            "total_points": total
+        })
+    
+    top_students.sort(key=lambda x: x["total_points"], reverse=True)
+    
+    # Sheikhs list with stats
+    sheikhs = await db.users.find({"role": "sheikh"}, {"_id": 0, "password_hash": 0}).to_list(100)
+    sheikh_stats = []
+    for sheikh in sheikhs:
+        sheikh_groups = await db.groups.find({"sheikh_id": sheikh["id"]}, {"_id": 0}).to_list(20)
+        group_ids = [g["id"] for g in sheikh_groups]
+        
+        students_count = await db.users.count_documents({"group_id": {"$in": group_ids}, "role": "student"})
+        recitations_count = await db.recitations.count_documents({"sheikh_id": sheikh["id"]})
+        
+        sheikh_stats.append({
+            "sheikh_id": sheikh["id"],
+            "sheikh_name": sheikh["name"],
+            "email": sheikh["email"],
+            "groups_count": len(sheikh_groups),
+            "students_count": students_count,
+            "recitations_count": recitations_count
+        })
+    
+    return {
+        "summary": {
+            "total_students": total_students,
+            "total_sheikhs": total_sheikhs,
+            "total_groups": total_groups,
+            "pending_students": pending_students,
+            "total_points": total_points,
+            "week_attendance": week_attendance,
+            "total_recitations": total_recitations,
+            "week_pages": week_pages
+        },
+        "top_groups": group_stats[:5],
+        "top_students": top_students[:10],
+        "sheikhs": sheikh_stats
+    }
+
+@api_router.get("/admin/sheikh/{sheikh_id}")
+async def get_sheikh_details(sheikh_id: str, current_user: dict = Depends(get_current_user)):
+    """Get detailed information about a sheikh (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    
+    sheikh = await db.users.find_one({"id": sheikh_id, "role": "sheikh"}, {"_id": 0, "password_hash": 0})
+    if not sheikh:
+        raise HTTPException(status_code=404, detail="الشيخ غير موجود")
+    
+    # Get sheikh's groups
+    groups = await db.groups.find({"sheikh_id": sheikh_id}, {"_id": 0}).to_list(20)
+    
+    # Get all students in these groups
+    group_ids = [g["id"] for g in groups]
+    students = await db.users.find(
+        {"group_id": {"$in": group_ids}, "role": "student"},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(500)
+    
+    # Get recitation and attendance stats
+    total_recitations = await db.recitations.count_documents({"sheikh_id": sheikh_id})
+    total_attendance = await db.attendance.count_documents({"sheikh_id": sheikh_id})
+    
+    return {
+        "sheikh": sheikh,
+        "groups": groups,
+        "students": students,
+        "stats": {
+            "groups_count": len(groups),
+            "students_count": len(students),
+            "total_recitations": total_recitations,
+            "total_attendance_records": total_attendance
+        }
+    }
+
+@api_router.get("/admin/student/{student_id}")
+async def get_student_full_details(student_id: str, current_user: dict = Depends(get_current_user)):
+    """Get full details about a student (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    
+    student = await db.users.find_one({"id": student_id, "role": "student"}, {"_id": 0, "password_hash": 0})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    # Get group
+    group = await db.groups.find_one({"id": student.get("group_id")}, {"_id": 0})
+    
+    # Get sheikh
+    sheikh = await db.users.find_one({"id": group.get("sheikh_id")}, {"_id": 0, "name": 1, "email": 1}) if group else None
+    
+    # Get all recitations
+    recitations = await db.recitations.find({"student_id": student_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    
+    # Get all attendance
+    attendance = await db.attendance.find({"student_id": student_id}, {"_id": 0}).sort("date", -1).to_list(100)
+    
+    # Get tracking sheets
+    tracking_sheets = await db.tracking_sheets.find({"student_id": student_id}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    
+    # Get points breakdown
+    points_data = await db.student_points.find_one({"student_id": student_id}, {"_id": 0})
+    
+    # Get warnings
+    warnings = await db.warnings.find({"student_id": student_id}, {"_id": 0}).to_list(50)
+    
+    return {
+        "student": student,
+        "group": group,
+        "sheikh": sheikh,
+        "recitations": recitations,
+        "attendance": attendance,
+        "tracking_sheets": tracking_sheets,
+        "points": points_data,
+        "warnings": warnings
+    }
+
 @api_router.post("/curriculum/{curriculum_id}/upload-pdf")
 async def upload_curriculum_pdf(curriculum_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     """Upload PDF file for curriculum (Admin only)"""
