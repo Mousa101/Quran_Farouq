@@ -70,6 +70,8 @@ const Sidebar = () => {
         { to: '/tracking', icon: FileText, label: 'ورق المتابعة' },
         { to: '/recitations', icon: BookOpen, label: 'التسميع' },
         { to: '/attendance', icon: UserCheck, label: 'الحضور' },
+        { to: '/homework', icon: BookText, label: 'الواجبات' },
+        { to: '/exams', icon: Award, label: 'الامتحانات' },
         { to: '/sheikh-rankings', icon: TrendingUp, label: 'ترتيب طلابي' },
         { to: '/curriculum', icon: BookMarked, label: 'عرض المنهج' },
         { to: '/schedule', icon: CalendarDays, label: 'الجدول الدراسي' },
