@@ -677,19 +677,128 @@ async def get_students_pending_assessment(current_user: dict = Depends(get_curre
 
 # ============== TRACKING SHEET ROUTES ==============
 
+def calculate_tracking_points(data: dict) -> dict:
+    """
+    حساب نقاط ورقة المتابعة:
+    - الصلاة: من 35 (كل صلاة نقطة خلال الأسبوع)
+    - أذكار: 7 نقاط كحد أقصى
+    - الجلوس مع القرآن: 7 نقاط
+    - السنن: 7 نقاط
+    - الوتر: 7 نقاط
+    الحد الأقصى: 63 نقطة
+    """
+    prayers = min(data.get("prayers_count", 0), 35)  # Max 35
+    adhkar = min(data.get("adhkar_count", 0), 7)  # Max 7
+    quran = min(data.get("quran_sitting_days", 0), 7)  # Max 7
+    sunnah = min(data.get("sunnah_prayers_days", 0), 7)  # Max 7
+    witr = min(data.get("witr_prayers_days", 0), 7)  # Max 7
+    
+    total = prayers + adhkar + quran + sunnah + witr
+    
+    return {
+        "prayers_points": prayers,
+        "adhkar_points": adhkar,
+        "quran_points": quran,
+        "sunnah_points": sunnah,
+        "witr_points": witr,
+        "total_points": total
+    }
+
+@api_router.post("/tracking-sheets/manual")
+async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_user: dict = Depends(get_current_user)):
+    """إدخال ورقة متابعة يدوياً (للشيخ)"""
+    if current_user["role"] != "sheikh":
+        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه إدخال ورقة المتابعة")
+    
+    # Calculate points
+    points_breakdown = calculate_tracking_points({
+        "prayers_count": data.prayers_count,
+        "adhkar_count": data.adhkar_count,
+        "quran_sitting_days": data.quran_sitting_days,
+        "sunnah_prayers_days": data.sunnah_prayers_days,
+        "witr_prayers_days": data.witr_prayers_days
+    })
+    
+    sheet_data = TrackingSheetData(
+        prayers_count=min(data.prayers_count, 35),
+        adhkar_count=min(data.adhkar_count, 7),
+        quran_sitting_days=min(data.quran_sitting_days, 7),
+        sunnah_prayers_days=min(data.sunnah_prayers_days, 7),
+        witr_prayers_days=min(data.witr_prayers_days, 7),
+        notes=data.notes
+    )
+    
+    sheet = TrackingSheet(
+        student_id=data.student_id,
+        sheikh_id=current_user["user_id"],
+        week_start=data.week_start,
+        data=sheet_data,
+        points_earned=points_breakdown["total_points"]
+    )
+    
+    sheet_dict = sheet.model_dump()
+    sheet_dict["created_at"] = sheet_dict["created_at"].isoformat()
+    
+    await db.tracking_sheets.insert_one(sheet_dict)
+    
+    # Award points
+    if points_breakdown["total_points"] > 0:
+        await add_points(
+            data.student_id,
+            points_breakdown["total_points"],
+            "tracking",
+            f"ورقة متابعة أسبوع {data.week_start}"
+        )
+    
+    # Notify student
+    await create_notification_internal(
+        data.student_id,
+        "ورقة متابعة جديدة",
+        f"تم تسجيل ورقة المتابعة للأسبوع {data.week_start} - حصلت على {points_breakdown['total_points']} نقطة",
+        "success"
+    )
+    
+    # Check for badges
+    total_tracking = await db.tracking_sheets.find({"student_id": data.student_id}, {"_id": 0}).to_list(1000)
+    total_prayers = sum(t["data"].get("prayers_count", 0) for t in total_tracking)
+    
+    if total_prayers >= 100:
+        await award_badge(data.student_id, "prayer_keeper")
+    
+    return {
+        "message": "تم إدخال ورقة المتابعة بنجاح",
+        "sheet_id": sheet.id,
+        "points_breakdown": points_breakdown
+    }
+
 @api_router.post("/tracking-sheets")
 async def create_tracking_sheet(sheet_data: TrackingSheetCreate, current_user: dict = Depends(get_current_user)):
     if current_user["role"] != "sheikh":
         raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه رفع ورقة المتابعة")
     
-    # Analyze image with AI
-    analysis_result = await analyze_tracking_sheet(sheet_data.image_base64)
+    # If image provided, analyze it
+    if sheet_data.image_base64:
+        analysis_result = await analyze_tracking_sheet(sheet_data.image_base64)
+    else:
+        analysis_result = {
+            "prayers_count": 0,
+            "adhkar_count": 0,
+            "quran_sitting_days": 0,
+            "sunnah_prayers_days": 0,
+            "witr_prayers_days": 0,
+            "quran_sitting_minutes": 0,
+            "family_recitation_count": 0
+        }
+    
+    # Calculate points using new system
+    points_breakdown = calculate_tracking_points(analysis_result)
     
     sheet = TrackingSheet(
         student_id=sheet_data.student_id,
         sheikh_id=current_user["user_id"],
         week_start=sheet_data.week_start,
-        data=TrackingSheetData(**analysis_result)
+        data=TrackingSheetData(**analysis_result),
+        points_earned=points_breakdown["total_points"]
     )
     
     sheet_dict = sheet.model_dump()
@@ -705,35 +814,27 @@ async def create_tracking_sheet(sheet_data: TrackingSheetCreate, current_user: d
         "info"
     )
     
-    # Award points based on tracking data
-    tracking_points = 0
-    tracking_points += analysis_result["prayers_count"]  # 1 point per prayer
-    tracking_points += analysis_result["quran_sitting_minutes"] // 10  # 1 point per 10 minutes
-    tracking_points += analysis_result["family_recitation_count"] * 3  # 3 points per family recitation
-    
-    if tracking_points > 0:
+    # Award points
+    if points_breakdown["total_points"] > 0:
         await add_points(
             sheet_data.student_id,
-            tracking_points,
+            points_breakdown["total_points"],
             "tracking",
             f"ورقة متابعة أسبوع {sheet_data.week_start}"
         )
     
     # Check for badges
     total_tracking = await db.tracking_sheets.find({"student_id": sheet_data.student_id}, {"_id": 0}).to_list(1000)
-    total_prayers = sum(t["data"]["prayers_count"] for t in total_tracking)
-    total_quran_time = sum(t["data"]["quran_sitting_minutes"] for t in total_tracking)
+    total_prayers = sum(t["data"].get("prayers_count", 0) for t in total_tracking)
     
     if total_prayers >= 100:
         await award_badge(sheet_data.student_id, "prayer_keeper")
-    if total_quran_time >= 1000:
-        await award_badge(sheet_data.student_id, "quran_lover")
     
     return {
-        "message": "تم رفع ورقة المتابعة وتحليلها بنجاح",
+        "message": "تم رفع ورقة المتابعة بنجاح",
         "sheet_id": sheet.id,
         "analysis": analysis_result,
-        "points_earned": tracking_points
+        "points_breakdown": points_breakdown
     }
 
 @api_router.get("/tracking-sheets")
