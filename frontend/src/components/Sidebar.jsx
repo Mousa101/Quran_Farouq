@@ -47,15 +47,17 @@ const Sidebar = () => {
     if (user?.role === 'admin') {
       return [
         ...baseItems,
+        { to: '/pending-students', icon: UserPlus, label: 'طلبات التسجيل' },
         { to: '/group-management', icon: UsersRound, label: 'إدارة المجموعات' },
         { to: '/student-management', icon: GraduationCap, label: 'إدارة الطلاب' },
         { to: '/admin-rankings', icon: TrendingUp, label: 'الترتيب والإحصائيات' },
+        { to: '/fees', icon: DollarSign, label: 'الرسوم المالية' },
+        { to: '/homework', icon: BookText, label: 'الواجبات' },
+        { to: '/exams', icon: Award, label: 'الامتحانات' },
         { to: '/curriculum', icon: BookMarked, label: 'إدارة المنهج' },
         { to: '/schedule', icon: CalendarDays, label: 'إدارة الجداول' },
         { to: '/activities', icon: Calendar, label: 'الأنشطة' },
-        { to: '/pending-students', icon: UserPlus, label: 'طلبات التسجيل' },
         { to: '/users', icon: Users, label: 'المستخدمين' },
-        { to: '/registration-codes', icon: Key, label: 'أكواد التسجيل' },
         { to: '/notifications', icon: Bell, label: 'الإشعارات' },
       ];
     }
