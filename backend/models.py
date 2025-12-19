@@ -426,6 +426,131 @@ class Schedule(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+# ============== FINANCIAL FEES MODELS ==============
+
+class FeeCreate(BaseModel):
+    student_id: str
+    fee_type: str  # "subscription" (اشتراك), "umrah" (عمرة), "activity" (نشاط)
+    amount: float
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+
+class Fee(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    student_id: str
+    fee_type: str
+    amount: float
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    is_paid: bool = False
+    paid_date: Optional[str] = None
+    created_by: str  # Admin ID
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# ============== HOMEWORK/ASSIGNMENTS MODELS ==============
+
+class HomeworkCreate(BaseModel):
+    title: str
+    description: str
+    due_date: str
+    group_id: Optional[str] = None  # If None, for all students
+    student_ids: Optional[List[str]] = None  # Specific students
+
+class Homework(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str
+    description: str
+    due_date: str
+    group_id: Optional[str] = None
+    student_ids: Optional[List[str]] = None
+    created_by: str
+    created_by_role: str  # "admin" or "sheikh"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class HomeworkSubmission(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    homework_id: str
+    student_id: str
+    status: str = "pending"  # "pending", "submitted", "graded"
+    submission_notes: Optional[str] = None
+    grade: Optional[int] = None
+    feedback: Optional[str] = None
+    submitted_at: Optional[datetime] = None
+    graded_at: Optional[datetime] = None
+    graded_by: Optional[str] = None
+
+# ============== ADMINISTRATIVE EXAMS (مفاصل إدارية) ==============
+
+class AdminExamCreate(BaseModel):
+    student_id: str
+    exam_type: str  # "quran" (مفصل قرآن), "tajweed" (تجويد)
+    juz_number: Optional[int] = None  # For Quran exams
+    surah_name: Optional[str] = None
+    page_from: Optional[int] = None
+    page_to: Optional[int] = None
+    # Results
+    error_count: int = 0
+    warning_count: int = 0
+    tajweed_errors: int = 0
+    pronunciation_errors: int = 0
+    memorization_errors: int = 0
+    result: str = "pending"  # "pass" (ناجح), "fail" (راسب), "pending"
+    grade: Optional[int] = None  # 0-100
+    notes: Optional[str] = None
+
+class AdminExam(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    student_id: str
+    exam_type: str
+    juz_number: Optional[int] = None
+    surah_name: Optional[str] = None
+    page_from: Optional[int] = None
+    page_to: Optional[int] = None
+    # Results
+    error_count: int = 0
+    warning_count: int = 0
+    tajweed_errors: int = 0
+    pronunciation_errors: int = 0
+    memorization_errors: int = 0
+    result: str = "pending"
+    grade: Optional[int] = None
+    notes: Optional[str] = None
+    examiner_id: str  # Sheikh or Admin who conducted exam
+    exam_date: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# ============== TAJWEED EXAMS ==============
+
+class TajweedExamCreate(BaseModel):
+    student_id: str
+    topic: str  # موضوع الامتحان (أحكام النون الساكنة، المدود، etc.)
+    questions_count: int = 10
+    correct_answers: int = 0
+    practical_score: int = 0  # الاختبار العملي (0-100)
+    theoretical_score: int = 0  # الاختبار النظري (0-100)
+    result: str = "pending"  # "pass", "fail", "pending"
+    notes: Optional[str] = None
+
+class TajweedExam(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    student_id: str
+    topic: str
+    questions_count: int = 10
+    correct_answers: int = 0
+    practical_score: int = 0
+    theoretical_score: int = 0
+    final_score: int = 0
+    result: str = "pending"
+    notes: Optional[str] = None
+    examiner_id: str
+    exam_date: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # Quran Juz names for reference
 QURAN_JUZ = [
     "الجزء الأول", "الجزء الثاني", "الجزء الثالث", "الجزء الرابع", "الجزء الخامس",
