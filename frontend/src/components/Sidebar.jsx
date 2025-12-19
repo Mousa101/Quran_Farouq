@@ -22,7 +22,10 @@ import {
   UserPlus,
   BookMarked,
   CalendarDays,
-  TrendingUp
+  TrendingUp,
+  DollarSign,
+  BookText,
+  Award
 } from 'lucide-react';
 import { Button } from './ui/button';
 
