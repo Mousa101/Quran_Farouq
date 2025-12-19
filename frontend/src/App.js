@@ -29,6 +29,9 @@ import CurriculumManagement from './pages/CurriculumManagement';
 import ScheduleManagement from './pages/ScheduleManagement';
 import SheikhRankings from './pages/SheikhRankings';
 import AdminRankings from './pages/AdminRankings';
+import FeesManagement from './pages/FeesManagement';
+import HomeworkManagement from './pages/HomeworkManagement';
+import ExamsManagement from './pages/ExamsManagement';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
