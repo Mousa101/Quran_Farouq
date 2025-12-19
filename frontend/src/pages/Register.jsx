@@ -181,8 +181,8 @@ const Register = () => {
         />
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center p-8">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-emerald-500/20 backdrop-blur-xl border border-emerald-500/30 flex items-center justify-center">
-              <BookOpen className="w-10 h-10 text-emerald-400" />
+            <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="شعار المركز" className="w-28 h-28 object-contain" />
             </div>
             <h1 className="text-4xl font-bold text-white mb-2 font-cairo">مركز الفاروق</h1>
             <h2 className="text-2xl font-bold text-emerald-400 mb-4 font-cairo">القرآني</h2>
@@ -197,8 +197,8 @@ const Register = () => {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 overflow-y-auto">
         <Card className="w-full max-w-lg glass-card animate-fadeIn my-4">
           <CardHeader className="text-center space-y-2 pb-4">
-            <div className="lg:hidden w-14 h-14 mx-auto mb-2 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-              <BookOpen className="w-7 h-7 text-emerald-400" />
+            <div className="lg:hidden w-20 h-20 mx-auto mb-2 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="شعار المركز" className="w-16 h-16 object-contain" />
             </div>
             <CardTitle className="text-xl font-bold text-white font-cairo">تسجيل طالب جديد</CardTitle>
             <CardDescription className="text-slate-400 text-sm">أدخل بياناتك للتسجيل في المركز</CardDescription>
