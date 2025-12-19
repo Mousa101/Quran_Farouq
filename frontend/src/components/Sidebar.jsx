@@ -92,8 +92,8 @@ const Sidebar = () => {
       {/* Logo */}
       <div className={`p-6 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-            <BookOpen className="w-6 h-6 text-emerald-400" />
+          <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+            <img src="/logo.png" alt="شعار المركز" className="w-10 h-10 object-contain" />
           </div>
           <div>
             <h1 className={`text-lg font-bold font-cairo ${isDark ? 'text-white' : 'text-slate-900'}`}>مركز الفاروق</h1>
