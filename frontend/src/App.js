@@ -348,6 +348,39 @@ function AppRoutes() {
         }
       />
 
+      <Route
+        path="/fees"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <FeesManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/homework"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <HomeworkManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/exams"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <ExamsManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Default Route */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
