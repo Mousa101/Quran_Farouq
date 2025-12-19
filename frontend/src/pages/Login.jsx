@@ -42,8 +42,8 @@ const Login = () => {
         />
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center p-8">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-emerald-500/20 backdrop-blur-xl border border-emerald-500/30 flex items-center justify-center">
-              <BookOpen className="w-10 h-10 text-emerald-400" />
+            <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="شعار المركز" className="w-28 h-28 object-contain" />
             </div>
             <h1 className="text-4xl font-bold text-white mb-2 font-cairo">مركز الفاروق</h1>
             <h2 className="text-2xl font-bold text-emerald-400 mb-4 font-cairo">القرآني</h2>
