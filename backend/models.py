@@ -137,17 +137,39 @@ class Group(BaseModel):
     sheikh_id: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-# Tracking Sheet Models
+# Tracking Sheet Models - Updated with detailed tracking
 class TrackingSheetData(BaseModel):
-    prayers_count: int = 0
+    # الصلاة - 35 نقطة كحد أقصى (كل صلاة نقطة خلال الأسبوع = 5 صلوات × 7 أيام)
+    prayers_count: int = 0  # عدد الصلوات (0-35)
+    # أذكار بعد الصلاة - 7 نقاط كحد أقصى
+    adhkar_count: int = 0  # عدد أيام الأذكار (0-7)
+    # الجلوس مع القرآن - 7 نقاط كحد أقصى
+    quran_sitting_days: int = 0  # عدد أيام الجلوس مع القرآن (0-7)
+    # السنن الرواتب - 7 نقاط كحد أقصى
+    sunnah_prayers_days: int = 0  # عدد أيام السنن (0-7)
+    # الوتر - 7 نقاط كحد أقصى
+    witr_prayers_days: int = 0  # عدد أيام صلاة الوتر (0-7)
+    # ملاحظات
+    notes: Optional[str] = None
+    # Legacy fields
     quran_sitting_minutes: int = 0
     family_recitation_count: int = 0
-    notes: Optional[str] = None
 
 class TrackingSheetCreate(BaseModel):
     student_id: str
     week_start: str
-    image_base64: str
+    image_base64: Optional[str] = None  # Optional now
+
+class TrackingSheetManualCreate(BaseModel):
+    """إدخال يدوي لورقة المتابعة"""
+    student_id: str
+    week_start: str
+    prayers_count: int = 0  # الصلاة (0-35)
+    adhkar_count: int = 0  # الأذكار (0-7)
+    quran_sitting_days: int = 0  # الجلوس مع القرآن (0-7)
+    sunnah_prayers_days: int = 0  # السنن (0-7)
+    witr_prayers_days: int = 0  # الوتر (0-7)
+    notes: Optional[str] = None
 
 class TrackingSheet(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -157,6 +179,7 @@ class TrackingSheet(BaseModel):
     week_start: str
     image_url: Optional[str] = None
     data: TrackingSheetData
+    points_earned: int = 0  # النقاط المكتسبة
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # NEW Recitation Models - Updated with ranges and ratings
