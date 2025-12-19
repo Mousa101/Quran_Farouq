@@ -2978,6 +2978,459 @@ async def get_student_full_details(student_id: str, current_user: dict = Depends
         "warnings": warnings
     }
 
+# ============== FINANCIAL FEES ==============
+
+@api_router.post("/fees")
+async def create_fee(data: FeeCreate, current_user: dict = Depends(get_current_user)):
+    """Create a fee for a student (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إضافة الرسوم")
+    
+    # Verify student exists
+    student = await db.users.find_one({"id": data.student_id, "role": "student"})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    fee = Fee(
+        student_id=data.student_id,
+        fee_type=data.fee_type,
+        amount=data.amount,
+        description=data.description,
+        due_date=data.due_date,
+        created_by=current_user["user_id"]
+    )
+    
+    fee_dict = fee.model_dump()
+    fee_dict["created_at"] = fee_dict["created_at"].isoformat()
+    
+    await db.fees.insert_one(fee_dict)
+    
+    # Notify student
+    fee_types = {"subscription": "رسوم اشتراك", "umrah": "عمرة", "activity": "نشاط"}
+    await create_notification_internal(
+        data.student_id,
+        "رسوم مالية جديدة",
+        f"تم إضافة {fee_types.get(data.fee_type, data.fee_type)} بمبلغ {data.amount}",
+        "warning"
+    )
+    
+    return {"message": "تم إضافة الرسوم بنجاح", "fee_id": fee.id}
+
+@api_router.get("/fees")
+async def get_fees(student_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Get fees - Admin sees all, Student sees their own"""
+    query = {}
+    if current_user["role"] == "student":
+        query["student_id"] = current_user["user_id"]
+    elif student_id:
+        query["student_id"] = student_id
+    
+    fees = await db.fees.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
+    
+    # Add student names
+    for fee in fees:
+        student = await db.users.find_one({"id": fee["student_id"]}, {"_id": 0, "name": 1})
+        fee["student_name"] = student["name"] if student else "غير معروف"
+    
+    return fees
+
+@api_router.get("/fees/student/{student_id}")
+async def get_student_fees(student_id: str, current_user: dict = Depends(get_current_user)):
+    """Get fees for a specific student"""
+    if current_user["role"] == "student" and current_user["user_id"] != student_id:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    fees = await db.fees.find({"student_id": student_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    
+    total_due = sum(f["amount"] for f in fees if not f.get("is_paid"))
+    total_paid = sum(f["amount"] for f in fees if f.get("is_paid"))
+    
+    return {
+        "fees": fees,
+        "summary": {
+            "total_due": total_due,
+            "total_paid": total_paid,
+            "pending_count": len([f for f in fees if not f.get("is_paid")])
+        }
+    }
+
+@api_router.put("/fees/{fee_id}/pay")
+async def mark_fee_paid(fee_id: str, current_user: dict = Depends(get_current_user)):
+    """Mark a fee as paid (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تأكيد الدفع")
+    
+    result = await db.fees.update_one(
+        {"id": fee_id},
+        {"$set": {
+            "is_paid": True,
+            "paid_date": datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        }}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="الرسوم غير موجودة")
+    
+    return {"message": "تم تأكيد الدفع بنجاح"}
+
+@api_router.delete("/fees/{fee_id}")
+async def delete_fee(fee_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a fee (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف الرسوم")
+    
+    result = await db.fees.delete_one({"id": fee_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="الرسوم غير موجودة")
+    
+    return {"message": "تم حذف الرسوم بنجاح"}
+
+# ============== HOMEWORK/ASSIGNMENTS ==============
+
+@api_router.post("/homework")
+async def create_homework(data: HomeworkCreate, current_user: dict = Depends(get_current_user)):
+    """Create homework (Admin or Sheikh)"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    homework = Homework(
+        title=data.title,
+        description=data.description,
+        due_date=data.due_date,
+        group_id=data.group_id,
+        student_ids=data.student_ids,
+        created_by=current_user["user_id"],
+        created_by_role=current_user["role"]
+    )
+    
+    homework_dict = homework.model_dump()
+    homework_dict["created_at"] = homework_dict["created_at"].isoformat()
+    
+    await db.homework.insert_one(homework_dict)
+    
+    # Create submissions for students
+    target_students = []
+    if data.student_ids:
+        target_students = data.student_ids
+    elif data.group_id:
+        students = await db.users.find({"group_id": data.group_id, "role": "student"}, {"_id": 0, "id": 1}).to_list(500)
+        target_students = [s["id"] for s in students]
+    else:
+        # All students (for sheikh, only their groups)
+        if current_user["role"] == "sheikh":
+            groups = await db.groups.find({"sheikh_id": current_user["user_id"]}, {"_id": 0, "id": 1}).to_list(20)
+            group_ids = [g["id"] for g in groups]
+            students = await db.users.find({"group_id": {"$in": group_ids}, "role": "student"}, {"_id": 0, "id": 1}).to_list(500)
+            target_students = [s["id"] for s in students]
+    
+    # Create submission records and notify
+    for student_id in target_students:
+        submission = HomeworkSubmission(
+            homework_id=homework.id,
+            student_id=student_id
+        )
+        sub_dict = submission.model_dump()
+        if sub_dict.get("submitted_at"):
+            sub_dict["submitted_at"] = sub_dict["submitted_at"].isoformat()
+        if sub_dict.get("graded_at"):
+            sub_dict["graded_at"] = sub_dict["graded_at"].isoformat()
+        await db.homework_submissions.insert_one(sub_dict)
+        
+        await create_notification_internal(
+            student_id,
+            "واجب جديد",
+            f"تم إضافة واجب: {data.title} - موعد التسليم: {data.due_date}",
+            "info"
+        )
+    
+    return {"message": "تم إضافة الواجب بنجاح", "homework_id": homework.id}
+
+@api_router.get("/homework")
+async def get_homework(current_user: dict = Depends(get_current_user)):
+    """Get homework based on role"""
+    if current_user["role"] == "student":
+        # Get student's submissions with homework details
+        submissions = await db.homework_submissions.find(
+            {"student_id": current_user["user_id"]},
+            {"_id": 0}
+        ).to_list(100)
+        
+        result = []
+        for sub in submissions:
+            homework = await db.homework.find_one({"id": sub["homework_id"]}, {"_id": 0})
+            if homework:
+                result.append({**homework, "submission": sub})
+        
+        return sorted(result, key=lambda x: x.get("due_date", ""), reverse=True)
+    
+    elif current_user["role"] == "sheikh":
+        homework = await db.homework.find(
+            {"created_by": current_user["user_id"]},
+            {"_id": 0}
+        ).sort("created_at", -1).to_list(100)
+        return homework
+    
+    else:  # Admin
+        homework = await db.homework.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+        return homework
+
+@api_router.get("/homework/{homework_id}/submissions")
+async def get_homework_submissions(homework_id: str, current_user: dict = Depends(get_current_user)):
+    """Get submissions for a homework (Admin/Sheikh)"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    submissions = await db.homework_submissions.find({"homework_id": homework_id}, {"_id": 0}).to_list(500)
+    
+    # Add student names
+    for sub in submissions:
+        student = await db.users.find_one({"id": sub["student_id"]}, {"_id": 0, "name": 1})
+        sub["student_name"] = student["name"] if student else "غير معروف"
+    
+    return submissions
+
+@api_router.put("/homework/submissions/{submission_id}/grade")
+async def grade_homework(submission_id: str, grade: int, feedback: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Grade a homework submission"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    result = await db.homework_submissions.update_one(
+        {"id": submission_id},
+        {"$set": {
+            "status": "graded",
+            "grade": grade,
+            "feedback": feedback,
+            "graded_at": datetime.now(timezone.utc).isoformat(),
+            "graded_by": current_user["user_id"]
+        }}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="التسليم غير موجود")
+    
+    return {"message": "تم تقييم الواجب بنجاح"}
+
+@api_router.delete("/homework/{homework_id}")
+async def delete_homework(homework_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete homework"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    # Check ownership for sheikh
+    if current_user["role"] == "sheikh":
+        homework = await db.homework.find_one({"id": homework_id})
+        if homework and homework.get("created_by") != current_user["user_id"]:
+            raise HTTPException(status_code=403, detail="لا يمكنك حذف واجب لم تقم بإنشائه")
+    
+    await db.homework.delete_one({"id": homework_id})
+    await db.homework_submissions.delete_many({"homework_id": homework_id})
+    
+    return {"message": "تم حذف الواجب بنجاح"}
+
+# ============== ADMINISTRATIVE EXAMS (مفاصل إدارية) ==============
+
+@api_router.post("/admin-exams")
+async def create_admin_exam(data: AdminExamCreate, current_user: dict = Depends(get_current_user)):
+    """Create an administrative exam (Admin/Sheikh)"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    # Verify student
+    student = await db.users.find_one({"id": data.student_id, "role": "student"})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    exam = AdminExam(
+        student_id=data.student_id,
+        exam_type=data.exam_type,
+        juz_number=data.juz_number,
+        surah_name=data.surah_name,
+        page_from=data.page_from,
+        page_to=data.page_to,
+        error_count=data.error_count,
+        warning_count=data.warning_count,
+        tajweed_errors=data.tajweed_errors,
+        pronunciation_errors=data.pronunciation_errors,
+        memorization_errors=data.memorization_errors,
+        result=data.result,
+        grade=data.grade,
+        notes=data.notes,
+        examiner_id=current_user["user_id"],
+        exam_date=datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    )
+    
+    exam_dict = exam.model_dump()
+    exam_dict["created_at"] = exam_dict["created_at"].isoformat()
+    
+    await db.admin_exams.insert_one(exam_dict)
+    
+    # Notify student
+    result_text = "ناجح ✅" if data.result == "pass" else "راسب ❌" if data.result == "fail" else "قيد المراجعة"
+    exam_type_text = "مفصل قرآن" if data.exam_type == "quran" else "امتحان تجويد"
+    await create_notification_internal(
+        data.student_id,
+        f"نتيجة {exam_type_text}",
+        f"النتيجة: {result_text} - الدرجة: {data.grade or 0}%",
+        "success" if data.result == "pass" else "warning"
+    )
+    
+    return {"message": "تم إضافة الامتحان بنجاح", "exam_id": exam.id}
+
+@api_router.get("/admin-exams")
+async def get_admin_exams(student_id: Optional[str] = None, exam_type: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Get administrative exams"""
+    query = {}
+    
+    if current_user["role"] == "student":
+        query["student_id"] = current_user["user_id"]
+    elif student_id:
+        query["student_id"] = student_id
+    
+    if exam_type:
+        query["exam_type"] = exam_type
+    
+    exams = await db.admin_exams.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
+    
+    # Add names
+    for exam in exams:
+        student = await db.users.find_one({"id": exam["student_id"]}, {"_id": 0, "name": 1})
+        examiner = await db.users.find_one({"id": exam["examiner_id"]}, {"_id": 0, "name": 1})
+        exam["student_name"] = student["name"] if student else "غير معروف"
+        exam["examiner_name"] = examiner["name"] if examiner else "غير معروف"
+    
+    return exams
+
+@api_router.get("/admin-exams/student/{student_id}")
+async def get_student_exams(student_id: str, current_user: dict = Depends(get_current_user)):
+    """Get all exams for a student with summary"""
+    if current_user["role"] == "student" and current_user["user_id"] != student_id:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    exams = await db.admin_exams.find({"student_id": student_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    
+    quran_exams = [e for e in exams if e["exam_type"] == "quran"]
+    tajweed_exams = [e for e in exams if e["exam_type"] == "tajweed"]
+    
+    return {
+        "exams": exams,
+        "summary": {
+            "total_quran_exams": len(quran_exams),
+            "passed_quran": len([e for e in quran_exams if e["result"] == "pass"]),
+            "failed_quran": len([e for e in quran_exams if e["result"] == "fail"]),
+            "total_tajweed_exams": len(tajweed_exams),
+            "passed_tajweed": len([e for e in tajweed_exams if e["result"] == "pass"]),
+            "failed_tajweed": len([e for e in tajweed_exams if e["result"] == "fail"])
+        }
+    }
+
+@api_router.put("/admin-exams/{exam_id}")
+async def update_admin_exam(exam_id: str, data: AdminExamCreate, current_user: dict = Depends(get_current_user)):
+    """Update an exam"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    update_data = {
+        "error_count": data.error_count,
+        "warning_count": data.warning_count,
+        "tajweed_errors": data.tajweed_errors,
+        "pronunciation_errors": data.pronunciation_errors,
+        "memorization_errors": data.memorization_errors,
+        "result": data.result,
+        "grade": data.grade,
+        "notes": data.notes
+    }
+    
+    result = await db.admin_exams.update_one({"id": exam_id}, {"$set": update_data})
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+    
+    return {"message": "تم تحديث الامتحان بنجاح"}
+
+@api_router.delete("/admin-exams/{exam_id}")
+async def delete_admin_exam(exam_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete an exam"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    result = await db.admin_exams.delete_one({"id": exam_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+    
+    return {"message": "تم حذف الامتحان بنجاح"}
+
+# ============== TAJWEED EXAMS ==============
+
+@api_router.post("/tajweed-exams")
+async def create_tajweed_exam(data: TajweedExamCreate, current_user: dict = Depends(get_current_user)):
+    """Create a tajweed exam"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    # Calculate final score
+    final_score = (data.practical_score + data.theoretical_score) // 2
+    
+    exam = TajweedExam(
+        student_id=data.student_id,
+        topic=data.topic,
+        questions_count=data.questions_count,
+        correct_answers=data.correct_answers,
+        practical_score=data.practical_score,
+        theoretical_score=data.theoretical_score,
+        final_score=final_score,
+        result=data.result,
+        notes=data.notes,
+        examiner_id=current_user["user_id"],
+        exam_date=datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    )
+    
+    exam_dict = exam.model_dump()
+    exam_dict["created_at"] = exam_dict["created_at"].isoformat()
+    
+    await db.tajweed_exams.insert_one(exam_dict)
+    
+    # Notify
+    result_text = "ناجح ✅" if data.result == "pass" else "راسب ❌"
+    await create_notification_internal(
+        data.student_id,
+        "نتيجة امتحان التجويد",
+        f"موضوع: {data.topic} - النتيجة: {result_text} - الدرجة: {final_score}%",
+        "success" if data.result == "pass" else "warning"
+    )
+    
+    return {"message": "تم إضافة امتحان التجويد بنجاح", "exam_id": exam.id}
+
+@api_router.get("/tajweed-exams")
+async def get_tajweed_exams(student_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Get tajweed exams"""
+    query = {}
+    
+    if current_user["role"] == "student":
+        query["student_id"] = current_user["user_id"]
+    elif student_id:
+        query["student_id"] = student_id
+    
+    exams = await db.tajweed_exams.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
+    
+    for exam in exams:
+        student = await db.users.find_one({"id": exam["student_id"]}, {"_id": 0, "name": 1})
+        exam["student_name"] = student["name"] if student else "غير معروف"
+    
+    return exams
+
+@api_router.delete("/tajweed-exams/{exam_id}")
+async def delete_tajweed_exam(exam_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a tajweed exam"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    result = await db.tajweed_exams.delete_one({"id": exam_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+    
+    return {"message": "تم حذف الامتحان بنجاح"}
+
 @api_router.post("/curriculum/{curriculum_id}/upload-pdf")
 async def upload_curriculum_pdf(curriculum_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     """Upload PDF file for curriculum (Admin only)"""
