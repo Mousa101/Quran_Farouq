@@ -75,6 +75,7 @@ class User(UserBase):
     school_grade: Optional[str] = None  # الصف الدراسي
     school_average: Optional[str] = None  # معدل الطالب
     birth_date: Optional[str] = None
+    join_date: Optional[str] = None  # تاريخ الإلتحاق
     profile_image: Optional[str] = None
     # Progress tracking (for students)
     previous_memorization_juz: Optional[List[int]] = None  # الحفظ القديم
