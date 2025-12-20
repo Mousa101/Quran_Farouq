@@ -72,7 +72,8 @@ const Layout = ({ children }) => {
   return (
     <div className="min-h-screen bg-background pattern-overlay">
       <Sidebar />
-      <main className="mr-64 min-h-screen p-8">
+      {/* Add top padding for mobile header and right margin for desktop sidebar */}
+      <main className="pt-16 md:pt-0 md:mr-64 min-h-screen p-4 md:p-8">
         {children}
       </main>
     </div>
