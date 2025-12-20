@@ -138,8 +138,8 @@ class UserCreateWithCode(BaseModel):
     birth_date: Optional[str] = None
     profile_image: Optional[str] = None
 
-@api_router.post("/auth/register")
-async def register(user_data: UserCreateWithCode):
+@api_router.post("/auth/register-with-code")
+async def register_with_code(user_data: UserCreateWithCode):
     # Check if email exists
     existing = await db.users.find_one({"email": user_data.email})
     if existing:
