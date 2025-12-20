@@ -105,6 +105,10 @@ function AppRoutes() {
         path="/activate" 
         element={user ? <Navigate to="/dashboard" replace /> : <Activate />} 
       />
+      <Route 
+        path="/forgot-password" 
+        element={user ? <Navigate to="/dashboard" replace /> : <ForgotPassword />} 
+      />
 
       {/* Protected Routes */}
       <Route
