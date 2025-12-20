@@ -495,32 +495,34 @@ const Register = () => {
                 </div>
               </div>
 
-              {/* School & Grade */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-slate-400 text-xs flex items-center gap-1">
-                    <School className="w-3 h-3" />
-                    المدرسة
-                  </Label>
-                  <Input
-                    type="text"
-                    placeholder="اسم المدرسة"
-                    value={formData.schoolName}
-                    onChange={(e) => handleChange('schoolName', e.target.value)}
-                    className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
-                  />
+              {/* School & Grade - Students only */}
+              {selectedRole === 'student' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-slate-400 text-xs flex items-center gap-1">
+                      <School className="w-3 h-3" />
+                      المدرسة
+                    </Label>
+                    <Input
+                      type="text"
+                      placeholder="اسم المدرسة"
+                      value={formData.schoolName}
+                      onChange={(e) => handleChange('schoolName', e.target.value)}
+                      className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-slate-400 text-xs">الصف الدراسي</Label>
+                    <Input
+                      type="text"
+                      placeholder="مثال: الصف السادس"
+                      value={formData.schoolGrade}
+                      onChange={(e) => handleChange('schoolGrade', e.target.value)}
+                      className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-slate-400 text-xs">الصف الدراسي</Label>
-                  <Input
-                    type="text"
-                    placeholder="مثال: الصف السادس"
-                    value={formData.schoolGrade}
-                    onChange={(e) => handleChange('schoolGrade', e.target.value)}
-                    className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
-                  />
-                </div>
-              </div>
+              )}
 
               {/* Join Date */}
               <div className="space-y-1">
