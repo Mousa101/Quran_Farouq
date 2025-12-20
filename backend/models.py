@@ -15,6 +15,7 @@ class StudentRegistrationRequest(BaseModel):
     password: str
     name: str
     confirm_password: str
+    role: str = "student"  # student, sheikh, admin
     # Phone numbers
     student_phone: Optional[str] = None
     father_phone: Optional[str] = None
@@ -26,6 +27,9 @@ class StudentRegistrationRequest(BaseModel):
     birth_date: Optional[str] = None
     join_date: Optional[str] = None  # تاريخ الإلتحاق
     profile_image: Optional[str] = None
+    # Sheikh/Admin specific
+    specialization: Optional[str] = None  # تخصص الشيخ
+    experience_years: Optional[int] = None  # سنوات الخبرة
 
 # Activation request
 class ActivationRequest(BaseModel):
