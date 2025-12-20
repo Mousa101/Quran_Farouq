@@ -143,7 +143,16 @@ const StudentDashboard = () => {
               </div>
             )}
             <div>
-              <h1 className="text-2xl font-bold text-white">{stats?.student?.name || user?.name}</h1>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-2xl font-bold text-white">{stats?.student?.name || user?.name}</h1>
+                {/* اسم المجموعة */}
+                {groupInfo && (
+                  <Badge className="bg-purple-500/20 text-purple-400 text-xs">
+                    <Users className="w-3 h-3 ml-1" />
+                    {groupInfo.name}
+                  </Badge>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2 mt-2">
                 {stats?.student?.tajweed_level && (
                   <Badge className={getTajweedBadgeColor(stats.student.tajweed_level)}>
@@ -155,6 +164,13 @@ const StudentDashboard = () => {
                   <Badge className="bg-blue-500/20 text-blue-400">
                     <Cake className="w-3 h-3 ml-1" />
                     {studentAge} سنة
+                  </Badge>
+                )}
+                {/* المعدل GPA */}
+                {stats?.student?.school_average && (
+                  <Badge className="bg-amber-500/20 text-amber-400">
+                    <GraduationCap className="w-3 h-3 ml-1" />
+                    المعدل: {stats.student.school_average}
                   </Badge>
                 )}
               </div>
