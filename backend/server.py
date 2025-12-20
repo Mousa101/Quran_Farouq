@@ -1532,7 +1532,9 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
             "father_phone": student.get("father_phone"),
             "mother_phone": student.get("mother_phone"),
             "birth_date": student.get("birth_date"),
+            "join_date": student.get("join_date"),
             "registration_date": student.get("registration_date"),
+            "group_id": student.get("group_id"),
             "initial_assessment_done": student.get("initial_assessment_done", False)
         },
         "memorization": {
