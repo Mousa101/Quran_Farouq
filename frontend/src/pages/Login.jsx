@@ -78,7 +78,7 @@ const Login = () => {
                     placeholder="example@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pr-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 text-left"
+                    className="pr-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 text-left h-10 md:h-11 text-sm md:text-base"
                     dir="ltr"
                     required
                     data-testid="login-email-input"
@@ -87,16 +87,16 @@ const Login = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-slate-300">كلمة المرور</Label>
+                <Label htmlFor="password" className="text-slate-300 text-sm md:text-base">كلمة المرور</Label>
                 <div className="relative">
-                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                  <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-slate-500" />
                   <Input
                     id="password"
                     type="password"
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pr-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+                    className="pr-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 h-10 md:h-11 text-sm md:text-base"
                     required
                     data-testid="login-password-input"
                   />
@@ -105,20 +105,20 @@ const Login = () => {
 
               <Button
                 type="submit"
-                className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl glow-green"
+                className="w-full h-10 md:h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl glow-green text-sm md:text-base"
                 disabled={loading}
                 data-testid="login-submit-btn"
               >
                 {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" />
                 ) : (
                   'دخول'
                 )}
               </Button>
             </form>
 
-            <div className="mt-6 text-center space-y-2">
-              <p className="text-slate-400">
+            <div className="mt-4 md:mt-6 text-center space-y-2">
+              <p className="text-slate-400 text-sm md:text-base">
                 ليس لديك حساب؟{' '}
                 <Link 
                   to="/register" 
@@ -128,7 +128,7 @@ const Login = () => {
                   سجل الآن
                 </Link>
               </p>
-              <p className="text-slate-500 text-sm">
+              <p className="text-slate-500 text-xs md:text-sm">
                 <Link 
                   to="/forgot-password" 
                   className="text-amber-400 hover:text-amber-300"
