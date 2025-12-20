@@ -416,20 +416,88 @@ const Register = () => {
                 </div>
               </div>
 
-              {/* Profile Image URL */}
+              {/* Join Date */}
               <div className="space-y-1">
                 <Label className="text-slate-400 text-xs flex items-center gap-1">
-                  <Image className="w-3 h-3" />
-                  رابط الصورة الشخصية (اختياري)
+                  <UserPlus className="w-3 h-3" />
+                  تاريخ الإلتحاق بالمركز
                 </Label>
                 <Input
-                  type="url"
-                  placeholder="https://example.com/photo.jpg"
-                  value={formData.profileImage}
-                  onChange={(e) => handleChange('profileImage', e.target.value)}
-                  className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
-                  dir="ltr"
+                  type="date"
+                  value={formData.joinDate}
+                  onChange={(e) => handleChange('joinDate', e.target.value)}
+                  className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
                 />
+              </div>
+
+              {/* Profile Image Upload */}
+              <div className="space-y-2">
+                <Label className="text-slate-400 text-xs flex items-center gap-1">
+                  <Image className="w-3 h-3" />
+                  الصورة الشخصية (اختياري)
+                </Label>
+                <div className="flex items-center gap-3">
+                  {/* معاينة الصورة */}
+                  {imagePreview ? (
+                    <div className="relative">
+                      <img 
+                        src={imagePreview} 
+                        alt="معاينة" 
+                        className="w-16 h-16 rounded-xl object-cover border-2 border-emerald-500/30"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeImage}
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center hover:bg-red-600"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-16 h-16 rounded-xl bg-slate-800/50 border-2 border-dashed border-slate-600 flex items-center justify-center cursor-pointer hover:border-emerald-500/50 transition-colors"
+                    >
+                      {uploadingImage ? (
+                        <Loader2 className="w-6 h-6 text-slate-500 animate-spin" />
+                      ) : (
+                        <Upload className="w-6 h-6 text-slate-500" />
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* زر الرفع */}
+                  <div className="flex-1">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploadingImage}
+                      className="h-8 text-xs bg-slate-800/50 border-slate-600 text-slate-300 hover:bg-slate-700"
+                    >
+                      {uploadingImage ? (
+                        <>
+                          <Loader2 className="w-3 h-3 ml-1 animate-spin" />
+                          جاري الرفع...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-3 h-3 ml-1" />
+                          {imagePreview ? 'تغيير الصورة' : 'اختر صورة'}
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-slate-500 text-[10px] mt-1">الحد الأقصى: 5 ميجابايت</p>
+                  </div>
+                </div>
               </div>
 
               {/* Notice */}
