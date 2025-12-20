@@ -4,10 +4,11 @@ import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Progress } from '../components/ui/progress';
 import { Badge } from '../components/ui/badge';
+import { CircularGauge } from '../components/ui/circular-gauge';
 import { 
   BookOpen, Clock, Users, Trophy, Calendar, CheckCircle, 
   User, Phone, School, Home, Star, AlertTriangle, Award,
-  Sunrise, Moon, BookMarked, Hand, Mail, Cake, MapPin
+  Sunrise, Moon, BookMarked, Hand, Mail, Cake, MapPin, GraduationCap
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
