@@ -384,55 +384,79 @@ const StudentDashboard = () => {
 
         {/* Attendance & Recitation - Circular Gauges */}
         <Card className="glass-card border-white/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-blue-400" />
+          <CardHeader className="pb-2 md:pb-3">
+            <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
               نسبة الحضور والتسميع
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-around py-4">
+            <div className="flex items-center justify-around py-2 md:py-4">
               {/* عداد الحضور */}
-              <CircularGauge 
-                value={stats?.attendance?.percentage || 0}
-                maxValue={100}
-                label="نسبة الحضور"
-                color="dynamic"
-                size="md"
-                icon={CheckCircle}
-              />
+              <div className="block md:hidden">
+                <CircularGauge 
+                  value={stats?.attendance?.percentage || 0}
+                  maxValue={100}
+                  label="نسبة الحضور"
+                  color="dynamic"
+                  size="sm"
+                  icon={CheckCircle}
+                />
+              </div>
+              <div className="hidden md:block">
+                <CircularGauge 
+                  value={stats?.attendance?.percentage || 0}
+                  maxValue={100}
+                  label="نسبة الحضور"
+                  color="dynamic"
+                  size="md"
+                  icon={CheckCircle}
+                />
+              </div>
               
               {/* عداد التسميع */}
-              <CircularGauge 
-                value={(stats?.recitation?.average_rating || 0) * 10}
-                maxValue={100}
-                label="نسبة التسميع"
-                color="dynamic"
-                size="md"
-                icon={Star}
-              />
+              <div className="block md:hidden">
+                <CircularGauge 
+                  value={(stats?.recitation?.average_rating || 0) * 10}
+                  maxValue={100}
+                  label="نسبة التسميع"
+                  color="dynamic"
+                  size="sm"
+                  icon={Star}
+                />
+              </div>
+              <div className="hidden md:block">
+                <CircularGauge 
+                  value={(stats?.recitation?.average_rating || 0) * 10}
+                  maxValue={100}
+                  label="نسبة التسميع"
+                  color="dynamic"
+                  size="md"
+                  icon={Star}
+                />
+              </div>
             </div>
             
             {/* تفاصيل إضافية */}
-            <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-700">
+            <div className="grid grid-cols-2 gap-2 md:gap-3 mt-3 md:mt-4 pt-3 md:pt-4 border-t border-slate-700">
               <div className="text-center">
-                <div className="flex items-center justify-center gap-2 text-xs">
+                <div className="flex items-center justify-center gap-1 md:gap-2 text-[10px] md:text-xs flex-wrap">
                   <span className="text-emerald-400 flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" />
+                    <CheckCircle className="w-2.5 h-2.5 md:w-3 md:h-3" />
                     حضور: {stats?.attendance?.present || 0}
                   </span>
                   <span className="text-red-400">غياب: {stats?.attendance?.absent || 0}</span>
                 </div>
-                <p className="text-slate-500 text-xs mt-1">عذر: {stats?.attendance?.excused || 0}</p>
+                <p className="text-slate-500 text-[10px] md:text-xs mt-1">عذر: {stats?.attendance?.excused || 0}</p>
               </div>
               <div className="text-center">
-                <div className="flex items-center justify-center gap-2 text-xs">
+                <div className="flex items-center justify-center gap-1 md:gap-2 text-[10px] md:text-xs">
                   <span className="text-amber-400 flex items-center gap-1">
-                    <Star className="w-3 h-3" />
+                    <Star className="w-2.5 h-2.5 md:w-3 md:h-3" />
                     التقييم: {stats?.recitation?.average_rating || 0}/10
                   </span>
                 </div>
-                <p className="text-slate-500 text-xs mt-1">
+                <p className="text-slate-500 text-[10px] md:text-xs mt-1">
                   {stats?.recitation?.recitations_count || 0} تسميع - {stats?.recitation?.passed_count || 0} اجتاز
                 </p>
               </div>
@@ -443,9 +467,9 @@ const StudentDashboard = () => {
 
       {/* Prayers & Quran Time */}
       <Card className="glass-card border-white/10">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
-            <Hand className="w-5 h-5 text-purple-400" />
+        <CardHeader className="pb-2 md:pb-3">
+          <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+            <Hand className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
             ورقة المتابعة الإيمانية
           </CardTitle>
         </CardHeader>
