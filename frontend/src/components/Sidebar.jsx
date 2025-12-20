@@ -256,7 +256,7 @@ const Sidebar = () => {
       </aside>
 
       {/* Desktop Sidebar */}
-      <aside className={`sidebar-container hidden md:flex fixed right-0 top-0 h-screen w-64 backdrop-blur-xl flex-col z-50 transition-colors duration-300 ${
+      <aside className={`sidebar-container hidden md:flex fixed right-0 top-0 h-screen w-64 backdrop-blur-xl flex-col z-50 transition-colors duration-300 pb-12 ${
         isDark ? 'bg-slate-900/95 border-l border-white/10' : 'bg-white/95 border-l border-slate-200'
       }`}>
         <SidebarContent />
