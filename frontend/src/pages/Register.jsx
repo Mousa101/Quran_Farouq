@@ -40,6 +40,55 @@ const Register = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // رفع الصورة
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // التحقق من نوع الملف
+    if (!file.type.startsWith('image/')) {
+      toast.error('يرجى اختيار صورة صالحة');
+      return;
+    }
+
+    // التحقق من حجم الملف (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('حجم الصورة يجب أن يكون أقل من 5 ميجابايت');
+      return;
+    }
+
+    setUploadingImage(true);
+
+    try {
+      // تحويل الصورة إلى base64
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target.result;
+        setImagePreview(base64);
+        setFormData(prev => ({ ...prev, profileImage: base64 }));
+        setUploadingImage(false);
+        toast.success('تم تحميل الصورة بنجاح');
+      };
+      reader.onerror = () => {
+        toast.error('فشل في قراءة الصورة');
+        setUploadingImage(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      toast.error('فشل في تحميل الصورة');
+      setUploadingImage(false);
+    }
+  };
+
+  // إزالة الصورة
+  const removeImage = () => {
+    setImagePreview(null);
+    setFormData(prev => ({ ...prev, profileImage: '' }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
