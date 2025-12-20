@@ -129,10 +129,10 @@ const Sidebar = () => {
 
   const navItems = getNavItems();
 
-  const SidebarContent = () => (
-    <>
+  const SidebarContent = ({ isMobile = false }) => (
+    <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className={`p-4 md:p-6 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+      <div className={`p-4 md:p-6 border-b flex-shrink-0 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
             <img src="/logo.png" alt="شعار المركز" className="w-8 h-8 md:w-10 md:h-10 object-contain" />
@@ -145,7 +145,7 @@ const Sidebar = () => {
       </div>
 
       {/* User Info */}
-      <div className={`p-3 md:p-4 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+      <div className={`p-3 md:p-4 border-b flex-shrink-0 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
         <div className={`p-2 md:p-3 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
           <p className={`font-medium text-sm md:text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>{user?.name}</p>
           <p className="text-xs text-emerald-500">
@@ -156,8 +156,8 @@ const Sidebar = () => {
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-2 md:p-4 space-y-1 md:space-y-2 overflow-y-auto">
+      {/* Navigation - Scrollable */}
+      <nav className="flex-1 p-2 md:p-4 space-y-1 md:space-y-2 overflow-y-auto min-h-0">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -178,8 +178,8 @@ const Sidebar = () => {
         ))}
       </nav>
 
-      {/* Theme Toggle & Logout */}
-      <div className={`p-3 md:p-4 border-t ${isDark ? 'border-white/10' : 'border-slate-200'} space-y-2`}>
+      {/* Theme Toggle & Logout - Fixed at bottom */}
+      <div className={`p-3 md:p-4 border-t flex-shrink-0 ${isDark ? 'border-white/10' : 'border-slate-200'} space-y-2`}>
         {/* Theme Toggle */}
         <Button
           onClick={toggleTheme}
@@ -215,7 +215,7 @@ const Sidebar = () => {
           <span>تسجيل الخروج</span>
         </Button>
       </div>
-    </>
+    </div>
   );
 
   return (
