@@ -247,11 +247,11 @@ async def login(credentials: UserLogin):
         )
     }
 
-# ============== NEW STUDENT REGISTRATION FLOW ==============
+# ============== NEW USER REGISTRATION FLOW ==============
 
-@api_router.post("/auth/student-register")
-async def student_register(data: StudentRegistrationRequest):
-    """Student registration - creates pending account needing activation"""
+@api_router.post("/auth/register")
+async def user_register(data: StudentRegistrationRequest):
+    """Universal registration - creates pending account needing activation for all roles"""
     # Validate passwords match
     if data.password != data.confirm_password:
         raise HTTPException(status_code=400, detail="كلمات المرور غير متطابقة")
@@ -261,41 +261,60 @@ async def student_register(data: StudentRegistrationRequest):
     if existing:
         raise HTTPException(status_code=400, detail="البريد الإلكتروني مسجل مسبقاً")
     
+    # Validate role
+    valid_roles = ["student", "sheikh", "admin"]
+    role = data.role if data.role in valid_roles else "student"
+    
     # Generate activation code (6 digits)
     import random
     activation_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
     
-    # Create student user (not activated)
-    user = User(
-        email=data.email,
-        name=data.name,
-        role="student",
-        is_active=False,
-        is_activated=False,
-        activation_code=activation_code,
-        student_phone=data.student_phone,
-        father_phone=data.father_phone,
-        mother_phone=data.mother_phone,
-        mosque_name=data.mosque_name,
-        school_name=data.school_name,
-        school_grade=data.school_grade,
-        birth_date=data.birth_date,
-        join_date=data.join_date,
-        profile_image=data.profile_image
-    )
+    # Create user (not activated)
+    user_dict = {
+        "id": str(uuid.uuid4()),
+        "email": data.email,
+        "name": data.name,
+        "role": role,
+        "is_active": False,
+        "is_activated": False,
+        "activation_code": activation_code,
+        "student_phone": data.student_phone,
+        "father_phone": data.father_phone,
+        "mother_phone": data.mother_phone,
+        "mosque_name": data.mosque_name,
+        "school_name": data.school_name,
+        "school_grade": data.school_grade,
+        "birth_date": data.birth_date,
+        "join_date": data.join_date,
+        "profile_image": data.profile_image,
+        "password_hash": get_password_hash(data.password),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "registration_date": datetime.now(timezone.utc).isoformat(),
+        "points": 0
+    }
     
-    user_dict = user.model_dump()
-    user_dict["password_hash"] = get_password_hash(data.password)
-    user_dict["created_at"] = user_dict["created_at"].isoformat()
-    user_dict["registration_date"] = user_dict["registration_date"].isoformat()
+    # Add sheikh/admin specific fields
+    if role in ["sheikh", "admin"]:
+        user_dict["specialization"] = data.specialization
+        user_dict["experience_years"] = data.experience_years
     
     await db.users.insert_one(user_dict)
     
+    role_name = "طالب" if role == "student" else ("معلم" if role == "sheikh" else "مدير")
+    
     return {
-        "message": "تم تسجيل بياناتك بنجاح. حسابك غير مفعل حالياً.",
+        "message": f"تم تسجيل بياناتك كـ{role_name} بنجاح. حسابك غير مفعل حالياً.",
         "detail": "يرجى التواصل مع إدارة المركز للحصول على كود التفعيل",
-        "email": data.email
+        "email": data.email,
+        "role": role
     }
+
+# Keep old endpoint for backwards compatibility
+@api_router.post("/auth/student-register")
+async def student_register(data: StudentRegistrationRequest):
+    """Student registration - creates pending account needing activation"""
+    data.role = "student"
+    return await user_register(data)
 
 @api_router.post("/auth/activate")
 async def activate_account(data: ActivationRequest):
