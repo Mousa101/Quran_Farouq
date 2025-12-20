@@ -270,50 +270,50 @@ const StudentDashboard = () => {
 
             {/* Mosque */}
             <div className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                  <Home className="w-5 h-5 text-purple-400" />
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                  <Home className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
                 </div>
-                <div>
-                  <p className="text-slate-400 text-xs">المسجد</p>
-                  <p className="text-white font-bold">{stats?.student?.mosque_name || '-'}</p>
+                <div className="min-w-0">
+                  <p className="text-slate-400 text-[10px] md:text-xs">المسجد</p>
+                  <p className="text-white font-bold text-sm md:text-base truncate">{stats?.student?.mosque_name || '-'}</p>
                 </div>
               </div>
             </div>
 
             {/* Registration Date */}
-            <div className="p-4 rounded-xl bg-slate-800/50 border border-white/5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-cyan-400" />
+            <div className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                  <Calendar className="w-4 h-4 md:w-5 md:h-5 text-cyan-400" />
                 </div>
-                <div>
-                  <p className="text-slate-400 text-xs">تاريخ التسجيل في المركز</p>
-                  <p className="text-white font-bold">{formatDate(stats?.student?.registration_date)}</p>
+                <div className="min-w-0">
+                  <p className="text-slate-400 text-[10px] md:text-xs">تاريخ التسجيل</p>
+                  <p className="text-white font-bold text-sm md:text-base truncate">{formatDate(stats?.student?.registration_date)}</p>
                 </div>
               </div>
             </div>
 
             {/* Phone Numbers */}
-            <div className="p-4 rounded-xl bg-slate-800/50 border border-white/5 md:col-span-2 lg:col-span-3">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                  <Phone className="w-5 h-5 text-green-400" />
+            <div className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5 col-span-1 sm:col-span-2 lg:col-span-3">
+              <div className="flex items-center gap-2 md:gap-3 mb-2 md:mb-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                  <Phone className="w-4 h-4 md:w-5 md:h-5 text-green-400" />
                 </div>
-                <p className="text-slate-400 text-sm">أرقام الهواتف</p>
+                <p className="text-slate-400 text-xs md:text-sm">أرقام الهواتف</p>
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="text-center p-3 rounded-lg bg-slate-900/50">
-                  <p className="text-slate-400 text-xs mb-1">هاتف الطالب</p>
-                  <p className="text-emerald-400 font-bold" dir="ltr">{stats?.student?.student_phone || '-'}</p>
+              <div className="grid grid-cols-3 gap-2 md:gap-4">
+                <div className="text-center p-2 md:p-3 rounded-lg bg-slate-900/50">
+                  <p className="text-slate-400 text-[10px] md:text-xs mb-1">هاتف الطالب</p>
+                  <p className="text-emerald-400 font-bold text-xs md:text-sm" dir="ltr">{stats?.student?.student_phone || '-'}</p>
                 </div>
-                <div className="text-center p-3 rounded-lg bg-slate-900/50">
-                  <p className="text-slate-400 text-xs mb-1">هاتف الأب</p>
-                  <p className="text-blue-400 font-bold" dir="ltr">{stats?.student?.father_phone || '-'}</p>
+                <div className="text-center p-2 md:p-3 rounded-lg bg-slate-900/50">
+                  <p className="text-slate-400 text-[10px] md:text-xs mb-1">هاتف الأب</p>
+                  <p className="text-blue-400 font-bold text-xs md:text-sm" dir="ltr">{stats?.student?.father_phone || '-'}</p>
                 </div>
-                <div className="text-center p-3 rounded-lg bg-slate-900/50">
-                  <p className="text-slate-400 text-xs mb-1">هاتف الأم</p>
-                  <p className="text-pink-400 font-bold" dir="ltr">{stats?.student?.mother_phone || '-'}</p>
+                <div className="text-center p-2 md:p-3 rounded-lg bg-slate-900/50">
+                  <p className="text-slate-400 text-[10px] md:text-xs mb-1">هاتف الأم</p>
+                  <p className="text-pink-400 font-bold text-xs md:text-sm" dir="ltr">{stats?.student?.mother_phone || '-'}</p>
                 </div>
               </div>
             </div>
@@ -322,20 +322,20 @@ const StudentDashboard = () => {
       </Card>
 
       {/* Memorization & Attendance/Recitation Gauges */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Memorization Progress */}
         <Card className="glass-card border-white/10">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-emerald-400" />
+          <CardHeader className="pb-2 md:pb-3">
+            <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+              <BookOpen className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
               مقدار الحفظ
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3 md:space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-slate-400">إجمالي الصفحات المحفوظة</span>
-                <span className="text-2xl font-bold text-emerald-400">
+                <span className="text-slate-400 text-sm md:text-base">إجمالي الصفحات المحفوظة</span>
+                <span className="text-xl md:text-2xl font-bold text-emerald-400">
                   {stats?.memorization?.total_memorized || 0} صفحة
                 </span>
               </div>
