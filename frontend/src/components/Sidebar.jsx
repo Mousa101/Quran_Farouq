@@ -249,7 +249,7 @@ const Sidebar = () => {
       )}
 
       {/* Mobile Sidebar */}
-      <aside className={`sidebar-container md:hidden fixed right-0 top-0 h-screen w-72 backdrop-blur-xl flex flex-col z-50 transition-transform duration-300 pt-14 ${
+      <aside className={`sidebar-container md:hidden fixed right-0 top-14 bottom-0 w-72 backdrop-blur-xl flex flex-col z-50 transition-transform duration-300 ${
         isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
       } ${isDark ? 'bg-slate-900/98 border-l border-white/10' : 'bg-white/98 border-l border-slate-200'}`}>
         <SidebarContent isMobile={true} />
