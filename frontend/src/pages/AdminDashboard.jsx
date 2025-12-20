@@ -53,25 +53,25 @@ const AdminDashboard = () => {
   const sheikhs = dashboardData?.sheikhs || [];
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-4 md:space-y-6 animate-fadeIn">
       {/* Welcome Header */}
-      <div className={`p-6 rounded-xl ${isDark ? 'glass-card border border-white/10' : 'bg-white border border-slate-200 shadow-sm'}`}>
-        <div className="flex items-center justify-between">
+      <div className={`p-4 md:p-6 rounded-xl ${isDark ? 'glass-card border border-white/10' : 'bg-white border border-slate-200 shadow-sm'}`}>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>مرحباً بك في لوحة التحكم</h1>
-            <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>نظرة شاملة على أداء المركز</p>
+            <h1 className={`text-lg md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>مرحباً بك في لوحة التحكم</h1>
+            <p className={`text-sm md:text-base ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>نظرة شاملة على أداء المركز</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link to="/admin-rankings">
-              <Button variant="outline" className={isDark ? 'border-white/10 hover:bg-white/5' : ''}>
-                <TrendingUp className="w-4 h-4 ml-2" />
+              <Button variant="outline" size="sm" className={`text-xs md:text-sm ${isDark ? 'border-white/10 hover:bg-white/5' : ''}`}>
+                <TrendingUp className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
                 الترتيب التفصيلي
               </Button>
             </Link>
             <Link to="/pending-students">
-              <Button className="bg-emerald-600 hover:bg-emerald-700">
-                <UserPlus className="w-4 h-4 ml-2" />
-                طلبات التسجيل ({summary.pending_students || 0})
+              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-xs md:text-sm">
+                <UserPlus className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
+                طلبات التسجيل
               </Button>
             </Link>
           </div>
@@ -79,55 +79,55 @@ const AdminDashboard = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
         <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-          <CardContent className="p-4">
+          <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الطلاب</p>
-                <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_students}</p>
+              <div className="min-w-0">
+                <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الطلاب</p>
+                <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_students}</p>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-emerald-400" />
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                <GraduationCap className="w-5 h-5 md:w-6 md:h-6 text-emerald-400" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-          <CardContent className="p-4">
+          <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المشايخ</p>
-                <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_sheikhs}</p>
+              <div className="min-w-0">
+                <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المشايخ</p>
+                <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_sheikhs}</p>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-blue-400" />
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-blue-400" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-          <CardContent className="p-4">
+          <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المجموعات</p>
-                <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_groups}</p>
+              <div className="min-w-0">
+                <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المجموعات</p>
+                <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_groups}</p>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                <Users className="w-6 h-6 text-purple-400" />
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                <Users className="w-5 h-5 md:w-6 md:h-6 text-purple-400" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-          <CardContent className="p-4">
+          <CardContent className="p-3 md:p-4">
             <div className="flex items-center justify-between">
-              <div>
-                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>إجمالي النقاط</p>
-                <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_points}</p>
+              <div className="min-w-0">
+                <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>إجمالي النقاط</p>
+                <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_points}</p>
               </div>
               <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
                 <Trophy className="w-6 h-6 text-amber-400" />
