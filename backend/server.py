@@ -554,6 +554,78 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         group_id=user.get("group_id")
     )
 
+# ============== USER PROFILE UPDATE ==============
+
+class UserProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    student_phone: Optional[str] = None
+    father_phone: Optional[str] = None
+    mother_phone: Optional[str] = None
+    mosque_name: Optional[str] = None
+    school_name: Optional[str] = None
+    school_grade: Optional[str] = None
+    school_average: Optional[str] = None
+    birth_date: Optional[str] = None
+    join_date: Optional[str] = None
+    profile_image: Optional[str] = None
+    specialization: Optional[str] = None
+    experience_years: Optional[int] = None
+
+@api_router.put("/users/me")
+async def update_my_profile(data: UserProfileUpdate, current_user: dict = Depends(get_current_user)):
+    """Update current user's profile"""
+    user = await db.users.find_one({"id": current_user["user_id"]})
+    if not user:
+        raise HTTPException(status_code=404, detail="المستخدم غير موجود")
+    
+    # Build update dict with only provided fields
+    update_data = {}
+    if data.name is not None:
+        update_data["name"] = data.name
+    if data.student_phone is not None:
+        update_data["student_phone"] = data.student_phone
+    if data.father_phone is not None:
+        update_data["father_phone"] = data.father_phone
+    if data.mother_phone is not None:
+        update_data["mother_phone"] = data.mother_phone
+    if data.mosque_name is not None:
+        update_data["mosque_name"] = data.mosque_name
+    if data.school_name is not None:
+        update_data["school_name"] = data.school_name
+    if data.school_grade is not None:
+        update_data["school_grade"] = data.school_grade
+    if data.school_average is not None:
+        update_data["school_average"] = data.school_average
+    if data.birth_date is not None:
+        update_data["birth_date"] = data.birth_date
+    if data.join_date is not None:
+        update_data["join_date"] = data.join_date
+    if data.profile_image is not None:
+        update_data["profile_image"] = data.profile_image
+    if data.specialization is not None:
+        update_data["specialization"] = data.specialization
+    if data.experience_years is not None:
+        update_data["experience_years"] = data.experience_years
+    
+    if update_data:
+        await db.users.update_one(
+            {"id": current_user["user_id"]},
+            {"$set": update_data}
+        )
+    
+    return {"message": "تم تحديث البيانات بنجاح"}
+
+@api_router.get("/users/me/full")
+async def get_my_full_profile(current_user: dict = Depends(get_current_user)):
+    """Get current user's full profile data"""
+    user = await db.users.find_one(
+        {"id": current_user["user_id"]},
+        {"_id": 0, "password_hash": 0, "activation_code": 0}
+    )
+    if not user:
+        raise HTTPException(status_code=404, detail="المستخدم غير موجود")
+    return user
+
 # ============== GROUP ROUTES ==============
 
 class GroupCreateAdmin(BaseModel):
