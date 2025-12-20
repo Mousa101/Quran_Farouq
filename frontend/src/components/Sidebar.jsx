@@ -179,7 +179,7 @@ const Sidebar = () => {
       </nav>
 
       {/* Theme Toggle & Logout - Fixed at bottom */}
-      <div className={`p-3 md:p-4 border-t flex-shrink-0 ${isDark ? 'border-white/10' : 'border-slate-200'} space-y-2`}>
+      <div className={`p-3 md:p-4 border-t flex-shrink-0 mt-auto ${isDark ? 'border-white/10 bg-slate-900/98' : 'border-slate-200 bg-white/98'} space-y-2`}>
         {/* Theme Toggle */}
         <Button
           onClick={toggleTheme}
