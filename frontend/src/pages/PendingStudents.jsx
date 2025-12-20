@@ -4,28 +4,35 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { UserPlus, Clock, Phone, Mail, Key, Copy, CheckCircle, School, Home, Calendar, User, Loader2 } from 'lucide-react';
+import { UserPlus, Clock, Phone, Mail, Key, Copy, CheckCircle, School, Home, Calendar, User, Loader2, BookOpen, Shield, GraduationCap, Briefcase } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const PendingStudents = () => {
-  const [pendingStudents, setPendingStudents] = useState([]);
+  const [pendingData, setPendingData] = useState({ students: [], sheikhs: [], admins: [], total: 0 });
   const [loading, setLoading] = useState(true);
-  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
 
   useEffect(() => {
-    fetchPendingStudents();
+    fetchPendingRegistrations();
   }, []);
 
-  const fetchPendingStudents = async () => {
+  const fetchPendingRegistrations = async () => {
     try {
-      const response = await axios.get(`${API}/admin/pending-students`);
-      setPendingStudents(response.data);
+      const response = await axios.get(`${API}/admin/pending-registrations`);
+      setPendingData(response.data);
     } catch (error) {
       console.error('Error:', error);
-      toast.error('فشل في تحميل البيانات');
+      // Fallback to old endpoint
+      try {
+        const res = await axios.get(`${API}/admin/pending-students`);
+        setPendingData({ students: res.data, sheikhs: [], admins: [], total: res.data.length });
+      } catch (e) {
+        toast.error('فشل في تحميل البيانات');
+      }
     } finally {
       setLoading(false);
     }
@@ -36,8 +43,8 @@ const PendingStudents = () => {
     toast.success('تم النسخ!');
   };
 
-  const openStudentDetails = (student) => {
-    setSelectedStudent(student);
+  const openUserDetails = (user) => {
+    setSelectedUser(user);
     setDialogOpen(true);
   };
 
@@ -52,6 +59,37 @@ const PendingStudents = () => {
     });
   };
 
+  const getRoleInfo = (role) => {
+    switch(role) {
+      case 'sheikh':
+        return { label: 'معلم', icon: BookOpen, color: 'blue', bgColor: 'bg-blue-500/20', textColor: 'text-blue-400' };
+      case 'admin':
+        return { label: 'مدير', icon: Shield, color: 'purple', bgColor: 'bg-purple-500/20', textColor: 'text-purple-400' };
+      default:
+        return { label: 'طالب', icon: GraduationCap, color: 'emerald', bgColor: 'bg-emerald-500/20', textColor: 'text-emerald-400' };
+    }
+  };
+
+  const getAllPending = () => {
+    const all = [
+      ...pendingData.students.map(s => ({...s, role: 'student'})),
+      ...pendingData.sheikhs.map(s => ({...s, role: 'sheikh'})),
+      ...pendingData.admins.map(s => ({...s, role: 'admin'}))
+    ];
+    return all.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  };
+
+  const getFilteredList = () => {
+    switch(activeTab) {
+      case 'students': return pendingData.students.map(s => ({...s, role: 'student'}));
+      case 'sheikhs': return pendingData.sheikhs.map(s => ({...s, role: 'sheikh'}));
+      case 'admins': return pendingData.admins.map(s => ({...s, role: 'admin'}));
+      default: return getAllPending();
+    }
+  };
+
+  const pendingList = getFilteredList();
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -61,21 +99,62 @@ const PendingStudents = () => {
   }
 
   return (
-    <div className="space-y-8 animate-fadeIn" data-testid="pending-students-page">
-      <div>
-        <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-          <UserPlus className="w-8 h-8 text-amber-400" />
-          طلبات التسجيل المعلقة
-        </h1>
-        <p className="text-slate-400 mt-1">طلاب بانتظار تفعيل حساباتهم</p>
+    <div className="space-y-6 animate-fadeIn" data-testid="pending-students-page">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+            <UserPlus className="w-6 h-6 md:w-8 md:h-8 text-amber-400" />
+            طلبات التسجيل المعلقة
+          </h1>
+          <p className="text-slate-400 text-sm mt-1">مستخدمون بانتظار تفعيل حساباتهم ({pendingData.total})</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant={activeTab === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('all')}
+            className={activeTab === 'all' ? 'bg-emerald-600' : 'border-slate-700'}
+          >
+            الكل ({pendingData.total})
+          </Button>
+          <Button
+            variant={activeTab === 'students' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('students')}
+            className={activeTab === 'students' ? 'bg-emerald-600' : 'border-slate-700'}
+          >
+            <GraduationCap className="w-4 h-4 ml-1" />
+            طلاب ({pendingData.students.length})
+          </Button>
+          <Button
+            variant={activeTab === 'sheikhs' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('sheikhs')}
+            className={activeTab === 'sheikhs' ? 'bg-blue-600' : 'border-slate-700'}
+          >
+            <BookOpen className="w-4 h-4 ml-1" />
+            معلمين ({pendingData.sheikhs.length})
+          </Button>
+          <Button
+            variant={activeTab === 'admins' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveTab('admins')}
+            className={activeTab === 'admins' ? 'bg-purple-600' : 'border-slate-700'}
+          >
+            <Shield className="w-4 h-4 ml-1" />
+            مدراء ({pendingData.admins.length})
+          </Button>
+        </div>
       </div>
 
-      {pendingStudents.length === 0 ? (
+      {pendingList.length === 0 ? (
         <Card className="glass-card border-white/10">
           <CardContent className="py-12 text-center">
             <CheckCircle className="w-16 h-16 mx-auto mb-4 text-emerald-400 opacity-50" />
             <p className="text-slate-400 text-lg">لا توجد طلبات معلقة</p>
-            <p className="text-slate-500 text-sm mt-2">جميع الطلاب تم تفعيل حساباتهم</p>
+            <p className="text-slate-500 text-sm mt-2">جميع المستخدمين تم تفعيل حساباتهم</p>
           </CardContent>
         </Card>
       ) : (
