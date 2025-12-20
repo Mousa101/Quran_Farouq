@@ -25,6 +25,7 @@ import StudentManagement from './pages/StudentManagement';
 import GroupManagement from './pages/GroupManagement';
 import InitialAssessment from './pages/InitialAssessment';
 import StudentEditProfile from './pages/StudentEditProfile';
+import SheikhEditProfile from './pages/SheikhEditProfile';
 import PendingStudents from './pages/PendingStudents';
 import CurriculumManagement from './pages/CurriculumManagement';
 import ScheduleManagement from './pages/ScheduleManagement';
