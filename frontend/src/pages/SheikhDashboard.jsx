@@ -3,7 +3,11 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Users, BookOpen, UserCheck, FileText, Plus, TrendingUp, Eye } from 'lucide-react';
+import { Badge } from '../components/ui/badge';
+import { 
+  Users, BookOpen, UserCheck, FileText, TrendingUp, Eye,
+  User, Mail, Phone, Home, Calendar, Briefcase, Star, Edit
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -13,6 +17,7 @@ const SheikhDashboard = () => {
   const [groups, setGroups] = useState([]);
   const [students, setStudents] = useState([]);
   const [recentRecitations, setRecentRecitations] = useState([]);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,13 +26,15 @@ const SheikhDashboard = () => {
 
   const fetchData = async () => {
     try {
-      const [groupsRes, recitationsRes] = await Promise.all([
+      const [groupsRes, recitationsRes, profileRes] = await Promise.all([
         axios.get(`${API}/groups`),
-        axios.get(`${API}/recitations`)
+        axios.get(`${API}/recitations`),
+        axios.get(`${API}/users/me/full`)
       ]);
       
       setGroups(groupsRes.data);
       setRecentRecitations(recitationsRes.data.slice(0, 5));
+      setProfile(profileRes.data);
       
       // Get students from all groups
       const allStudents = [];
@@ -50,6 +57,11 @@ const SheikhDashboard = () => {
     { to: '/attendance', icon: UserCheck, label: 'تسجيل الحضور', color: 'amber' },
   ];
 
+  const formatDate = (dateStr) => {
+    if (!dateStr) return '-';
+    return new Date(dateStr).toLocaleDateString('ar-SA');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -59,74 +71,147 @@ const SheikhDashboard = () => {
   }
 
   return (
-    <div className="space-y-8 animate-fadeIn" data-testid="sheikh-dashboard">
-      {/* Welcome */}
-      <div className="glass-card p-6 border border-white/10">
-        <h1 className="text-2xl font-bold text-white mb-2"> المشرف {user?.name}</h1>
-        <p className="text-slate-400">إدارة حلقات التحفيظ والطلاب</p>
+    <div className="space-y-4 md:space-y-6 animate-fadeIn" data-testid="sheikh-dashboard">
+      {/* Welcome & Profile Header */}
+      <div className="glass-card p-4 md:p-6 border border-white/10">
+        <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
+          {/* Profile Image & Name */}
+          <div className="flex items-center gap-3 md:gap-4">
+            {profile?.profile_image ? (
+              <img 
+                src={profile.profile_image} 
+                alt="صورة شخصية"
+                className="w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl object-cover border-2 border-blue-500/30"
+              />
+            ) : (
+              <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl bg-blue-500/20 flex items-center justify-center">
+                <User className="w-8 h-8 md:w-10 md:h-10 text-blue-400" />
+              </div>
+            )}
+            <div>
+              <h1 className="text-lg md:text-2xl font-bold text-white">المشرف {user?.name}</h1>
+              <div className="flex flex-wrap gap-1 md:gap-2 mt-1 md:mt-2">
+                {profile?.specialization && (
+                  <Badge className="bg-blue-500/20 text-blue-400 text-[10px] md:text-xs">
+                    <Briefcase className="w-2.5 h-2.5 md:w-3 md:h-3 ml-1" />
+                    {profile.specialization}
+                  </Badge>
+                )}
+                {profile?.experience_years && (
+                  <Badge className="bg-amber-500/20 text-amber-400 text-[10px] md:text-xs">
+                    <Star className="w-2.5 h-2.5 md:w-3 md:h-3 ml-1" />
+                    {profile.experience_years} سنة خبرة
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Summary */}
+          <div className="flex-1 grid grid-cols-3 gap-2 md:gap-4">
+            <div className="text-center p-2 md:p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+              <p className="text-xl md:text-2xl font-bold text-emerald-400">{groups.length}</p>
+              <p className="text-slate-400 text-[10px] md:text-xs">مجموعة</p>
+            </div>
+            <div className="text-center p-2 md:p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+              <p className="text-xl md:text-2xl font-bold text-blue-400">{students.length}</p>
+              <p className="text-slate-400 text-[10px] md:text-xs">طالب</p>
+            </div>
+            <div className="text-center p-2 md:p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
+              <p className="text-xl md:text-2xl font-bold text-purple-400">{recentRecitations.length}</p>
+              <p className="text-slate-400 text-[10px] md:text-xs">تسميع</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="glass-card border-white/10">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">المجموعات</p>
-                <p className="text-3xl font-bold text-white mt-1">{groups.length}</p>
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-                <Users className="w-6 h-6 text-emerald-400" />
+      {/* Personal Info Card */}
+      <Card className="glass-card border-white/10">
+        <CardHeader className="pb-2 md:pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+            <User className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
+            بياناتي الشخصية
+          </CardTitle>
+          <Link to="/sheikh-edit-profile">
+            <Button size="sm" variant="outline" className="h-7 md:h-8 text-xs border-blue-500/30 text-blue-400 hover:bg-blue-500/10">
+              <Edit className="w-3 h-3 ml-1" />
+              تعديل
+            </Button>
+          </Link>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
+            {/* Email */}
+            <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-slate-400 text-[10px] md:text-xs">البريد</p>
+                  <p className="text-white font-medium text-xs md:text-sm truncate" dir="ltr">{profile?.email || '-'}</p>
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card className="glass-card border-white/10">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">الطلاب</p>
-                <p className="text-3xl font-bold text-white mt-1">{students.length}</p>
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-blue-400" />
+            {/* Phone */}
+            <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                  <Phone className="w-3.5 h-3.5 md:w-4 md:h-4 text-emerald-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-slate-400 text-[10px] md:text-xs">الهاتف</p>
+                  <p className="text-white font-medium text-xs md:text-sm" dir="ltr">{profile?.student_phone || '-'}</p>
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card className="glass-card border-white/10">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-sm">التسميعات هذا الأسبوع</p>
-                <p className="text-3xl font-bold text-white mt-1">{recentRecitations.length}</p>
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-purple-400" />
+            {/* Mosque */}
+            <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                  <Home className="w-3.5 h-3.5 md:w-4 md:h-4 text-purple-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-slate-400 text-[10px] md:text-xs">المسجد</p>
+                  <p className="text-white font-medium text-xs md:text-sm truncate">{profile?.mosque_name || '-'}</p>
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+
+            {/* Join Date */}
+            <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                  <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4 text-cyan-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-slate-400 text-[10px] md:text-xs">تاريخ الإلتحاق</p>
+                  <p className="text-white font-medium text-xs md:text-sm">{formatDate(profile?.join_date || profile?.registration_date)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Quick Actions */}
       <Card className="glass-card border-white/10">
-        <CardHeader>
-          <CardTitle className="text-xl font-bold text-white">إجراءات سريعة</CardTitle>
+        <CardHeader className="pb-2 md:pb-3">
+          <CardTitle className="text-base md:text-lg font-bold text-white">إجراءات سريعة</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
             {quickActions.map((action) => (
               <Link key={action.to} to={action.to}>
                 <Button
                   variant="ghost"
-                  className={`w-full h-24 flex flex-col items-center justify-center gap-2 bg-${action.color}-500/10 hover:bg-${action.color}-500/20 border border-${action.color}-500/30 rounded-xl transition-all`}
+                  className={`w-full h-16 md:h-24 flex flex-col items-center justify-center gap-1 md:gap-2 bg-${action.color}-500/10 hover:bg-${action.color}-500/20 border border-${action.color}-500/30 rounded-xl transition-all`}
                   data-testid={`quick-action-${action.to.replace('/', '')}`}
                 >
-                  <action.icon className={`w-8 h-8 text-${action.color}-400`} />
-                  <span className="text-white text-sm">{action.label}</span>
+                  <action.icon className={`w-5 h-5 md:w-8 md:h-8 text-${action.color}-400`} />
+                  <span className="text-white text-[10px] md:text-sm">{action.label}</span>
                 </Button>
               </Link>
             ))}
@@ -136,24 +221,23 @@ const SheikhDashboard = () => {
 
       {/* My Groups */}
       <Card className="glass-card border-white/10">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-xl font-bold text-white">مجموعاتي</CardTitle>
-          
+        <CardHeader className="pb-2 md:pb-3">
+          <CardTitle className="text-base md:text-lg font-bold text-white">مجموعاتي</CardTitle>
         </CardHeader>
         <CardContent>
           {groups.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
+            <div className="text-center py-6 md:py-8 text-slate-400 text-sm">
               لم تقم بإنشاء أي مجموعة بعد
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4">
               {groups.map((group) => (
                 <div
                   key={group.id}
-                  className="p-4 rounded-xl bg-slate-800/50 border border-white/5 hover:border-emerald-500/30 transition-all"
+                  className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5 hover:border-emerald-500/30 transition-all"
                 >
-                  <h3 className="text-lg font-bold text-white">{group.name}</h3>
-                  <p className="text-slate-400 text-sm mt-1">{group.description || 'لا يوجد وصف'}</p>
+                  <h3 className="text-sm md:text-lg font-bold text-white">{group.name}</h3>
+                  <p className="text-slate-400 text-xs md:text-sm mt-1">{group.description || 'لا يوجد وصف'}</p>
                 </div>
               ))}
             </div>
@@ -163,39 +247,48 @@ const SheikhDashboard = () => {
 
       {/* My Students */}
       <Card className="glass-card border-white/10">
-        <CardHeader>
-          <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
-            <Users className="w-5 h-5 text-emerald-400" />
+        <CardHeader className="pb-2 md:pb-3">
+          <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+            <Users className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
             طلابي ({students.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {students.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
+            <div className="text-center py-6 md:py-8 text-slate-400 text-sm">
               لا يوجد طلاب في مجموعاتك
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {students.map((student) => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
+              {students.slice(0, 6).map((student) => (
                 <Link 
                   key={student.id} 
                   to={`/student/${student.id}`}
-                  className="p-4 rounded-xl bg-slate-800/50 border border-white/5 hover:border-emerald-500/30 transition-all flex items-center justify-between group"
+                  className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5 hover:border-emerald-500/30 transition-all flex items-center justify-between group"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
-                      <span className="text-sm font-bold text-emerald-400">
+                  <div className="flex items-center gap-2 md:gap-3">
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-700 flex items-center justify-center">
+                      <span className="text-xs md:text-sm font-bold text-emerald-400">
                         {student.name?.charAt(0)}
                       </span>
                     </div>
-                    <div>
-                      <p className="text-white font-medium">{student.name}</p>
-                      <p className="text-slate-400 text-xs">{student.email}</p>
+                    <div className="min-w-0">
+                      <p className="text-white font-medium text-sm md:text-base truncate">{student.name}</p>
+                      <p className="text-slate-400 text-[10px] md:text-xs truncate">{student.email}</p>
                     </div>
                   </div>
-                  <Eye className="w-4 h-4 text-slate-400 group-hover:text-emerald-400 transition-colors" />
+                  <Eye className="w-4 h-4 text-slate-400 group-hover:text-emerald-400 transition-colors flex-shrink-0" />
                 </Link>
               ))}
+            </div>
+          )}
+          {students.length > 6 && (
+            <div className="mt-3 text-center">
+              <Link to="/groups">
+                <Button variant="outline" size="sm" className="text-emerald-400 border-emerald-500/30">
+                  عرض جميع الطلاب ({students.length})
+                </Button>
+              </Link>
             </div>
           )}
         </CardContent>
@@ -203,34 +296,32 @@ const SheikhDashboard = () => {
 
       {/* Recent Recitations */}
       <Card className="glass-card border-white/10">
-        <CardHeader>
-          <CardTitle className="text-xl font-bold text-white">آخر التسميعات</CardTitle>
+        <CardHeader className="pb-2 md:pb-3">
+          <CardTitle className="text-base md:text-lg font-bold text-white">آخر التسميعات</CardTitle>
         </CardHeader>
         <CardContent>
           {recentRecitations.length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
+            <div className="text-center py-6 md:py-8 text-slate-400 text-sm">
               لا توجد تسميعات مسجلة
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2 md:space-y-3">
               {recentRecitations.map((rec) => (
                 <div
                   key={rec.id}
-                  className="p-4 rounded-xl bg-slate-800/50 border border-white/5 flex items-center justify-between"
+                  className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5 flex items-center justify-between"
                 >
                   <div>
-                    <p className="text-white font-medium">سورة {rec.surah_name}</p>
-                    <p className="text-slate-400 text-sm">آية {rec.verses_from} - {rec.verses_to}</p>
+                    <p className="text-white font-medium text-sm md:text-base">سورة {rec.surah_name}</p>
+                    <p className="text-slate-400 text-xs md:text-sm">آية {rec.verses_from} - {rec.verses_to}</p>
                   </div>
-                  <div className="text-left">
-                    <span className={`px-3 py-1 rounded-full text-sm font-bold ${
-                      rec.quality_score >= 8 ? 'bg-emerald-500/20 text-emerald-400' :
-                      rec.quality_score >= 5 ? 'bg-amber-500/20 text-amber-400' :
-                      'bg-red-500/20 text-red-400'
-                    }`}>
-                      {rec.quality_score}/10
-                    </span>
-                  </div>
+                  <span className={`px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-bold ${
+                    rec.quality_score >= 8 ? 'bg-emerald-500/20 text-emerald-400' :
+                    rec.quality_score >= 5 ? 'bg-amber-500/20 text-amber-400' :
+                    'bg-red-500/20 text-red-400'
+                  }`}>
+                    {rec.quality_score}/10
+                  </span>
                 </div>
               ))}
             </div>
