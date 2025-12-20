@@ -252,7 +252,7 @@ const Sidebar = () => {
       <aside className={`sidebar-container md:hidden fixed right-0 top-0 h-screen w-72 backdrop-blur-xl flex flex-col z-50 transition-transform duration-300 ${
         isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'
       } ${isDark ? 'bg-slate-900/98 border-l border-white/10' : 'bg-white/98 border-l border-slate-200'}`}>
-        <div className="pt-14">
+        <div className="pt-14 flex flex-col h-full overflow-y-auto">
           <SidebarContent />
         </div>
       </aside>
