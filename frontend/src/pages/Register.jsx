@@ -417,40 +417,54 @@ const Register = () => {
 
               {/* Phone Numbers - Different for students vs others */}
               {selectedRole === 'student' ? (
-                <>
-                  {/* Student Phone Numbers */}}
-              <div className="space-y-2">
-                <Label className="text-slate-400 text-xs flex items-center gap-1">
-                  <Phone className="w-3 h-3" />
-                  أرقام الهواتف
-                </Label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-2">
+                  <Label className="text-slate-400 text-xs flex items-center gap-1">
+                    <Phone className="w-3 h-3" />
+                    أرقام الهواتف
+                  </Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Input
+                      type="tel"
+                      placeholder="هاتف الطالب"
+                      value={formData.studentPhone}
+                      onChange={(e) => handleChange('studentPhone', e.target.value)}
+                      className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
+                      dir="ltr"
+                    />
+                    <Input
+                      type="tel"
+                      placeholder="هاتف الأب"
+                      value={formData.fatherPhone}
+                      onChange={(e) => handleChange('fatherPhone', e.target.value)}
+                      className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
+                      dir="ltr"
+                    />
+                    <Input
+                      type="tel"
+                      placeholder="هاتف الأم"
+                      value={formData.motherPhone}
+                      onChange={(e) => handleChange('motherPhone', e.target.value)}
+                      className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Label className="text-slate-400 text-xs flex items-center gap-1">
+                    <Phone className="w-3 h-3" />
+                    رقم الهاتف
+                  </Label>
                   <Input
                     type="tel"
-                    placeholder="هاتف الطالب"
+                    placeholder="رقم الهاتف"
                     value={formData.studentPhone}
                     onChange={(e) => handleChange('studentPhone', e.target.value)}
                     className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
                     dir="ltr"
                   />
-                  <Input
-                    type="tel"
-                    placeholder="هاتف الأب"
-                    value={formData.fatherPhone}
-                    onChange={(e) => handleChange('fatherPhone', e.target.value)}
-                    className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
-                    dir="ltr"
-                  />
-                  <Input
-                    type="tel"
-                    placeholder="هاتف الأم"
-                    value={formData.motherPhone}
-                    onChange={(e) => handleChange('motherPhone', e.target.value)}
-                    className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
-                    dir="ltr"
-                  />
                 </div>
-              </div>
+              )}
 
               {/* Mosque & Birth Date */}
               <div className="grid grid-cols-2 gap-3">
