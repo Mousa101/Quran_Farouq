@@ -24,6 +24,7 @@ class StudentRegistrationRequest(BaseModel):
     school_name: Optional[str] = None
     school_grade: Optional[str] = None  # الصف الدراسي
     birth_date: Optional[str] = None
+    join_date: Optional[str] = None  # تاريخ الإلتحاق
     profile_image: Optional[str] = None
 
 # Activation request
