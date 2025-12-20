@@ -324,6 +324,21 @@ function AppRoutes() {
       />
 
       <Route
+        path="/sheikh-edit-profile"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <SheikhEditProfile />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/curriculum"
         element={
           <ProtectedRoute>
