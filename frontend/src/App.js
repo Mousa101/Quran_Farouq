@@ -333,10 +333,6 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
-            </Layout>
-          </ProtectedRoute>
-        }
-      />
 
       <Route
         path="/curriculum"
