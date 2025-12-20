@@ -279,6 +279,17 @@ function AppRoutes() {
       />
 
       <Route
+        path="/sheikh-management"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <SheikhManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/group-management"
         element={
           <ProtectedRoute>
