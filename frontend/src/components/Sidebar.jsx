@@ -208,7 +208,7 @@ const Sidebar = () => {
         <Button
           onClick={handleLogout}
           variant="ghost"
-          className="w-full justify-start gap-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 text-sm md:text-base"
+          className="w-full justify-start gap-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 text-sm md:text-base mb-12"
           data-testid="logout-btn"
         >
           <LogOut className="w-5 h-5" />
