@@ -246,78 +246,142 @@ const PendingStudents = () => {
         </div>
       )}
 
-      {/* Student Details Dialog */}
+      {/* User Details Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="bg-slate-900 border-slate-700 max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
-              <User className="w-6 h-6 text-amber-400" />
-              بيانات الطالب
+              {selectedUser && (() => {
+                const info = getRoleInfo(selectedUser.role);
+                return <info.icon className={`w-6 h-6 ${info.textColor}`} />;
+              })()}
+              بيانات المستخدم
             </DialogTitle>
           </DialogHeader>
           
-          {selectedStudent && (
+          {selectedUser && (
             <div className="space-y-4 mt-4">
+              {/* Role Badge */}
+              <div className="flex justify-center">
+                <Badge className={`${getRoleInfo(selectedUser.role).bgColor} ${getRoleInfo(selectedUser.role).textColor} text-sm px-3 py-1`}>
+                  {getRoleInfo(selectedUser.role).label}
+                </Badge>
+              </div>
+              
               {/* Activation Code - Highlighted */}
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center">
                 <p className="text-sm text-amber-300 mb-2">كود التفعيل</p>
                 <div className="flex items-center justify-center gap-3">
                   <span className="text-3xl font-mono font-bold text-amber-400 tracking-[0.3em]">
-                    {selectedStudent.activation_code}
+                    {selectedUser.activation_code}
                   </span>
                   <Button
                     size="sm"
                     variant="outline"
                     className="border-amber-500/50 text-amber-400 hover:bg-amber-500/20"
-                    onClick={() => copyToClipboard(selectedStudent.activation_code)}
+                    onClick={() => copyToClipboard(selectedUser.activation_code)}
                   >
                     <Copy className="w-4 h-4 ml-1" />
                     نسخ
                   </Button>
                 </div>
                 <p className="text-xs text-slate-400 mt-3">
-                  أرسل هذا الكود للطالب عبر واتساب أو SMS لتفعيل حسابه
+                  أرسل هذا الكود للمستخدم لتفعيل حسابه
                 </p>
               </div>
               
-              {/* Student Info */}
+              {/* User Info */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-lg bg-slate-800/50">
                   <p className="text-xs text-slate-400 mb-1">الاسم</p>
-                  <p className="text-white font-medium">{selectedStudent.name}</p>
+                  <p className="text-white font-medium">{selectedUser.name}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-slate-800/50">
                   <p className="text-xs text-slate-400 mb-1 flex items-center gap-1">
                     <Mail className="w-3 h-3" />
                     البريد الإلكتروني
                   </p>
-                  <p className="text-white font-medium text-sm" dir="ltr">{selectedStudent.email}</p>
+                  <p className="text-white font-medium text-sm" dir="ltr">{selectedUser.email}</p>
                 </div>
               </div>
               
+              {/* Sheikh/Admin specific */}
+              {(selectedUser.role === 'sheikh' || selectedUser.role === 'admin') && (
+                <div className="grid grid-cols-2 gap-3">
+                  {selectedUser.specialization && (
+                    <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                      <p className="text-xs text-blue-300 mb-1 flex items-center gap-1">
+                        <Briefcase className="w-3 h-3" />
+                        التخصص
+                      </p>
+                      <p className="text-white font-medium">{selectedUser.specialization}</p>
+                    </div>
+                  )}
+                  {selectedUser.experience_years && (
+                    <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                      <p className="text-xs text-blue-300 mb-1">سنوات الخبرة</p>
+                      <p className="text-white font-medium">{selectedUser.experience_years} سنة</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
               {/* Phone Numbers */}
               <div className="space-y-2">
-                <p className="text-sm text-slate-300 font-medium">أرقام الهواتف:</p>
-                <div className="grid grid-cols-3 gap-2">
+                <p className="text-sm text-slate-300 font-medium">رقم الهاتف:</p>
+                {selectedUser.student_phone ? (
+                  <div className="p-2 rounded-lg bg-slate-800/50 flex items-center justify-between">
+                    <p className="text-emerald-400 font-medium" dir="ltr">{selectedUser.student_phone}</p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 text-xs"
+                      onClick={() => copyToClipboard(selectedUser.student_phone)}
+                    >
+                      <Copy className="w-3 h-3 ml-1" />
+                      نسخ
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-sm">لم يتم تحديد رقم</p>
+                )}
+              </div>
+              
+              {/* Student specific - Parent phones */}
+              {selectedUser.role === 'student' && (
+                <div className="grid grid-cols-2 gap-2">
                   <div className="p-2 rounded-lg bg-slate-800/50 text-center">
-                    <p className="text-xs text-slate-400">الطالب</p>
-                    <p className="text-emerald-400 font-medium text-sm" dir="ltr">
-                      {selectedStudent.student_phone || '-'}
+                    <p className="text-xs text-slate-400">هاتف الأب</p>
+                    <p className="text-blue-400 font-medium text-sm" dir="ltr">
+                      {selectedUser.father_phone || '-'}
                     </p>
-                    {selectedStudent.student_phone && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 text-xs mt-1"
-                        onClick={() => copyToClipboard(selectedStudent.student_phone)}
-                      >
-                        <Copy className="w-3 h-3 ml-1" />
-                        نسخ
-                      </Button>
-                    )}
                   </div>
                   <div className="p-2 rounded-lg bg-slate-800/50 text-center">
-                    <p className="text-xs text-slate-400">الأب</p>
+                    <p className="text-xs text-slate-400">هاتف الأم</p>
+                    <p className="text-pink-400 font-medium text-sm" dir="ltr">
+                      {selectedUser.mother_phone || '-'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Registration Date */}
+              <div className="p-3 rounded-lg bg-slate-800/50">
+                <p className="text-xs text-slate-400 mb-1 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  تاريخ التسجيل
+                </p>
+                <p className="text-white font-medium">{formatDate(selectedUser.created_at)}</p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default PendingStudents;
                     <p className="text-blue-400 font-medium text-sm" dir="ltr">
                       {selectedStudent.father_phone || '-'}
                     </p>
