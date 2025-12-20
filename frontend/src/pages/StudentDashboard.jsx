@@ -203,81 +203,73 @@ const StudentDashboard = () => {
 
       {/* Personal Info Card - Detailed */}
       <Card className="glass-card border-white/10">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
-            <User className="w-5 h-5 text-emerald-400" />
+        <CardHeader className="pb-2 md:pb-3">
+          <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+            <User className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
             بياناتي الشخصية
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
             {/* Name */}
-            <div className="p-4 rounded-xl bg-slate-800/50 border border-white/5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                  <User className="w-5 h-5 text-emerald-400" />
+            <div className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                  <User className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
                 </div>
-                <div>
-                  <p className="text-slate-400 text-xs">الاسم الكامل</p>
-                  <p className="text-white font-bold">{stats?.student?.name || user?.name || '-'}</p>
+                <div className="min-w-0">
+                  <p className="text-slate-400 text-[10px] md:text-xs">الاسم الكامل</p>
+                  <p className="text-white font-bold text-sm md:text-base truncate">{stats?.student?.name || user?.name || '-'}</p>
                 </div>
               </div>
             </div>
 
             {/* Email */}
-            <div className="p-4 rounded-xl bg-slate-800/50 border border-white/5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                  <Mail className="w-5 h-5 text-blue-400" />
+            <div className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
                 </div>
-                <div>
-                  <p className="text-slate-400 text-xs">البريد الإلكتروني</p>
-                  <p className="text-white font-medium text-sm" dir="ltr">{stats?.student?.email || user?.email || '-'}</p>
+                <div className="min-w-0">
+                  <p className="text-slate-400 text-[10px] md:text-xs">البريد الإلكتروني</p>
+                  <p className="text-white font-medium text-xs md:text-sm truncate" dir="ltr">{stats?.student?.email || user?.email || '-'}</p>
                 </div>
               </div>
             </div>
 
             {/* Age & Birth Date */}
-            <div className="p-4 rounded-xl bg-slate-800/50 border border-white/5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-pink-500/20 flex items-center justify-center">
-                  <Cake className="w-5 h-5 text-pink-400" />
+            <div className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-pink-500/20 flex items-center justify-center flex-shrink-0">
+                  <Cake className="w-4 h-4 md:w-5 md:h-5 text-pink-400" />
                 </div>
-                <div>
-                  <p className="text-slate-400 text-xs">العمر / تاريخ الميلاد</p>
-                  <p className="text-white font-bold">
+                <div className="min-w-0">
+                  <p className="text-slate-400 text-[10px] md:text-xs">العمر / تاريخ الميلاد</p>
+                  <p className="text-white font-bold text-sm md:text-base">
                     {studentAge ? `${studentAge} سنة` : '-'}
-                    {stats?.student?.birth_date && (
-                      <span className="text-slate-400 text-xs font-normal mr-2">
-                        ({formatDate(stats.student.birth_date)})
-                      </span>
-                    )}
                   </p>
                 </div>
               </div>
             </div>
 
             {/* School */}
-            <div className="p-4 rounded-xl bg-slate-800/50 border border-white/5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                  <School className="w-5 h-5 text-amber-400" />
+            <div className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5">
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                  <School className="w-4 h-4 md:w-5 md:h-5 text-amber-400" />
                 </div>
-                <div>
-                  <p className="text-slate-400 text-xs">المدرسة / الصف</p>
-                  <p className="text-white font-bold">{stats?.student?.school_name || '-'}</p>
+                <div className="min-w-0">
+                  <p className="text-slate-400 text-[10px] md:text-xs">المدرسة / الصف</p>
+                  <p className="text-white font-bold text-sm md:text-base truncate">{stats?.student?.school_name || '-'}</p>
                   {stats?.student?.school_grade && (
-                    <p className="text-amber-400 text-xs">{stats.student.school_grade}</p>
-                  )}
-                  {stats?.student?.school_average && (
-                    <p className="text-emerald-400 text-xs">المعدل: {stats.student.school_average}</p>
+                    <p className="text-amber-400 text-[10px] md:text-xs">{stats.student.school_grade}</p>
                   )}
                 </div>
               </div>
             </div>
 
             {/* Mosque */}
-            <div className="p-4 rounded-xl bg-slate-800/50 border border-white/5">
+            <div className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5">
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
                   <Home className="w-5 h-5 text-purple-400" />
