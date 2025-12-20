@@ -127,49 +127,49 @@ const StudentDashboard = () => {
   return (
     <div className="space-y-6 animate-fadeIn" data-testid="student-dashboard">
       {/* Welcome & Points Header */}
-      <div className="glass-card p-6 border border-white/10">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+      <div className="glass-card p-4 md:p-6 border border-white/10">
+        <div className="flex flex-col gap-4 md:gap-6">
           {/* Profile Image & Name */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 md:gap-4">
             {stats?.student?.profile_image ? (
               <img 
                 src={stats.student.profile_image} 
                 alt="صورة شخصية"
-                className="w-20 h-20 rounded-2xl object-cover border-2 border-emerald-500/30"
+                className="w-14 h-14 md:w-20 md:h-20 rounded-xl md:rounded-2xl object-cover border-2 border-emerald-500/30"
               />
             ) : (
-              <div className="w-20 h-20 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
-                <User className="w-10 h-10 text-emerald-400" />
+              <div className="w-14 h-14 md:w-20 md:h-20 rounded-xl md:rounded-2xl bg-emerald-500/20 flex items-center justify-center">
+                <User className="w-7 h-7 md:w-10 md:h-10 text-emerald-400" />
               </div>
             )}
-            <div>
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl font-bold text-white">{stats?.student?.name || user?.name}</h1>
+                <h1 className="text-lg md:text-2xl font-bold text-white truncate">{stats?.student?.name || user?.name}</h1>
                 {/* اسم المجموعة */}
                 {groupInfo && (
-                  <Badge className="bg-purple-500/20 text-purple-400 text-xs">
+                  <Badge className="bg-purple-500/20 text-purple-400 text-[10px] md:text-xs">
                     <Users className="w-3 h-3 ml-1" />
                     {groupInfo.name}
                   </Badge>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="flex flex-wrap gap-1 md:gap-2 mt-1 md:mt-2">
                 {stats?.student?.tajweed_level && (
-                  <Badge className={getTajweedBadgeColor(stats.student.tajweed_level)}>
-                    <Star className="w-3 h-3 ml-1" />
+                  <Badge className={`${getTajweedBadgeColor(stats.student.tajweed_level)} text-[10px] md:text-xs`}>
+                    <Star className="w-2.5 h-2.5 md:w-3 md:h-3 ml-1" />
                     {stats.student.tajweed_level}
                   </Badge>
                 )}
                 {studentAge && (
-                  <Badge className="bg-blue-500/20 text-blue-400">
-                    <Cake className="w-3 h-3 ml-1" />
+                  <Badge className="bg-blue-500/20 text-blue-400 text-[10px] md:text-xs">
+                    <Cake className="w-2.5 h-2.5 md:w-3 md:h-3 ml-1" />
                     {studentAge} سنة
                   </Badge>
                 )}
                 {/* المعدل GPA */}
                 {stats?.student?.school_average && (
-                  <Badge className="bg-amber-500/20 text-amber-400">
-                    <GraduationCap className="w-3 h-3 ml-1" />
+                  <Badge className="bg-amber-500/20 text-amber-400 text-[10px] md:text-xs">
+                    <GraduationCap className="w-2.5 h-2.5 md:w-3 md:h-3 ml-1" />
                     المعدل: {stats.student.school_average}
                   </Badge>
                 )}
@@ -178,23 +178,23 @@ const StudentDashboard = () => {
           </div>
 
           {/* Rank & Total Points */}
-          <div className="flex-1 flex flex-col lg:flex-row lg:items-center lg:justify-end gap-4">
+          <div className="grid grid-cols-2 gap-2 md:gap-4">
             {myRank && (
-              <div className={`flex items-center gap-3 px-5 py-3 rounded-xl ${getRankStyle(myRank.rank).bg}`}>
-                <Trophy className={`w-8 h-8 ${getRankStyle(myRank.rank).text}`} />
+              <div className={`flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-3 rounded-xl ${getRankStyle(myRank.rank).bg}`}>
+                <Trophy className={`w-6 h-6 md:w-8 md:h-8 ${getRankStyle(myRank.rank).text}`} />
                 <div>
-                  <p className={`text-lg font-bold ${getRankStyle(myRank.rank).text}`}>
+                  <p className={`text-sm md:text-lg font-bold ${getRankStyle(myRank.rank).text}`}>
                     المركز {myPosition}
                   </p>
-                  <p className="text-slate-400 text-sm">{getRankStyle(myRank.rank).label}</p>
+                  <p className="text-slate-400 text-[10px] md:text-sm">{getRankStyle(myRank.rank).label}</p>
                 </div>
               </div>
             )}
-            <div className="flex items-center gap-3 px-5 py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30">
-              <Award className="w-8 h-8 text-emerald-400" />
+            <div className="flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30">
+              <Award className="w-6 h-6 md:w-8 md:h-8 text-emerald-400" />
               <div>
-                <p className="text-2xl font-bold text-emerald-400">{stats?.total_points || 0}</p>
-                <p className="text-slate-400 text-sm">مجموع النقاط</p>
+                <p className="text-xl md:text-2xl font-bold text-emerald-400">{stats?.total_points || 0}</p>
+                <p className="text-slate-400 text-[10px] md:text-sm">مجموع النقاط</p>
               </div>
             </div>
           </div>
