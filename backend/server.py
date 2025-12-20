@@ -408,6 +408,139 @@ async def admin_reset_password(data: PasswordResetRequest, current_user: dict = 
     
     return {"message": f"تم إعادة تعيين كلمة المرور للمستخدم {user['name']} بنجاح"}
 
+# ============== ADMIN: SHEIKH MANAGEMENT ==============
+
+@api_router.get("/admin/sheikhs")
+async def get_all_sheikhs(current_user: dict = Depends(get_current_user)):
+    """Get all sheikhs with their details - Admin only"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    
+    # Get all sheikhs
+    sheikhs = await db.users.find(
+        {"role": "sheikh"},
+        {"_id": 0, "password_hash": 0, "activation_code": 0}
+    ).to_list(100)
+    
+    # Add group info and student count for each sheikh
+    for sheikh in sheikhs:
+        groups = await db.groups.find({"sheikh_id": sheikh["id"]}, {"_id": 0}).to_list(20)
+        sheikh["groups"] = groups
+        sheikh["groups_count"] = len(groups)
+        
+        # Count students in sheikh's groups
+        group_ids = [g["id"] for g in groups]
+        students_count = await db.users.count_documents({"role": "student", "group_id": {"$in": group_ids}})
+        sheikh["students_count"] = students_count
+    
+    return sheikhs
+
+@api_router.get("/admin/sheikh/{sheikh_id}")
+async def get_sheikh_details(sheikh_id: str, current_user: dict = Depends(get_current_user)):
+    """Get detailed info about a specific sheikh - Admin only"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    
+    # Get sheikh
+    sheikh = await db.users.find_one(
+        {"id": sheikh_id, "role": "sheikh"},
+        {"_id": 0, "password_hash": 0, "activation_code": 0}
+    )
+    
+    if not sheikh:
+        raise HTTPException(status_code=404, detail="المعلم غير موجود")
+    
+    # Get sheikh's groups
+    groups = await db.groups.find({"sheikh_id": sheikh_id}, {"_id": 0}).to_list(20)
+    
+    # Get students for each group with detailed info
+    groups_with_students = []
+    total_students = 0
+    total_points = 0
+    
+    for group in groups:
+        students = await db.users.find(
+            {"role": "student", "group_id": group["id"]},
+            {"_id": 0, "password_hash": 0, "activation_code": 0}
+        ).to_list(50)
+        
+        group["students"] = students
+        group["students_count"] = len(students)
+        total_students += len(students)
+        
+        for student in students:
+            total_points += student.get("points", 0)
+        
+        groups_with_students.append(group)
+    
+    # Get sheikh's activity stats
+    recitations_count = await db.recitations.count_documents({"sheikh_id": sheikh_id})
+    attendance_count = await db.attendance.count_documents({"sheikh_id": sheikh_id})
+    
+    return {
+        "sheikh": sheikh,
+        "groups": groups_with_students,
+        "stats": {
+            "total_groups": len(groups),
+            "total_students": total_students,
+            "total_points": total_points,
+            "recitations_given": recitations_count,
+            "attendance_records": attendance_count
+        }
+    }
+
+@api_router.delete("/admin/sheikh/{sheikh_id}")
+async def delete_sheikh(sheikh_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a sheikh - Admin only"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف المعلم")
+    
+    # Get sheikh
+    sheikh = await db.users.find_one({"id": sheikh_id, "role": "sheikh"})
+    if not sheikh:
+        raise HTTPException(status_code=404, detail="المعلم غير موجود")
+    
+    # Check if sheikh has groups
+    groups = await db.groups.find({"sheikh_id": sheikh_id}, {"_id": 0}).to_list(20)
+    
+    if groups:
+        # Option: Remove sheikh from groups (don't delete the groups)
+        await db.groups.update_many(
+            {"sheikh_id": sheikh_id},
+            {"$set": {"sheikh_id": None}}
+        )
+    
+    # Delete sheikh
+    await db.users.delete_one({"id": sheikh_id})
+    
+    return {
+        "message": f"تم حذف المعلم {sheikh['name']} بنجاح",
+        "groups_affected": len(groups)
+    }
+
+@api_router.get("/admin/pending-registrations")
+async def get_pending_registrations(current_user: dict = Depends(get_current_user)):
+    """Get all pending registrations (students, sheikhs, admins) - Admin only"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    
+    pending = await db.users.find(
+        {"is_activated": False},
+        {"_id": 0, "password_hash": 0}
+    ).to_list(100)
+    
+    # Group by role
+    students = [u for u in pending if u.get("role") == "student"]
+    sheikhs = [u for u in pending if u.get("role") == "sheikh"]
+    admins = [u for u in pending if u.get("role") == "admin"]
+    
+    return {
+        "students": students,
+        "sheikhs": sheikhs,
+        "admins": admins,
+        "total": len(pending)
+    }
+
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
     user = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0})
