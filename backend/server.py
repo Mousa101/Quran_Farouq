@@ -351,6 +351,44 @@ async def get_pending_students(current_user: dict = Depends(get_current_user)):
     
     return pending
 
+# ============== ADMIN: PASSWORD RESET ==============
+
+class PasswordResetRequest(BaseModel):
+    email: str
+    new_password: str
+
+@api_router.post("/admin/reset-password")
+async def admin_reset_password(data: PasswordResetRequest, current_user: dict = Depends(get_current_user)):
+    """Reset user password - Admin only"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إعادة تعيين كلمة المرور")
+    
+    # Find user
+    user = await db.users.find_one({"email": data.email})
+    if not user:
+        raise HTTPException(status_code=404, detail="المستخدم غير موجود")
+    
+    # Validate new password
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="كلمة المرور يجب أن تكون 6 أحرف على الأقل")
+    
+    # Update password
+    new_hash = get_password_hash(data.new_password)
+    await db.users.update_one(
+        {"email": data.email},
+        {"$set": {"password_hash": new_hash}}
+    )
+    
+    # Notify user
+    await create_notification_internal(
+        user["id"],
+        "تم تغيير كلمة المرور",
+        "تم إعادة تعيين كلمة المرور الخاصة بك من قبل الإدارة. يرجى تسجيل الدخول بكلمة المرور الجديدة.",
+        "warning"
+    )
+    
+    return {"message": f"تم إعادة تعيين كلمة المرور للمستخدم {user['name']} بنجاح"}
+
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
     user = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0})
