@@ -414,7 +414,7 @@ const StudentDashboard = () => {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
             <Hand className="w-5 h-5 text-purple-400" />
-            الصلوات والجلوس مع القرآن
+            ورقة المتابعة الإيمانية
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -423,6 +423,11 @@ const StudentDashboard = () => {
               <BookMarked className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
               <p className="text-2xl font-bold text-white">{stats?.tracking?.total_prayers || 0}</p>
               <p className="text-emerald-400 text-xs">الصلوات المفروضة</p>
+            </div>
+            <div className="p-4 rounded-xl bg-amber-500/10 text-center">
+              <Clock className="w-8 h-8 mx-auto text-amber-400 mb-2" />
+              <p className="text-2xl font-bold text-white">{stats?.tracking?.total_quran_time || 0}</p>
+              <p className="text-amber-400 text-xs">الجلوس مع القرآن</p>
             </div>
             <div className="p-4 rounded-xl bg-purple-500/10 text-center">
               <Hand className="w-8 h-8 mx-auto text-purple-400 mb-2" />
@@ -439,11 +444,7 @@ const StudentDashboard = () => {
               <p className="text-2xl font-bold text-white">{stats?.tracking?.total_witr || 0}</p>
               <p className="text-indigo-400 text-xs">صلاة الوتر</p>
             </div>
-            <div className="p-4 rounded-xl bg-amber-500/10 text-center">
-              <Clock className="w-8 h-8 mx-auto text-amber-400 mb-2" />
-              <p className="text-2xl font-bold text-white">{stats?.tracking?.total_quran_time || 0}</p>
-              <p className="text-amber-400 text-xs">دقائق مع القرآن</p>
-            </div>
+            
             <div className="p-4 rounded-xl bg-pink-500/10 text-center">
               <Users className="w-8 h-8 mx-auto text-pink-400 mb-2" />
               <p className="text-2xl font-bold text-white">{stats?.tracking?.total_family_recitation || 0}</p>
