@@ -280,6 +280,40 @@ const Register = () => {
           </CardHeader>
           <CardContent className="pt-0">
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Role Selection */}
+              <div className="space-y-2">
+                <Label className="text-slate-300 text-sm">نوع الحساب <span className="text-red-400">*</span></Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {roles.map((role) => (
+                    <button
+                      key={role.id}
+                      type="button"
+                      onClick={() => setSelectedRole(role.id)}
+                      className={`p-3 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-1 ${
+                        selectedRole === role.id
+                          ? `bg-${role.color}-500/20 border-${role.color}-500 text-${role.color}-400`
+                          : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
+                      }`}
+                      style={{
+                        backgroundColor: selectedRole === role.id ? `var(--${role.color}-500-20, rgba(16, 185, 129, 0.2))` : undefined,
+                        borderColor: selectedRole === role.id ? 
+                          (role.color === 'emerald' ? '#10b981' : role.color === 'blue' ? '#3b82f6' : '#a855f7') 
+                          : undefined,
+                        color: selectedRole === role.id ? 
+                          (role.color === 'emerald' ? '#34d399' : role.color === 'blue' ? '#60a5fa' : '#c084fc') 
+                          : undefined
+                      }}
+                    >
+                      <role.icon className="w-5 h-5" />
+                      <span className="text-xs font-medium">{role.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-slate-500 text-[10px] text-center">
+                  {roles.find(r => r.id === selectedRole)?.description}
+                </p>
+              </div>
+
               {/* Basic Info */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -347,7 +381,44 @@ const Register = () => {
                 </div>
               </div>
 
-              {/* Phone Numbers */}
+              {/* Sheikh/Admin specific fields */}
+              {(selectedRole === 'sheikh' || selectedRole === 'admin') && (
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                  <div className="space-y-1">
+                    <Label className="text-blue-300 text-sm flex items-center gap-1">
+                      <Briefcase className="w-3 h-3" />
+                      التخصص
+                    </Label>
+                    <Input
+                      type="text"
+                      placeholder={selectedRole === 'sheikh' ? "مثال: تجويد، حفظ" : "مثال: إدارة تعليمية"}
+                      value={formData.specialization}
+                      onChange={(e) => handleChange('specialization', e.target.value)}
+                      className="h-9 text-sm bg-slate-800/50 border-slate-700 text-white"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-blue-300 text-sm flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      سنوات الخبرة
+                    </Label>
+                    <Input
+                      type="number"
+                      placeholder="مثال: 5"
+                      min="0"
+                      max="50"
+                      value={formData.experienceYears}
+                      onChange={(e) => handleChange('experienceYears', e.target.value)}
+                      className="h-9 text-sm bg-slate-800/50 border-slate-700 text-white"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Phone Numbers - Different for students vs others */}
+              {selectedRole === 'student' ? (
+                <>
+                  {/* Student Phone Numbers */}}
               <div className="space-y-2">
                 <Label className="text-slate-400 text-xs flex items-center gap-1">
                   <Phone className="w-3 h-3" />
