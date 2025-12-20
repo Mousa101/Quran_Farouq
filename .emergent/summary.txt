@@ -2,81 +2,63 @@
 The user is building a comprehensive Quran memorization application. The initial scope included role-based access (Admin, Sheikh, Student), gamification, and management features.
 
 **New Features Requested in this Session:**
-1.  **Sheikh & Admin Dashboards:**
-    *   **Sheikh:** Full access to student data, ranking of their students.
-    *   **Admin:** Filterable rankings (by groups, individuals, attendance, recitation), curriculum management (PDF upload or manual entry), and daily schedule creation.
-2.  **Tracking Sheet & Points System Overhaul:**
-    *   A new, detailed points system for the Tracking Sheet including prayers (35pts/week), dhikr (7), sitting with Quran (7), Sunnah prayers (7), and Witr (7).
-    *   Update overall points: Attendance (10), Minimum Recitation (20), plus Tracking Sheet points.
-3.  **Admin Dashboard Redesign:**
-    *   Make the dashboard a central hub with comprehensive stats (total students, sheikhs, points), weekly stats (attendance, pages), group rankings, and top student rankings.
-4.  **Financial, Homework & Exam Management:**
-    *   **Financials:** Admins can create fees (subscription, Umrah, activity) for students, which appear in the student's dues section.
-    *   **Homework:** Admins/Sheikhs can assign homework for lessons.
-    *   **Exams:** Admins can create Quran recitation exams (tracking errors, pass/fail) and Tajweed exams.
-5.  **UI/UX Enhancements:**
-    *   Replace the application logo.
-    *   On the **Register page**: Add a Join Date field, change the profile picture to a file upload, and add a Forgot Password feature.
-    *   On the **Student Dashboard**: Modify the Memorization card, add GPA, show the group name, display attendance/recitation as percentages, and add a feature for Admins to reset these stats periodically.
+1.  **UI/UX Enhancements:**
+    *   **Register Page:** Add a Join Date field, change the profile picture to a file upload, and add a Forgot Password feature.
+    *   **Student Dashboard:** Modify the Memorization card, add GPA, show the group name, and convert attendance/recitation stats into circular percentage gauges.
+2.  **Mobile Responsiveness:** Make the entire application, especially the dashboards and sidebar, fully responsive and usable on mobile devices.
+3.  **Expanded Registration & Roles:**
+    *   Allow Admins and Sheikhs (Teachers) to register through the main registration page.
+    *   Require an activation code (provided by a master Admin) for all new roles.
+4.  **Admin & Sheikh Feature Expansion:**
+    *   **Admin:** Add the ability to view, manage, and delete Sheikhs.
+    *   **Sheikh:** Add the ability for a Sheikh to edit their own personal profile, including their photo. Display this personal information on the Sheikh's main dashboard.
+5.  **Bug Report:** The logout button is not appearing on the mobile version of the site.
 
 **User's preferred language**: ar
 
 **what currently exists?**
-The application is a feature-rich Quran management platform with role-based access.
+The application is a feature-rich Quran management platform with a responsive UI.
 
 **Key implemented features include:**
-- **New Registration Flow:** A two-step process where students self-register and await admin activation.
-- **Comprehensive Dashboards:** Detailed dashboards for Students, Sheikhs, and a new, comprehensive Admin dashboard with advanced statistics and rankings.
-- **Curriculum & Schedule Management:** Admins can define the curriculum (via manual entry or PDF) and set detailed daily schedules for lessons.
-- **Financial, Homework & Exam Management:** Admins can manage student fees, and both Admins and Sheikhs can create homework and exams.
-- **Overhauled Points System:** A new, detailed points system for tracking sheets (prayers, dhikr, etc.) has been implemented, along with points for attendance and recitation.
-- **UI Updates:** The application has a new logo across all relevant pages (Login, Register, Sidebar).
+- **Comprehensive Dashboards:** Detailed and responsive dashboards for Students, Sheikhs, and Admins.
+- **Expanded Registration:** A unified registration flow supports Students, Sheikhs, and Admins, all requiring admin activation.
+- **Role-Based Features:**
+    - **Admin:** Full management capabilities, including a new page to manage Sheikhs (view/delete).
+    - **Sheikh:** Can view their students and groups, and now have a dedicated page to edit their personal profile (photo, specialty, experience, etc.), with this information displayed on their dashboard.
+    - **Student:** Can view their progress, including stats displayed in new circular gauges.
+- **Mobile-First UI:** The Sidebar, Login, Register, and all main dashboards have been refactored to be fully responsive, including a hamburger menu for navigation.
+- **UI Overhaul:** The Register and Student Dashboard pages have been significantly updated as per user requests, including new fields and components like a circular progress gauge.
 
 **Last working item**:
-    - Last item agent was working: The agent was about to start implementing a batch of UI/UX improvements requested by the user in their last message. This involves changes to the student registration page and the student dashboard.
+    - Last item agent was working: The user reported that the logout button is not visible on mobile devices. The agent has acknowledged the issue but has not started the fix.
     - Status: NOT STARTED
     - Agent Testing Done: N
-    - Which testing method agent to use? both
+    - Which testing method agent to use? screenshot tool
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-  - Issue 1: Homework API might be broken (Priority: P0)
+  - Issue 1: Logout button not visible on mobile (Priority: P0)
   
   Issues Detail:
   - Issue 1: 
-     - Attempted fixes: During testing of the newly created APIs, the  command to test the homework endpoint returned an  (failure), but the agent moved on without investigating or fixing it.
+     - Attempted fixes: None. This was the last user report.
      - Next debug checklist: 
-        1. Review the  endpoint in .
-        2. Re-run the  test from Chat Message 169 & 170 to reproduce the error and check the backend logs for a detailed traceback.
-        3. Check the  and  Pydantic models in  for any mismatches with the API logic.
-     - Why fix this issue and what will be achieved with the fix? The homework feature is a key requirement from the user and is likely non-functional on the backend. Fixing it will enable Admins and Sheikhs to assign homework.
+        1. Examine .
+        2. Check the CSS classes applied to the logout button and its container within the mobile menu view (). It's likely hidden by a responsive utility class (e.g., ) or is being pushed out of the visible area.
+        3. Adjust the Tailwind CSS classes to ensure the logout button is rendered correctly within the mobile sidebar drawer.
+     - Why fix this issue and what will be achieved with the fix? This is a critical usability issue, as mobile users cannot log out of their accounts.
      - Status:  NOT STARTED
      - Is recurring issue? N
-     - Should Test frontend/backend/both after fix? backend
+     - Should Test frontend/backend/both after fix? frontend
      - Blocked on other issue: None
 
 **In progress Task List**:
-  - Task 1: Implement UI/UX changes for Registration and Student Dashboard (Priority: P0)
-     - Where to resume: The agent has viewed  and . The next step is to implement the following changes based on the user's last request (Chat 194):
-        1. **Register Page ():**
-           - Add a Join Date () input field.
-           - Replace the profile picture URL input with a file upload component.
-           - Add a Forgot Password link/feature.
-        2. **Student Dashboard ():**
-           - In the memorization card, remove New Memorization and split Previous Memorization into two stats: Pages and Juzs.
-           - Add GPA () to the personal information section.
-           - Display the student's group name next to their name.
-           - Convert attendance and recitation stats into percentages (, ).
-        3. **Backend:**
-           - Implement an API endpoint for Admins to reset student statistics (attendance/recitation) at the end of a semester.
-     - What will be achieved with this? This will complete the user's latest set of UI/UX requests, improving usability and data presentation.
-     - Status:  NOT STARTED
-     - Should Test frontend/backend/both after fix? both
-     - Blocked on something: None
+  - None.
 
 **Upcoming and Future Tasks**
     Upcoming Tasks:
-    - P1: Re-implement Image Analysis for Tracking Sheets: The agent implemented a workaround for a bug in  by effectively disabling the image upload feature. The original goal to use Gemini for analyzing uploaded tracking sheets still needs to be properly implemented.
+    - P1: Re-implement Image Analysis for Tracking Sheets: The original goal to use Gemini for analyzing uploaded tracking sheets still needs to be properly implemented. The current solution is a manual entry form.
+    - P2: Implement Admin Feature to Reset Student Statistics: Admins should have an API endpoint and a UI button to reset student stats (like attendance/recitation) periodically (e.g., at the end of a semester). This was part of an earlier request but was not implemented.
     
     Future Tasks:
     - PDF reports for students.
@@ -84,25 +66,25 @@ The application is a feature-rich Quran management platform with role-based acce
     - Mobile push notifications.
 
 **Completed work in this session**
-- **Sheikh/Admin Features:**
-  - Implemented curriculum management with manual entry.
-  - Implemented schedule management.
-  - Implemented advanced, filterable rankings for Admins and student rankings for Sheikhs.
-- **Points & Dashboard Overhaul:**
-  - Implemented a new, detailed points system for tracking sheets ().
-  - Redesigned the Admin Dashboard () to be a comprehensive hub with statistics and rankings.
-- **New Management Modules:**
-  - Implemented systems for managing Financials (), Homework (), and Exams () with corresponding backend APIs and frontend pages.
-- **UI and Bug Fixes:**
-  - Replaced the application logo on , , and .
-  - Fixed a critical bug in  that caused the tracking sheet upload to fail, and implemented a manual entry form as a primary solution.
+- **Mobile Responsiveness:** Refactored the ,  layout, , , , and  to be fully responsive with a hamburger menu.
+- **New Registration Flow:** Updated the  page and backend (, ) to support the registration of , , and  roles, each requiring an activation code.
+- **Sheikh Management Module (Admin):**
+  - Created a new  page for Admins to view, search, and delete Sheikhs.
+  - Added backend APIs: , .
+- **Sheikh Profile Module (Sheikh):**
+  - Created a  page for Sheikhs to edit their personal data (photo, specialty, etc.).
+  - Created a  endpoint to handle profile updates.
+  - Redesigned  to prominently display the Sheikh's personal and professional information.
+- **UI/UX Enhancements:**
+  - Implemented all requested changes on the  and  pages, including adding a Join Date, file upload for photos, and new circular progress gauges.
+  - Created a new  page.
+- **Bug Fixes:**
+  - **Homework API Verified:** Confirmed that the  endpoint, previously suspected to be broken, is working correctly.
+  - **Duplicate Endpoint Removed:** Resolved a critical bug by renaming a duplicate  endpoint in  that was causing all registration attempts to fail.
+  - **Frontend Compilation Errors:** Fixed multiple JSX syntax errors in  and  that caused the frontend to crash.
 
 **Earlier issues found/mentioned but not fixed**
-   - Issue 1:
-     - Debug checklist: The  test for the Homework API failed (Chat 170). The agent did not investigate the . The  endpoint needs to be reviewed and tested again.
-     - Why to solve this issue and what will be achieved with this? This is a core feature requested by the user that is likely broken.
-     - Should Test frontend/backend/both after fix: backend
-     - Is recurring issue? N
+   - None. All previous issues were either resolved in this session or are now tracked in the Upcoming Tasks or Last working item sections.
 
 **Known issue recurrence from previous fork**
   - None.
@@ -112,85 +94,77 @@ The application is a feature-rich Quran management platform with role-based acce
 
 **Key Technical Concepts**
 - **Backend:** FastAPI, Pydantic, Motor (async MongoDB driver), JWT.
-- **Frontend:** React, React Router, Axios, Tailwind CSS, Shadcn/UI.
+- **Frontend:** React, React Router, Axios, Tailwind CSS, Shadcn/UI, Responsive Design (Mobile-First).
 - **Database:** MongoDB.
 
 **key DB schema**
-  - **users:** {...,  (Optional[date]),  (Optional[str])}
-  - **tracking_sheets:** {..., , , , , }
-  - **curriculums:** {uid=0(root) gid=0(root) groups=0(root), , , : [{, , ...}]}
-  - **schedules:** {uid=0(root) gid=0(root) groups=0(root), , , : [{, , , }]}
-  - **fees:** {uid=0(root) gid=0(root) groups=0(root), , , , , }
-  - **homework:** {uid=0(root) gid=0(root) groups=0(root), , , , }
-  - **exams:** {uid=0(root) gid=0(root) groups=0(root), , , , , , , ...}
+  - **users:** Includes , ,  (student, sheikh, admin), and role-specific fields like  and  for sheikhs.
+  - **(Other schemas remain as per previous handoff)**
 
 **changes in tech stack**
   - None.
 
 **All files of reference**
-*   **/app/backend/server.py**: Heavily modified to add APIs for curriculum, schedules, rankings, new points system, fees, homework, and exams. Now exceedingly large.
-*   **/app/backend/models.py**: Updated with new Pydantic models for all new features.
-*   **/app/backend/image_analysis.py**: Overwritten to fix a bug, but the core image analysis functionality is now bypassed.
-*   **/app/frontend/src/pages/AdminDashboard.jsx**: Overwritten with a new comprehensive statistics and ranking layout.
-*   **/app/frontend/src/pages/TrackingSheets.jsx**: Overwritten with a new manual entry form for the revised points system.
-*   **/app/frontend/src/pages/AdminRankings.jsx, CurriculumManagement.jsx, ScheduleManagement.jsx, SheikhRankings.jsx, FeesManagement.jsx, HomeworkManagement.jsx, ExamsManagement.jsx**: New pages created for the new features.
-*   **/app/frontend/src/App.js**: Updated with routes for all new pages.
-*   **/app/frontend/src/components/Sidebar.jsx**: Updated with links to all new pages for relevant roles and the new logo.
-*   **/app/frontend/public/logo.png**: New logo file.
+*   **/app/frontend/src/components/Sidebar.jsx**: Overwritten to implement a responsive design with a hamburger menu for mobile.
+*   **/app/frontend/src/pages/Register.jsx**: Overwritten to add role selection (student, sheikh, admin), conditional fields, and other UI improvements.
+*   **/app/frontend/src/pages/SheikhManagement.jsx**: New page for admins to manage sheikhs.
+*   **/app/frontend/src/pages/SheikhEditProfile.jsx**: New page for sheikhs to edit their own profile.
+*   **/app/frontend/src/pages/SheikhDashboard.jsx**: Overwritten to display detailed personal info for the logged-in sheikh.
+*   **/app/frontend/src/pages/StudentDashboard.jsx**: Heavily updated to include new circular gauges and data points.
+*   **/app/frontend/src/pages/PendingStudents.jsx**: Rewritten to fix bugs and correctly display pending registrations for all user roles.
+*   **/app/backend/server.py**: Modified to add new APIs for sheikh management and user profile updates, and to fix a duplicate registration endpoint.
+*   **/app/backend/models.py**: Updated to support new fields in the User model and registration request.
+*   **/app/frontend/src/App.js**: Updated with new routes for sheikh management and profile editing.
+*   **/app/frontend/src/components/ui/circular-gauge.jsx**: New reusable component for displaying percentage-based stats.
 
 **Areas that need refactoring**:
--  is now over 2500 lines long and urgently needs to be broken down into multiple  files based on functionality (e.g., , , , ).
+-  is a monolith that continues to grow. It urgently needs to be broken down into multiple  files based on functionality (e.g., , , ).
 
 **key api endpoints**
-- **Admin/Sheikh Features:**
-  - , 
-  - , 
-  - 
-  - 
-  - 
-- **New Modules:**
-  - 
-  -  (**Potentially Broken**)
-  - 
-- **Tracking Sheet:**
-  -  (Updated for manual entry and new point calculations)
+- : Updated to handle registration for , , and  roles.
+- : (New) Updates the profile of the currently authenticated user (used by Sheikhs).
+- : (New) Fetches a list of all sheikhs for the admin dashboard.
+- : (New) Allows an admin to delete a sheikh.
+- : (Updated) Fetches pending registrations for all roles.
+- : (New) Allows an admin to reset a user's password.
 
 **Critical Info for New Agent**
-- **Last User Request is Priority #1:** The immediate task is to implement the UI/UX changes from Chat 194.
-- **Homework API is Likely Broken:** The test for this API failed and was not fixed. This is the highest priority bug.
-- **Points System is Completely New:** The logic for calculating points from tracking sheets has been completely rewritten in .
-- **Image Upload is Bypassed:** The tracking sheet's image analysis feature is currently not functional; it relies on a manual entry form. The user's original request to use Gemini AI is an upcoming task.
-- ** is a monolith:** Be very careful when editing this file. The recommendation to refactor it is critical for long-term maintainability.
+- **Highest Priority:** The immediate task is to fix the missing logout button on mobile, as reported by the user in their last message.
+- **User Environment Confusion:** The user previously reported data not syncing because they were using two different URLs ( vs. ). Be mindful that this confusion might arise again. Always guide the user to use the single, correct preview URL.
+- **Refactoring Needed:** The  file is critically large and complex. While the immediate priority is the bug fix, any significant backend work should be prefaced with a plan to refactor the routes into smaller, manageable files.
 
 **documents and test_reports created in this job**
   - None.
 
 **Last 10 User Messages and any pending HUMAN messages**
-- **User (Latest):** عدل على صفحة تسجيل مستخدم جديد عند الطالب... (Requesting UI/UX changes for Register page and Student Dashboard, and a stat reset feature).
-- **User:** ورق المتابعة لا يعمل بشكل جيد ويعطي خطأ في التحليل... (Reporting a bug with the tracking sheet image analysis).
-- **User:** حط عند المدير الرسوم الماليو وينزلها للطالب... (Requesting financial, homework, and exam management features).
-- **User:** زبط ورق المتابعة خليه يحسب الصلاة والأذكار... (Requesting a complete overhaul of the tracking sheet points system and the admin dashboard).
-- **User:** حط خيار للاثنين يقدر يرفع ملف pdf... (Requesting curriculum, schedule, and ranking features for Admins and Sheikhs).
+- User: زر تسجيل الخروج لا يظهر في نسخخة الهاتف
+- User: البيانات مش مربوطة عالتلفون بضيف طالب من الموقع ما بظهر عالتلفون
+- User: ضفت الطالب وظهر من هاض الرابط بشكل طبيعي quran-tracker-41.preview.emergentagent.com/dashboard بس لما ادخل على التلفون من هاد الرابط ما بطلع اشي https://quran-tracker-41.emergent.host
+- User: خلي البيانات الشخصية تطلع عند الصفحة الرئيسية عند المعلم
+- User: اعطي المعلم ميزت التعديل على بياناته الشخصيه ومنها اضافة صورته
+- User: حط في تسجيل الدخول مستخدم جديد كمدير أو كمعلم وكلهم بحتاجوا كودات من المدير وأضف صلاحية حذف المعلم أو الإطلاع على بياناته أو بيانات مجموعته وكافة تفاصيله عند المدير
+- User: خلي المواقع متاح للاستخدام على الهواتف
+- User: 1) تعديل واجهة المستخدم أول وخليها متناسقة واعمل النسب شكلها يظهر بشكل دئري مثل عداد السيارة 2)إعادة التعيين عبر المدير 3) نقوم بذلك لاحقا
 
 **Project Health Check:**
-- **Working:** The application is largely functional with many new features added.
-- **Broken:** The homework creation feature is likely broken on the backend.
-- **Mocked:** The image analysis for tracking sheets is bypassed, with a manual entry form acting as the primary interface.
+- **Working:** Core application logic, all new features (responsive UI, expanded registration, Sheikh management/profile editing), and previously identified bugs are fixed.
+- **Broken:** The logout button is not visible on mobile devices.
+- **Mocked:** The image analysis for tracking sheets is still a manual entry form, not the intended AI-based solution.
 
 **3rd Party Integrations**
- - **Gemini 2.5 Flash:** Planned for image analysis of tracking sheets. The implementation was attempted, but a bug was found. The feature is currently bypassed and needs to be properly implemented. Requires User LLM Key.
+ - **Gemini 2.5 Flash:** Planned for image analysis of tracking sheets. This remains an upcoming task.
 
 **Testing status**
-  - Testing agent used after significant changes: YES (but it found no tests to run for the new features).
+  - Testing agent used after significant changes: NO
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: []
-  - Known regressions: The tracking sheet image upload feature is no longer functional, replaced by manual entry.
+  - Known regressions: None.
 
 **Credentials to test flow:**
 - **Admin:**  / 
 - **Sheikh:**  / 
-- **Student Registration:** New students can register directly via the  page. Their accounts will be inactive until an Admin logs in, retrieves the activation code from the طلبات التسجيل (Pending Registrations) page, and the code is entered by the student on the  page.
+- **Student:** Can be registered via the UI.
+- **New Registration:** New  or  accounts can be created from the  page. An existing Admin must then log in, go to the طلبات التسجيل (Pending Registrations) page to get the activation code for the new user.
 
 **What agent forgot to execute**
-- The agent did not investigate or fix the failing API test for the  endpoint.
-- The agent did not fully implement the user's original requirement for Gemini-based image analysis on tracking sheets, opting for a manual-entry workaround instead of fixing the integration.</analysis>
+- The agent did not implement the Admin reset student stats feature that was part of the original UI/UX request for the student dashboard. It has been added to Upcoming Tasks.</analysis>
