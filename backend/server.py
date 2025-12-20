@@ -280,6 +280,7 @@ async def student_register(data: StudentRegistrationRequest):
         school_name=data.school_name,
         school_grade=data.school_grade,
         birth_date=data.birth_date,
+        join_date=data.join_date,
         profile_image=data.profile_image
     )
     
