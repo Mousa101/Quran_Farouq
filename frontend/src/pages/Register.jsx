@@ -115,23 +115,34 @@ const Register = () => {
     setLoading(true);
     
     try {
-      const response = await axios.post(`${API}/auth/student-register`, {
+      const payload = {
         name: formData.name,
         email: formData.email,
         password: formData.password,
         confirm_password: formData.confirmPassword,
+        role: selectedRole,
         mosque_name: formData.mosqueName,
-        school_name: formData.schoolName,
-        school_grade: formData.schoolGrade,
         birth_date: formData.birthDate,
         join_date: formData.joinDate,
         student_phone: formData.studentPhone,
-        father_phone: formData.fatherPhone,
-        mother_phone: formData.motherPhone,
         profile_image: formData.profileImage
-      });
+      };
+
+      // Add role-specific fields
+      if (selectedRole === 'student') {
+        payload.school_name = formData.schoolName;
+        payload.school_grade = formData.schoolGrade;
+        payload.father_phone = formData.fatherPhone;
+        payload.mother_phone = formData.motherPhone;
+      } else if (selectedRole === 'sheikh' || selectedRole === 'admin') {
+        payload.specialization = formData.specialization;
+        payload.experience_years = formData.experienceYears ? parseInt(formData.experienceYears) : null;
+      }
+
+      const response = await axios.post(`${API}/auth/register`, payload);
       
-      toast.success('تم تسجيل بياناتك بنجاح');
+      const roleLabel = selectedRole === 'student' ? 'طالب' : (selectedRole === 'sheikh' ? 'معلم' : 'مدير');
+      toast.success(`تم تسجيل بياناتك كـ${roleLabel} بنجاح`);
       setRegisteredEmail(formData.email);
       setStep(2);
     } catch (error) {
