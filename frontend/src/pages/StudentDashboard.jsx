@@ -329,7 +329,7 @@ const StudentDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Memorization & Tajweed */}
+      {/* Memorization & Attendance/Recitation Gauges */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Memorization Progress */}
         <Card className="glass-card border-white/10">
@@ -357,17 +357,20 @@ const StudentDashboard = () => {
                 </span>
                 <span className="text-slate-500">604 صفحة</span>
               </div>
+              
+              {/* تقسيم الحفظ إلى صفحات وأجزاء */}
               <div className="grid grid-cols-2 gap-3 mt-4">
-                <div className="p-3 rounded-lg bg-slate-800/50 text-center">
-                  <p className="text-slate-400 text-xs">الحفظ السابق</p>
-                  <p className="text-white font-bold">{stats?.memorization?.total_previous || 0} صفحة</p>
-                  {stats?.memorization?.previous_juz?.length > 0 && (
-                    <p className="text-slate-500 text-xs">({stats.memorization.previous_juz.length} جزء)</p>
-                  )}
+                <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 text-center">
+                  <BookOpen className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
+                  <p className="text-2xl font-bold text-white">{stats?.memorization?.total_previous || 0}</p>
+                  <p className="text-emerald-400 text-sm">صفحة محفوظة</p>
                 </div>
-                <div className="p-3 rounded-lg bg-emerald-500/10 text-center">
-                  <p className="text-emerald-400 text-xs">الحفظ الجديد</p>
-                  <p className="text-emerald-400 font-bold">{stats?.memorization?.new_pages || 0} صفحة</p>
+                <div className="p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20 text-center">
+                  <BookMarked className="w-8 h-8 mx-auto text-blue-400 mb-2" />
+                  <p className="text-2xl font-bold text-white">
+                    {stats?.memorization?.previous_juz?.length || Math.floor((stats?.memorization?.total_memorized || 0) / 20)}
+                  </p>
+                  <p className="text-blue-400 text-sm">جزء محفوظ</p>
                 </div>
               </div>
               
@@ -387,7 +390,7 @@ const StudentDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Attendance & Recitation */}
+        {/* Attendance & Recitation - Circular Gauges */}
         <Card className="glass-card border-white/10">
           <CardHeader className="pb-3">
             <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
@@ -396,44 +399,50 @@ const StudentDashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {/* Attendance */}
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-slate-400 text-sm">نسبة الحضور</span>
-                  <span className="text-blue-400 font-bold">{stats?.attendance?.percentage || 0}%</span>
-                </div>
-                <Progress 
-                  value={stats?.attendance?.percentage || 0} 
-                  className="h-3 bg-slate-700"
-                />
-                <div className="flex gap-4 mt-2 text-xs">
+            <div className="flex items-center justify-around py-4">
+              {/* عداد الحضور */}
+              <CircularGauge 
+                value={stats?.attendance?.percentage || 0}
+                maxValue={100}
+                label="نسبة الحضور"
+                color="dynamic"
+                size="md"
+                icon={CheckCircle}
+              />
+              
+              {/* عداد التسميع */}
+              <CircularGauge 
+                value={(stats?.recitation?.average_rating || 0) * 10}
+                maxValue={100}
+                label="نسبة التسميع"
+                color="dynamic"
+                size="md"
+                icon={Star}
+              />
+            </div>
+            
+            {/* تفاصيل إضافية */}
+            <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-slate-700">
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-2 text-xs">
                   <span className="text-emerald-400 flex items-center gap-1">
                     <CheckCircle className="w-3 h-3" />
                     حضور: {stats?.attendance?.present || 0}
                   </span>
                   <span className="text-red-400">غياب: {stats?.attendance?.absent || 0}</span>
-                  <span className="text-amber-400">عذر: {stats?.attendance?.excused || 0}</span>
                 </div>
+                <p className="text-slate-500 text-xs mt-1">عذر: {stats?.attendance?.excused || 0}</p>
               </div>
-              
-              {/* Recitation */}
-              <div className="pt-3 border-t border-slate-700">
-                <div className="flex justify-between mb-2">
-                  <span className="text-slate-400 text-sm">متوسط تقييم التسميع</span>
-                  <span className="text-amber-400 font-bold flex items-center gap-1">
-                    <Star className="w-4 h-4" />
-                    {stats?.recitation?.average_rating || 0}/10
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-2 text-xs">
+                  <span className="text-amber-400 flex items-center gap-1">
+                    <Star className="w-3 h-3" />
+                    التقييم: {stats?.recitation?.average_rating || 0}/10
                   </span>
                 </div>
-                <Progress 
-                  value={(stats?.recitation?.average_rating || 0) * 10} 
-                  className="h-3 bg-slate-700"
-                />
-                <div className="flex gap-4 mt-2 text-xs">
-                  <span className="text-slate-400">عدد التسميعات: {stats?.recitation?.recitations_count || 0}</span>
-                  <span className="text-emerald-400">اجتاز: {stats?.recitation?.passed_count || 0}</span>
-                </div>
+                <p className="text-slate-500 text-xs mt-1">
+                  {stats?.recitation?.recitations_count || 0} تسميع - {stats?.recitation?.passed_count || 0} اجتاز
+                </p>
               </div>
             </div>
           </CardContent>
