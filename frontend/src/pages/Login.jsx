@@ -117,7 +117,7 @@ const Login = () => {
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
+            <div className="mt-6 text-center space-y-2">
               <p className="text-slate-400">
                 ليس لديك حساب؟{' '}
                 <Link 
@@ -126,6 +126,14 @@ const Login = () => {
                   data-testid="register-link"
                 >
                   سجل الآن
+                </Link>
+              </p>
+              <p className="text-slate-500 text-sm">
+                <Link 
+                  to="/forgot-password" 
+                  className="text-amber-400 hover:text-amber-300"
+                >
+                  نسيت كلمة المرور؟
                 </Link>
               </p>
             </div>
