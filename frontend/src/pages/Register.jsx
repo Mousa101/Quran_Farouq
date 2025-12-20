@@ -4,7 +4,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { BookOpen, Mail, Lock, User, Loader2, Phone, Calendar, School, Home, CheckCircle, Key, Image, Upload, UserPlus } from 'lucide-react';
+import { BookOpen, Mail, Lock, User, Loader2, Phone, Calendar, School, Home, CheckCircle, Key, Image, Upload, UserPlus, GraduationCap, Shield, Briefcase } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 
@@ -17,6 +17,7 @@ const Register = () => {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [activationCode, setActivationCode] = useState('');
+  const [selectedRole, setSelectedRole] = useState('student');
   const fileInputRef = useRef(null);
   const [imagePreview, setImagePreview] = useState(null);
   
@@ -28,13 +29,22 @@ const Register = () => {
     mosqueName: '',
     schoolName: '',
     birthDate: '',
-    joinDate: '', // تاريخ الإلتحاق
+    joinDate: '',
     schoolGrade: '',
     studentPhone: '',
     fatherPhone: '',
     motherPhone: '',
-    profileImage: ''
+    profileImage: '',
+    // Sheikh/Admin specific
+    specialization: '',
+    experienceYears: ''
   });
+
+  const roles = [
+    { id: 'student', label: 'طالب', icon: GraduationCap, color: 'emerald', description: 'التسجيل كطالب في حلقات التحفيظ' },
+    { id: 'sheikh', label: 'معلم', icon: BookOpen, color: 'blue', description: 'التسجيل كمعلم قرآن كريم' },
+    { id: 'admin', label: 'مدير', icon: Shield, color: 'purple', description: 'التسجيل كمدير للمركز' }
+  ];
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
