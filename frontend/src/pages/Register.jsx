@@ -523,11 +523,15 @@ const Register = () => {
                   سجل الدخول
                 </Link>
               </p>
-              <p className="text-slate-500 text-xs mt-2">
-                <Link to="/activate" className="text-emerald-400 hover:text-emerald-300">
+              <div className="flex items-center justify-center gap-3 mt-2">
+                <Link to="/activate" className="text-emerald-400 hover:text-emerald-300 text-xs">
                   لديك كود تفعيل؟
                 </Link>
-              </p>
+                <span className="text-slate-600">|</span>
+                <Link to="/forgot-password" className="text-amber-400 hover:text-amber-300 text-xs">
+                  نسيت كلمة المرور؟
+                </Link>
+              </div>
             </div>
           </CardContent>
         </Card>
