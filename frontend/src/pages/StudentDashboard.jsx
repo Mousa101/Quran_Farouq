@@ -18,6 +18,7 @@ const StudentDashboard = () => {
   const [stats, setStats] = useState(null);
   const [activities, setActivities] = useState([]);
   const [rankings, setRankings] = useState({ scores: [] });
+  const [groupInfo, setGroupInfo] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
@@ -33,6 +34,19 @@ const StudentDashboard = () => {
       setStats(statsRes.data);
       setActivities(activitiesRes.data.slice(0, 3));
       setRankings(rankingsRes.data);
+      
+      // جلب معلومات المجموعة
+      if (statsRes.data?.student?.group_id) {
+        try {
+          const groupsRes = await axios.get(`${API}/groups`);
+          const studentGroup = groupsRes.data.find(g => g.id === statsRes.data.student.group_id);
+          if (studentGroup) {
+            setGroupInfo(studentGroup);
+          }
+        } catch (e) {
+          console.error('Error fetching group:', e);
+        }
+      }
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
