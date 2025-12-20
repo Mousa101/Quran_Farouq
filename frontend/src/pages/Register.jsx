@@ -114,6 +114,7 @@ const Register = () => {
         school_name: formData.schoolName,
         school_grade: formData.schoolGrade,
         birth_date: formData.birthDate,
+        join_date: formData.joinDate,
         student_phone: formData.studentPhone,
         father_phone: formData.fatherPhone,
         mother_phone: formData.motherPhone,
