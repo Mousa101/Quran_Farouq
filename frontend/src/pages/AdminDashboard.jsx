@@ -129,8 +129,8 @@ const AdminDashboard = () => {
                 <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>إجمالي النقاط</p>
                 <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_points}</p>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                <Trophy className="w-6 h-6 text-amber-400" />
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                <Trophy className="w-5 h-5 md:w-6 md:h-6 text-amber-400" />
               </div>
             </div>
           </CardContent>
@@ -138,46 +138,46 @@ const AdminDashboard = () => {
       </div>
 
       {/* Weekly Stats */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-2 md:gap-4">
         <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                <UserCheck className="w-5 h-5 text-emerald-400" />
+          <CardContent className="p-3 md:p-4">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                <UserCheck className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
               </div>
-              <div>
-                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>حضور هذا الأسبوع</p>
-                <p className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.week_attendance} مرة</p>
+              <div className="min-w-0">
+                <p className={`text-[10px] md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>حضور هذا الأسبوع</p>
+                <p className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.week_attendance} مرة</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                <BookOpen className="w-5 h-5 text-blue-400" />
+          <CardContent className="p-3 md:p-4">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
               </div>
-              <div>
-                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>صفحات هذا الأسبوع</p>
-                <p className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.week_pages} صفحة</p>
+              <div className="min-w-0">
+                <p className={`text-[10px] md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>صفحات هذا الأسبوع</p>
+                <p className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.week_pages} صفحة</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Top Groups */}
         <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              <Users className="w-5 h-5 text-purple-400" />
+          <CardHeader className="flex flex-row items-center justify-between p-3 md:p-6">
+            <CardTitle className={`flex items-center gap-2 text-sm md:text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <Users className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
               ترتيب المجموعات
             </CardTitle>
             <Link to="/admin-rankings?filter=groups">
-              <Button variant="ghost" size="sm" className="text-emerald-400">
+              <Button variant="ghost" size="sm" className="text-emerald-400 text-xs md:text-sm">
                 عرض الكل <ArrowUpRight className="w-4 h-4 mr-1" />
               </Button>
             </Link>
