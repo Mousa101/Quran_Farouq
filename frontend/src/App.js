@@ -33,6 +33,7 @@ import AdminRankings from './pages/AdminRankings';
 import FeesManagement from './pages/FeesManagement';
 import HomeworkManagement from './pages/HomeworkManagement';
 import ExamsManagement from './pages/ExamsManagement';
+import SheikhManagement from './pages/SheikhManagement';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
