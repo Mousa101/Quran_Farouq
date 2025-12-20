@@ -159,65 +159,79 @@ const PendingStudents = () => {
         </Card>
       ) : (
         <div className="grid gap-4">
-          {pendingStudents.map((student) => (
-            <Card 
-              key={student.id} 
-              className="glass-card border-white/10 hover:border-amber-500/30 transition-all cursor-pointer"
-              onClick={() => openStudentDetails(student)}
-            >
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-                      <Clock className="w-6 h-6 text-amber-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-white">{student.name}</h3>
-                      <p className="text-slate-400 text-sm">{student.email}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    {/* Activation Code Display */}
-                    <div className="bg-slate-800/50 rounded-xl p-3 border border-amber-500/30">
-                      <p className="text-xs text-slate-400 mb-1">كود التفعيل:</p>
-                      <div className="flex items-center gap-2">
-                        <span className="text-2xl font-mono font-bold text-amber-400 tracking-widest">
-                          {student.activation_code}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-8 w-8 p-0 text-slate-400 hover:text-white"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            copyToClipboard(student.activation_code);
-                          }}
-                        >
-                          <Copy className="w-4 h-4" />
-                        </Button>
+          {pendingList.map((user) => {
+            const roleInfo = getRoleInfo(user.role);
+            return (
+              <Card 
+                key={user.id} 
+                className="glass-card border-white/10 hover:border-amber-500/30 transition-all cursor-pointer"
+                onClick={() => openUserDetails(user)}
+              >
+                <CardContent className="p-3 md:p-4">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl ${roleInfo.bgColor} flex items-center justify-center`}>
+                        <roleInfo.icon className={`w-5 h-5 md:w-6 md:h-6 ${roleInfo.textColor}`} />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="text-base md:text-lg font-bold text-white truncate">{user.name}</h3>
+                          <Badge className={`${roleInfo.bgColor} ${roleInfo.textColor} text-[10px]`}>
+                            {roleInfo.label}
+                          </Badge>
+                        </div>
+                        <p className="text-slate-400 text-xs md:text-sm truncate">{user.email}</p>
                       </div>
                     </div>
                     
-                    <Badge className="bg-amber-500/20 text-amber-400">
-                      في الانتظار
-                    </Badge>
+                    <div className="flex items-center gap-2 md:gap-4">
+                      {/* Activation Code Display */}
+                      <div className="bg-slate-800/50 rounded-xl p-2 md:p-3 border border-amber-500/30 flex-shrink-0">
+                        <p className="text-[10px] md:text-xs text-slate-400 mb-0.5 md:mb-1">كود التفعيل:</p>
+                        <div className="flex items-center gap-1 md:gap-2">
+                          <span className="text-lg md:text-2xl font-mono font-bold text-amber-400 tracking-widest">
+                            {user.activation_code}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 md:h-8 md:w-8 p-0 text-slate-400 hover:text-white"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyToClipboard(user.activation_code);
+                            }}
+                          >
+                            <Copy className="w-3 h-3 md:w-4 md:h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      
+                      <Badge className="bg-amber-500/20 text-amber-400 text-[10px] md:text-xs hidden md:flex">
+                        في الانتظار
+                      </Badge>
+                    </div>
                   </div>
-                </div>
-                
-                {/* Quick Info */}
-                <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-400">
-                  {student.student_phone && (
-                    <span className="flex items-center gap-1">
-                      <Phone className="w-4 h-4" />
-                      {student.student_phone}
-                    </span>
-                  )}
-                  {student.father_phone && (
-                    <span className="flex items-center gap-1">
-                      <Phone className="w-4 h-4 text-blue-400" />
-                      الأب: {student.father_phone}
-                    </span>
+                  
+                  {/* Quick Info */}
+                  <div className="mt-2 md:mt-3 flex flex-wrap gap-2 md:gap-4 text-xs md:text-sm text-slate-400">
+                    {user.student_phone && (
+                      <span className="flex items-center gap-1">
+                        <Phone className="w-3 h-3 md:w-4 md:h-4" />
+                        {user.student_phone}
+                      </span>
+                    )}
+                    {user.role === 'student' && user.father_phone && (
+                      <span className="flex items-center gap-1">
+                        <Phone className="w-3 h-3 md:w-4 md:h-4 text-blue-400" />
+                        الأب: {user.father_phone}
+                      </span>
+                    )}
+                    {(user.role === 'sheikh' || user.role === 'admin') && user.specialization && (
+                      <span className="flex items-center gap-1">
+                        <Briefcase className="w-3 h-3 md:w-4 md:h-4 text-blue-400" />
+                        {user.specialization}
+                      </span>
+                    )}
                   )}
                   {student.mother_phone && (
                     <span className="flex items-center gap-1">
