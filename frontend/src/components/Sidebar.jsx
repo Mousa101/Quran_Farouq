@@ -179,7 +179,7 @@ const Sidebar = () => {
       </nav>
 
       {/* Theme Toggle & Logout - Fixed at absolute bottom */}
-      <div className={`absolute bottom-0 left-0 right-0 p-3 md:p-4 border-t ${isDark ? 'border-white/10 bg-slate-900' : 'border-slate-200 bg-white'} space-y-2`}>
+      <div className={`absolute bottom-12 left-0 right-0 p-3 md:p-4 border-t ${isDark ? 'border-white/10 bg-slate-900' : 'border-slate-200 bg-white'} space-y-2`}>
         {/* Theme Toggle */}
         <Button
           onClick={toggleTheme}
