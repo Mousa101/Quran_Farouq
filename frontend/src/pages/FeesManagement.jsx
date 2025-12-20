@@ -203,7 +203,7 @@ const FeesManagement = () => {
               </div>
               <div>
                 <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المستحقات</p>
-                <p className="text-xl font-bold text-red-400">{totalDue} ر.س</p>
+                <p className="text-xl font-bold text-red-400">{totalDue} د.أ</p>
               </div>
             </div>
           </CardContent>
@@ -216,7 +216,7 @@ const FeesManagement = () => {
               </div>
               <div>
                 <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المدفوع</p>
-                <p className="text-xl font-bold text-emerald-400">{totalPaid} ر.س</p>
+                <p className="text-xl font-bold text-emerald-400">{totalPaid} د.أ</p>
               </div>
             </div>
           </CardContent>
@@ -229,7 +229,7 @@ const FeesManagement = () => {
               </div>
               <div>
                 <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الإجمالي</p>
-                <p className="text-xl font-bold text-blue-400">{totalDue + totalPaid} ر.س</p>
+                <p className="text-xl font-bold text-blue-400">{totalDue + totalPaid} د.أ</p>
               </div>
             </div>
           </CardContent>
