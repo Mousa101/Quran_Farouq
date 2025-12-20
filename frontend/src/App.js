@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Activate from './pages/Activate';
+import ForgotPassword from './pages/ForgotPassword';
 import AdminDashboard from './pages/AdminDashboard';
 import SheikhDashboard from './pages/SheikhDashboard';
 import StudentDashboard from './pages/StudentDashboard';
