@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { BookOpen, Mail, Lock, User, Loader2, Phone, Calendar, School, Home, CheckCircle, Key, Image } from 'lucide-react';
+import { BookOpen, Mail, Lock, User, Loader2, Phone, Calendar, School, Home, CheckCircle, Key, Image, Upload, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 
@@ -14,8 +14,11 @@ const Register = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1); // 1: Registration, 2: Waiting/Activation
   const [loading, setLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [activationCode, setActivationCode] = useState('');
+  const fileInputRef = useRef(null);
+  const [imagePreview, setImagePreview] = useState(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -25,6 +28,7 @@ const Register = () => {
     mosqueName: '',
     schoolName: '',
     birthDate: '',
+    joinDate: '', // تاريخ الإلتحاق
     schoolGrade: '',
     studentPhone: '',
     fatherPhone: '',
