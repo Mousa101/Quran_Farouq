@@ -81,6 +81,7 @@ const Sidebar = () => {
       return [
         ...baseItems,
         { to: '/pending-students', icon: UserPlus, label: 'طلبات التسجيل' },
+        { to: '/sheikh-management', icon: BookOpen, label: 'إدارة المعلمين' },
         { to: '/group-management', icon: UsersRound, label: 'إدارة المجموعات' },
         { to: '/student-management', icon: GraduationCap, label: 'إدارة الطلاب' },
         { to: '/admin-rankings', icon: TrendingUp, label: 'الترتيب والإحصائيات' },
