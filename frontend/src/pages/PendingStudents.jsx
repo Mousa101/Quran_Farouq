@@ -232,17 +232,17 @@ const PendingStudents = () => {
                         {user.specialization}
                       </span>
                     )}
-                  )}
-                  {student.mother_phone && (
-                    <span className="flex items-center gap-1">
-                      <Phone className="w-4 h-4 text-pink-400" />
-                      الأم: {student.mother_phone}
-                    </span>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    {user.role === 'student' && user.mother_phone && (
+                      <span className="flex items-center gap-1">
+                        <Phone className="w-3 h-3 md:w-4 md:h-4 text-pink-400" />
+                        الأم: {user.mother_phone}
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
