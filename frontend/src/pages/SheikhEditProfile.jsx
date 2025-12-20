@@ -41,7 +41,7 @@ const SheikhEditProfile = () => {
 
   const fetchProfile = async () => {
     try {
-      const res = await axios.get(`${API}/auth/me`);
+      const res = await axios.get(`${API}/users/me/full`);
       const userData = res.data;
       setFormData({
         name: userData.name || '',
