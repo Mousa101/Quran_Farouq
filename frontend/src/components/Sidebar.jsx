@@ -109,6 +109,7 @@ const Sidebar = () => {
         { to: '/sheikh-rankings', icon: TrendingUp, label: 'ترتيب طلابي' },
         { to: '/curriculum', icon: BookMarked, label: 'عرض المنهج' },
         { to: '/schedule', icon: CalendarDays, label: 'الجدول الدراسي' },
+        { to: '/sheikh-edit-profile', icon: UserCog, label: 'تعديل بياناتي' },
         { to: '/notifications', icon: Bell, label: 'الإشعارات' },
       ];
     }
