@@ -55,23 +55,23 @@ const Login = () => {
       </div>
 
       {/* Right side - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 md:p-8">
         <Card className="w-full max-w-md glass-card animate-fadeIn">
-          <CardHeader className="text-center space-y-2">
-            <div className="lg:hidden w-16 h-16 mx-auto mb-4 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-              <BookOpen className="w-8 h-8 text-emerald-400" />
+          <CardHeader className="text-center space-y-2 p-4 md:p-6">
+            <div className="lg:hidden w-14 h-14 md:w-16 md:h-16 mx-auto mb-2 md:mb-4 rounded-xl bg-emerald-500/20 flex items-center justify-center overflow-hidden">
+              <img src="/logo.png" alt="شعار المركز" className="w-12 h-12 md:w-14 md:h-14 object-contain" />
             </div>
-            <CardTitle className="text-2xl font-bold text-white font-cairo">تسجيل الدخول</CardTitle>
-            <CardDescription className="text-slate-400">
+            <CardTitle className="text-xl md:text-2xl font-bold text-white font-cairo">تسجيل الدخول</CardTitle>
+            <CardDescription className="text-slate-400 text-sm md:text-base">
               أدخل بياناتك للوصول إلى حسابك
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
+          <CardContent className="p-4 md:p-6 pt-0">
+            <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-slate-300">البريد الإلكتروني</Label>
+                <Label htmlFor="email" className="text-slate-300 text-sm md:text-base">البريد الإلكتروني</Label>
                 <div className="relative">
-                  <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                  <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-slate-500" />
                   <Input
                     id="email"
                     type="email"
