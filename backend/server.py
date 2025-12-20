@@ -2841,7 +2841,6 @@ async def get_admin_dashboard_stats(current_user: dict = Depends(get_current_use
     total_points = sum(p.get("total_points", 0) for p in all_points)
     
     # Attendance stats (this week)
-    from datetime import timedelta
     today = datetime.now(timezone.utc)
     week_start = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
     
