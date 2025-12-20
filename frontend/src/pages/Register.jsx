@@ -275,8 +275,8 @@ const Register = () => {
             <div className="lg:hidden w-20 h-20 mx-auto mb-2 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
               <img src="/logo.png" alt="شعار المركز" className="w-16 h-16 object-contain" />
             </div>
-            <CardTitle className="text-xl font-bold text-white font-cairo">تسجيل طالب جديد</CardTitle>
-            <CardDescription className="text-slate-400 text-sm">أدخل بياناتك للتسجيل في المركز</CardDescription>
+            <CardTitle className="text-xl font-bold text-white font-cairo">تسجيل مستخدم جديد</CardTitle>
+            <CardDescription className="text-slate-400 text-sm">اختر نوع حسابك وأدخل بياناتك</CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
             <form onSubmit={handleSubmit} className="space-y-4">
