@@ -1850,6 +1850,69 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
     total_previous = (len(previous_juz) * 20) + previous_pages
     total_memorized = total_previous + total_new_pages
     
+    # حساب بيانات ورقة المتابعة - الأسبوعية والفصلية
+    today = datetime.now(timezone.utc)
+    days_since_sunday = today.weekday() + 1 if today.weekday() != 6 else 0
+    current_week_start = (today - timedelta(days=days_since_sunday)).strftime('%Y-%m-%d')
+    
+    # حساب بداية الفصل
+    month = today.month
+    if month <= 4:
+        semester_start = f"{today.year}-01-01"
+    elif month <= 8:
+        semester_start = f"{today.year}-05-01"
+    else:
+        semester_start = f"{today.year}-09-01"
+    
+    # البحث عن ورقة الأسبوع الحالي
+    current_week_sheet = None
+    for sheet in tracking:
+        if sheet.get("week_start") == current_week_start:
+            current_week_sheet = sheet
+            break
+    
+    # البيانات الأسبوعية
+    weekly_data = {
+        "prayers": 0,
+        "quran_sitting": 0,
+        "duha_prayers": 0,
+        "family_recitation": 0,
+        "study_hours": 0,
+        "witr": 0,
+        "night_prayer": 0,
+        "fasting": 0,
+        "total_points": 0
+    }
+    
+    if current_week_sheet and current_week_sheet.get("data"):
+        data = current_week_sheet["data"]
+        weekly_data = {
+            "prayers": data.get("prayers_count", 0),
+            "quran_sitting": data.get("quran_sitting_days", 0),
+            "duha_prayers": data.get("duha_prayers", 0),
+            "family_recitation": data.get("family_recitation", 0),
+            "study_hours": data.get("study_hours", 0),
+            "witr": data.get("witr_prayers_days", 0),
+            "night_prayer": data.get("night_prayer", 0),
+            "fasting": data.get("fasting", 0),
+            "total_points": current_week_sheet.get("points_earned", 0)
+        }
+    
+    # البيانات الفصلية
+    semester_sheets = [s for s in tracking if s.get("week_start", "") >= semester_start]
+    semester_data = {
+        "prayers": sum(s["data"].get("prayers_count", 0) for s in semester_sheets if s.get("data")),
+        "quran_sitting": sum(s["data"].get("quran_sitting_days", 0) for s in semester_sheets if s.get("data")),
+        "duha_prayers": sum(s["data"].get("duha_prayers", 0) for s in semester_sheets if s.get("data")),
+        "family_recitation": sum(s["data"].get("family_recitation", 0) for s in semester_sheets if s.get("data")),
+        "study_hours": sum(s["data"].get("study_hours", 0) for s in semester_sheets if s.get("data")),
+        "witr": sum(s["data"].get("witr_prayers_days", 0) for s in semester_sheets if s.get("data")),
+        "night_prayer": sum(s["data"].get("night_prayer", 0) for s in semester_sheets if s.get("data")),
+        "fasting": sum(s["data"].get("fasting", 0) for s in semester_sheets if s.get("data")),
+        "total_points": sum(s.get("points_earned", 0) for s in semester_sheets),
+        "weeks_count": len(semester_sheets)
+    }
+    
     return {
         "student": {
             "name": student.get("name"),
@@ -1878,13 +1941,11 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
             "percentage": round((total_memorized / 604) * 100, 1)
         },
         "tracking": {
+            "weekly": weekly_data,
+            "semester": semester_data,
             "total_prayers": total_prayers,
             "total_quran_time": total_quran_time,
             "total_family_recitation": total_family_recitation,
-            "total_adhkar": total_adhkar,
-            "total_sunnah": total_sunnah,
-            "total_witr": total_witr,
-            "total_duha": total_duha,
             "sheets_count": len(tracking)
         },
         "recitation": {
