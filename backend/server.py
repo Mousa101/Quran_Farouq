@@ -1137,6 +1137,99 @@ async def get_tracking_sheets(
     sheets = await db.tracking_sheets.find(query, {"_id": 0}).to_list(100)
     return sheets
 
+@api_router.get("/tracking-sheets/stats/{student_id}")
+async def get_tracking_stats(student_id: str, current_user: dict = Depends(get_current_user)):
+    """الحصول على إحصائيات ورقة المتابعة - الأسبوع الحالي والمجموع الفصلي"""
+    
+    # Get current week start (Sunday)
+    today = datetime.now(timezone.utc)
+    days_since_sunday = today.weekday() + 1 if today.weekday() != 6 else 0
+    current_week_start = (today - timedelta(days=days_since_sunday)).strftime('%Y-%m-%d')
+    
+    # Get current semester start (assume semester is 4 months)
+    # For simplicity, use the beginning of the current semester period
+    month = today.month
+    if month <= 4:
+        semester_start = f"{today.year}-01-01"
+    elif month <= 8:
+        semester_start = f"{today.year}-05-01"
+    else:
+        semester_start = f"{today.year}-09-01"
+    
+    # Get all tracking sheets for this student
+    all_sheets = await db.tracking_sheets.find(
+        {"student_id": student_id}, 
+        {"_id": 0}
+    ).to_list(1000)
+    
+    # Filter for current week
+    current_week_sheet = None
+    for sheet in all_sheets:
+        if sheet.get("week_start") == current_week_start:
+            current_week_sheet = sheet
+            break
+    
+    # Calculate weekly totals (from current week sheet)
+    weekly_data = {
+        "prayers": 0,
+        "quran_sitting": 0,
+        "duha_prayers": 0,
+        "family_recitation": 0,
+        "study_hours": 0,
+        "witr": 0,
+        "night_prayer": 0,
+        "fasting": 0,
+        "total_points": 0
+    }
+    
+    if current_week_sheet and current_week_sheet.get("data"):
+        data = current_week_sheet["data"]
+        weekly_data = {
+            "prayers": data.get("prayers_count", 0),
+            "quran_sitting": data.get("quran_sitting_days", 0),
+            "duha_prayers": data.get("duha_prayers", 0),
+            "family_recitation": data.get("family_recitation", 0),
+            "study_hours": data.get("study_hours", 0),
+            "witr": data.get("witr_prayers_days", 0),
+            "night_prayer": data.get("night_prayer", 0),
+            "fasting": data.get("fasting", 0),
+            "total_points": current_week_sheet.get("points_earned", 0)
+        }
+    
+    # Calculate semester totals
+    semester_sheets = [s for s in all_sheets if s.get("week_start", "") >= semester_start]
+    
+    semester_data = {
+        "prayers": sum(s["data"].get("prayers_count", 0) for s in semester_sheets if s.get("data")),
+        "quran_sitting": sum(s["data"].get("quran_sitting_days", 0) for s in semester_sheets if s.get("data")),
+        "duha_prayers": sum(s["data"].get("duha_prayers", 0) for s in semester_sheets if s.get("data")),
+        "family_recitation": sum(s["data"].get("family_recitation", 0) for s in semester_sheets if s.get("data")),
+        "study_hours": sum(s["data"].get("study_hours", 0) for s in semester_sheets if s.get("data")),
+        "witr": sum(s["data"].get("witr_prayers_days", 0) for s in semester_sheets if s.get("data")),
+        "night_prayer": sum(s["data"].get("night_prayer", 0) for s in semester_sheets if s.get("data")),
+        "fasting": sum(s["data"].get("fasting", 0) for s in semester_sheets if s.get("data")),
+        "total_points": sum(s.get("points_earned", 0) for s in semester_sheets),
+        "weeks_count": len(semester_sheets)
+    }
+    
+    return {
+        "current_week_start": current_week_start,
+        "semester_start": semester_start,
+        "weekly": weekly_data,
+        "semester": semester_data,
+        "max_weekly_points": 72,  # الحد الأقصى للنقاط الأسبوعية
+        "categories": {
+            "prayers": {"max_weekly": 35, "label": "الصلوات"},
+            "quran_sitting": {"max_weekly": 7, "label": "الجلوس مع القرآن"},
+            "duha_prayers": {"max_weekly": 7, "label": "صلاة الضحى"},
+            "family_recitation": {"max_weekly": 7, "label": "التسميع للأهل"},
+            "study_hours": {"max_weekly": 7, "label": "ساعات الدراسة"},
+            "witr": {"max_weekly": 7, "label": "الوتر"},
+            "night_prayer": {"max_weekly": 1, "label": "قيام الليل"},
+            "fasting": {"max_weekly": 1, "label": "الصيام"}
+        }
+    }
+
 # ============== RECITATION ROUTES ==============
 
 @api_router.post("/recitations")
