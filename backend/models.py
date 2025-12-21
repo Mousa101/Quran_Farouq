@@ -145,19 +145,27 @@ class Group(BaseModel):
 
 # Tracking Sheet Models - Updated with detailed tracking
 class TrackingSheetData(BaseModel):
-    # الصلاة - 35 نقطة كحد أقصى (كل صلاة نقطة خلال الأسبوع = 5 صلوات × 7 أيام)
+    # الصلوات - 35 نقطة كحد أقصى (كل صلاة نقطة خلال الأسبوع = 5 صلوات × 7 أيام)
     prayers_count: int = 0  # عدد الصلوات (0-35)
-    # أذكار بعد الصلاة - 7 نقاط كحد أقصى
-    adhkar_count: int = 0  # عدد أيام الأذكار (0-7)
     # الجلوس مع القرآن - 7 نقاط كحد أقصى
     quran_sitting_days: int = 0  # عدد أيام الجلوس مع القرآن (0-7)
-    # السنن الرواتب - 7 نقاط كحد أقصى
-    sunnah_prayers_days: int = 0  # عدد أيام السنن (0-7)
+    # صلاة الضحى - 7 نقاط كحد أقصى
+    duha_prayers: int = 0  # عدد أيام صلاة الضحى (0-7)
+    # التسميع للأهل - 7 نقاط كحد أقصى
+    family_recitation: int = 0  # عدد أيام التسميع للأهل (0-7)
+    # ساعات الدراسة - 7 نقاط كحد أقصى
+    study_hours: int = 0  # عدد أيام الدراسة (0-7)
     # الوتر - 7 نقاط كحد أقصى
     witr_prayers_days: int = 0  # عدد أيام صلاة الوتر (0-7)
+    # قيام الليل - نقطة واحدة كحد أقصى
+    night_prayer: int = 0  # قيام الليل في الأسبوع (0-1)
+    # الصيام - نقطة واحدة كحد أقصى
+    fasting: int = 0  # صيام في الأسبوع (0-1)
     # ملاحظات
     notes: Optional[str] = None
-    # Legacy fields
+    # Legacy fields (للتوافق مع البيانات القديمة)
+    adhkar_count: int = 0
+    sunnah_prayers_days: int = 0
     quran_sitting_minutes: int = 0
     family_recitation_count: int = 0
 
