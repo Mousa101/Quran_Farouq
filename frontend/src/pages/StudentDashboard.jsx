@@ -465,7 +465,7 @@ const StudentDashboard = () => {
         </Card>
       </div>
 
-      {/* Prayers & Quran Time */}
+      {/* ورقة المتابعة الإيمانية - الأسبوعية والفصلية */}
       <Card className="glass-card border-white/10">
         <CardHeader className="pb-2 md:pb-3">
           <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
@@ -474,37 +474,110 @@ const StudentDashboard = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div className="p-4 rounded-xl bg-emerald-500/10 text-center">
-              <BookMarked className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
-              <p className="text-2xl font-bold text-white">{stats?.tracking?.total_prayers || 0}</p>
-              <p className="text-emerald-400 text-xs">الصلوات المفروضة</p>
+          {/* القيم الأسبوعية */}
+          <div className="mb-4">
+            <h4 className="text-sm font-bold text-emerald-400 mb-3 flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              هذا الأسبوع
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+              <div className="p-2 md:p-3 rounded-xl bg-emerald-500/10 text-center">
+                <Hand className="w-5 h-5 md:w-6 md:h-6 mx-auto text-emerald-400 mb-1" />
+                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.prayers || 0}<span className="text-xs text-slate-500">/35</span></p>
+                <p className="text-emerald-400 text-[10px] md:text-xs">الصلوات</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-blue-500/10 text-center">
+                <BookMarked className="w-5 h-5 md:w-6 md:h-6 mx-auto text-blue-400 mb-1" />
+                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.quran_sitting || 0}<span className="text-xs text-slate-500">/7</span></p>
+                <p className="text-blue-400 text-[10px] md:text-xs">القرآن</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-amber-500/10 text-center">
+                <Sunrise className="w-5 h-5 md:w-6 md:h-6 mx-auto text-amber-400 mb-1" />
+                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.duha_prayers || 0}<span className="text-xs text-slate-500">/7</span></p>
+                <p className="text-amber-400 text-[10px] md:text-xs">الضحى</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-pink-500/10 text-center">
+                <Users className="w-5 h-5 md:w-6 md:h-6 mx-auto text-pink-400 mb-1" />
+                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.family_recitation || 0}<span className="text-xs text-slate-500">/7</span></p>
+                <p className="text-pink-400 text-[10px] md:text-xs">التسميع</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-purple-500/10 text-center">
+                <GraduationCap className="w-5 h-5 md:w-6 md:h-6 mx-auto text-purple-400 mb-1" />
+                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.study_hours || 0}<span className="text-xs text-slate-500">/7</span></p>
+                <p className="text-purple-400 text-[10px] md:text-xs">الدراسة</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-indigo-500/10 text-center">
+                <Moon className="w-5 h-5 md:w-6 md:h-6 mx-auto text-indigo-400 mb-1" />
+                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.witr || 0}<span className="text-xs text-slate-500">/7</span></p>
+                <p className="text-indigo-400 text-[10px] md:text-xs">الوتر</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-yellow-500/10 text-center">
+                <Star className="w-5 h-5 md:w-6 md:h-6 mx-auto text-yellow-400 mb-1" />
+                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.night_prayer || 0}<span className="text-xs text-slate-500">/1</span></p>
+                <p className="text-yellow-400 text-[10px] md:text-xs">قيام الليل</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-cyan-500/10 text-center">
+                <Calendar className="w-5 h-5 md:w-6 md:h-6 mx-auto text-cyan-400 mb-1" />
+                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.fasting || 0}<span className="text-xs text-slate-500">/1</span></p>
+                <p className="text-cyan-400 text-[10px] md:text-xs">الصيام</p>
+              </div>
             </div>
-            <div className="p-4 rounded-xl bg-amber-500/10 text-center">
-              <Clock className="w-8 h-8 mx-auto text-amber-400 mb-2" />
-              <p className="text-2xl font-bold text-white">{stats?.tracking?.total_quran_time || 0}</p>
-              <p className="text-amber-400 text-xs">الجلوس مع القرآن</p>
+            <div className="mt-2 text-center">
+              <span className="text-sm text-slate-400">نقاط الأسبوع: </span>
+              <span className="text-lg font-bold text-emerald-400">{stats?.tracking?.weekly?.total_points || 0}</span>
+              <span className="text-sm text-slate-500">/72</span>
             </div>
-            <div className="p-4 rounded-xl bg-purple-500/10 text-center">
-              <Hand className="w-8 h-8 mx-auto text-purple-400 mb-2" />
-              <p className="text-2xl font-bold text-white">{stats?.tracking?.total_adhkar || 0}</p>
-              <p className="text-purple-400 text-xs">أذكار بعد الصلاة</p>
+          </div>
+
+          {/* الفاصل */}
+          <div className="border-t border-white/10 my-4"></div>
+
+          {/* المجموع الفصلي */}
+          <div>
+            <h4 className="text-sm font-bold text-amber-400 mb-3 flex items-center gap-2">
+              <Trophy className="w-4 h-4" />
+              المجموع الفصلي
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-emerald-500/20">
+                <p className="text-lg md:text-xl font-bold text-emerald-400">{stats?.tracking?.semester?.prayers || 0}</p>
+                <p className="text-slate-400 text-[10px] md:text-xs">الصلوات</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-blue-500/20">
+                <p className="text-lg md:text-xl font-bold text-blue-400">{stats?.tracking?.semester?.quran_sitting || 0}</p>
+                <p className="text-slate-400 text-[10px] md:text-xs">القرآن</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-amber-500/20">
+                <p className="text-lg md:text-xl font-bold text-amber-400">{stats?.tracking?.semester?.duha_prayers || 0}</p>
+                <p className="text-slate-400 text-[10px] md:text-xs">الضحى</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-pink-500/20">
+                <p className="text-lg md:text-xl font-bold text-pink-400">{stats?.tracking?.semester?.family_recitation || 0}</p>
+                <p className="text-slate-400 text-[10px] md:text-xs">التسميع</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-purple-500/20">
+                <p className="text-lg md:text-xl font-bold text-purple-400">{stats?.tracking?.semester?.study_hours || 0}</p>
+                <p className="text-slate-400 text-[10px] md:text-xs">الدراسة</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-indigo-500/20">
+                <p className="text-lg md:text-xl font-bold text-indigo-400">{stats?.tracking?.semester?.witr || 0}</p>
+                <p className="text-slate-400 text-[10px] md:text-xs">الوتر</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-yellow-500/20">
+                <p className="text-lg md:text-xl font-bold text-yellow-400">{stats?.tracking?.semester?.night_prayer || 0}</p>
+                <p className="text-slate-400 text-[10px] md:text-xs">قيام الليل</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-cyan-500/20">
+                <p className="text-lg md:text-xl font-bold text-cyan-400">{stats?.tracking?.semester?.fasting || 0}</p>
+                <p className="text-slate-400 text-[10px] md:text-xs">الصيام</p>
+              </div>
             </div>
-            <div className="p-4 rounded-xl bg-blue-500/10 text-center">
-              <Sunrise className="w-8 h-8 mx-auto text-blue-400 mb-2" />
-              <p className="text-2xl font-bold text-white">{stats?.tracking?.total_sunnah || 0}</p>
-              <p className="text-blue-400 text-xs">السنن الرواتب</p>
-            </div>
-            <div className="p-4 rounded-xl bg-indigo-500/10 text-center">
-              <Moon className="w-8 h-8 mx-auto text-indigo-400 mb-2" />
-              <p className="text-2xl font-bold text-white">{stats?.tracking?.total_witr || 0}</p>
-              <p className="text-indigo-400 text-xs">صلاة الوتر</p>
-            </div>
-            
-            <div className="p-4 rounded-xl bg-pink-500/10 text-center">
-              <Users className="w-8 h-8 mx-auto text-pink-400 mb-2" />
-              <p className="text-2xl font-bold text-white">{stats?.tracking?.total_family_recitation || 0}</p>
-              <p className="text-pink-400 text-xs">التسميع للأهل</p>
+            <div className="mt-3 flex justify-between items-center text-sm">
+              <span className="text-slate-400">عدد الأسابيع: {stats?.tracking?.semester?.weeks_count || 0}</span>
+              <div>
+                <span className="text-slate-400">إجمالي النقاط: </span>
+                <span className="text-xl font-bold text-amber-400">{stats?.tracking?.semester?.total_points || 0}</span>
+              </div>
             </div>
           </div>
         </CardContent>
