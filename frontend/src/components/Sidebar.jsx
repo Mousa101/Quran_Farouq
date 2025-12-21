@@ -130,7 +130,7 @@ const Sidebar = () => {
   const navItems = getNavItems();
 
   const SidebarContent = ({ isMobile = false }) => (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col h-full">
       {/* Logo */}
       <div className={`p-4 md:p-6 border-b flex-shrink-0 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
         <div className="flex items-center gap-3">
@@ -156,8 +156,8 @@ const Sidebar = () => {
         </div>
       </div>
 
-      {/* Navigation - Scrollable with padding for bottom buttons */}
-      <nav className="flex-1 p-2 md:p-4 space-y-1 md:space-y-2 overflow-y-auto pb-28">
+      {/* Navigation - Scrollable */}
+      <nav className="flex-1 p-2 md:p-4 space-y-1 md:space-y-2 overflow-y-auto min-h-0">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -178,8 +178,8 @@ const Sidebar = () => {
         ))}
       </nav>
 
-      {/* Theme Toggle & Logout - Fixed at absolute bottom */}
-      <div className={`absolute bottom-12 left-0 right-0 p-3 md:p-4 border-t ${isDark ? 'border-white/10 bg-slate-900' : 'border-slate-200 bg-white'} space-y-2`}>
+      {/* Theme Toggle & Logout - Fixed at bottom */}
+      <div className={`flex-shrink-0 p-3 md:p-4 border-t ${isDark ? 'border-white/10 bg-slate-900' : 'border-slate-200 bg-white'} space-y-2 ${isMobile ? 'mb-10' : ''}`}>
         {/* Theme Toggle */}
         <Button
           onClick={toggleTheme}
@@ -208,7 +208,7 @@ const Sidebar = () => {
         <Button
           onClick={handleLogout}
           variant="ghost"
-          className="w-full justify-start gap-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 text-sm md:text-base mb-12"
+          className="w-full justify-start gap-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 text-sm md:text-base"
           data-testid="logout-btn"
         >
           <LogOut className="w-5 h-5" />
