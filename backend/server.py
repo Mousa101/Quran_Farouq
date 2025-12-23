@@ -1614,6 +1614,63 @@ async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict 
         elif attendance_count >= 30:
             await award_badge(attendance_data.student_id, "month_streak")
     
+    # ========== إنذار تلقائي عند تجاوز 3 أيام غياب بدون عذر ==========
+    elif attendance_data.status == "absent" and not attendance_data.excuse_reason:
+        # حساب عدد أيام الغياب بدون عذر
+        unexcused_absences = await db.attendance.count_documents({
+            "student_id": attendance_data.student_id,
+            "status": "absent",
+            "$or": [
+                {"excuse_reason": None},
+                {"excuse_reason": ""},
+                {"excuse_reason": {"$exists": False}}
+            ]
+        })
+        
+        # إذا تجاوز 3 أيام غياب بدون عذر، إنشاء إنذار تلقائي
+        if unexcused_absences >= 3:
+            # التحقق من عدم وجود إنذار سابق لنفس السبب في نفس الشهر
+            current_month_start = datetime.now(timezone.utc).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            existing_warning = await db.warnings.find_one({
+                "student_id": attendance_data.student_id,
+                "type": "غياب",
+                "created_at": {"$gte": current_month_start.isoformat()}
+            })
+            
+            if not existing_warning:
+                # إنشاء إنذار جديد
+                warning_doc = {
+                    "id": str(uuid.uuid4()),
+                    "student_id": attendance_data.student_id,
+                    "sheikh_id": current_user["user_id"],
+                    "type": "غياب",
+                    "message": f"تم تجاوز الحد المسموح من الغياب بدون عذر ({unexcused_absences} أيام)",
+                    "date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    "severity": "high" if unexcused_absences >= 5 else "medium",
+                    "auto_generated": True,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }
+                await db.warnings.insert_one(warning_doc)
+                
+                # إرسال إشعار للطالب
+                await create_notification_internal(
+                    attendance_data.student_id,
+                    "⚠️ إنذار غياب",
+                    f"لقد تجاوزت الحد المسموح من الغياب بدون عذر ({unexcused_absences} أيام). يرجى الالتزام بالحضور.",
+                    "warning"
+                )
+                
+                # إرسال إشعار لولي الأمر (إذا كان هناك رقم هاتف)
+                if student.get("father_phone") or student.get("mother_phone"):
+                    logger.info(f"إنذار غياب تلقائي للطالب {student.get('name')} - {unexcused_absences} أيام غياب")
+                
+                return {
+                    "message": "تم تسجيل الغياب مع إصدار إنذار تلقائي",
+                    "attendance_id": attendance.id,
+                    "warning_issued": True,
+                    "unexcused_absences": unexcused_absences
+                }
+    
     return {"message": "تم تسجيل الحضور بنجاح", "attendance_id": attendance.id}
 
 @api_router.get("/attendance")
