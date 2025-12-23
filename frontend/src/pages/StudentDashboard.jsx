@@ -154,12 +154,7 @@ const StudentDashboard = () => {
                 )}
               </div>
               <div className="flex flex-wrap gap-1 md:gap-2 mt-1 md:mt-2">
-                {stats?.student?.tajweed_level && (
-                  <Badge className={`${getTajweedBadgeColor(stats.student.tajweed_level)} text-[10px] md:text-xs`}>
-                    <Star className="w-2.5 h-2.5 md:w-3 md:h-3 ml-1" />
-                    {stats.student.tajweed_level}
-                  </Badge>
-                )}
+                
                 {studentAge && (
                   <Badge className="bg-blue-500/20 text-blue-400 text-[10px] md:text-xs">
                     <Cake className="w-2.5 h-2.5 md:w-3 md:h-3 ml-1" />
@@ -333,22 +328,6 @@ const StudentDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-3 md:space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-400 text-sm md:text-base">إجمالي الصفحات المحفوظة</span>
-                <span className="text-xl md:text-2xl font-bold text-emerald-400">
-                  {stats?.memorization?.total_memorized || 0} صفحة
-                </span>
-              </div>
-              <Progress 
-                value={stats?.memorization?.percentage || 0} 
-                className="h-4 bg-slate-700"
-              />
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">
-                  {stats?.memorization?.percentage || 0}% من القرآن
-                </span>
-                <span className="text-slate-500">604 صفحة</span>
-              </div>
               
               {/* تقسيم الحفظ إلى صفحات وأجزاء */}
               <div className="grid grid-cols-2 gap-3 mt-4">
@@ -378,6 +357,23 @@ const StudentDashboard = () => {
                   </div>
                 </div>
               )}
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400 text-sm md:text-base">إجمالي الصفحات المحفوظة</span>
+                <span className="text-xl md:text-2xl font-bold text-emerald-400">
+                  {stats?.memorization?.total_memorized || 0} صفحة
+                </span>
+              </div>
+              <Progress 
+                value={stats?.memorization?.percentage || 0} 
+                className="h-4 bg-slate-700"
+              />
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500">
+                  {stats?.memorization?.percentage || 0}% من القرآن
+                </span>
+                <span className="text-slate-500">604 صفحة</span>
+              </div>
+              
             </div>
           </CardContent>
         </Card>
