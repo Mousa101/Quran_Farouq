@@ -1058,28 +1058,43 @@ async def create_tracking_sheet(sheet_data: TrackingSheetCreate, current_user: d
     if current_user["role"] != "sheikh":
         raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه رفع ورقة المتابعة")
     
-    # If image provided, analyze it
+    # If image provided, analyze it using AI to count checkmarks
     if sheet_data.image_base64:
         analysis_result = await analyze_tracking_sheet(sheet_data.image_base64)
+        logger.info(f"تحليل صورة ورقة المتابعة: {analysis_result}")
     else:
         analysis_result = {
             "prayers_count": 0,
-            "adhkar_count": 0,
             "quran_sitting_days": 0,
-            "sunnah_prayers_days": 0,
+            "duha_prayers": 0,
+            "family_recitation": 0,
+            "study_hours": 0,
             "witr_prayers_days": 0,
-            "quran_sitting_minutes": 0,
-            "family_recitation_count": 0
+            "night_prayer": 0,
+            "fasting": 0
         }
     
     # Calculate points using new system
     points_breakdown = calculate_tracking_points(analysis_result)
     
+    # Create sheet data with new fields
+    sheet_data_obj = TrackingSheetData(
+        prayers_count=analysis_result.get("prayers_count", 0),
+        quran_sitting_days=analysis_result.get("quran_sitting_days", 0),
+        duha_prayers=analysis_result.get("duha_prayers", 0),
+        family_recitation=analysis_result.get("family_recitation", 0),
+        study_hours=analysis_result.get("study_hours", 0),
+        witr_prayers_days=analysis_result.get("witr_prayers_days", 0),
+        night_prayer=analysis_result.get("night_prayer", 0),
+        fasting=analysis_result.get("fasting", 0),
+        notes=analysis_result.get("notes", "")
+    )
+    
     sheet = TrackingSheet(
         student_id=sheet_data.student_id,
         sheikh_id=current_user["user_id"],
         week_start=sheet_data.week_start,
-        data=TrackingSheetData(**analysis_result),
+        data=sheet_data_obj,
         points_earned=points_breakdown["total_points"]
     )
     
@@ -1092,7 +1107,7 @@ async def create_tracking_sheet(sheet_data: TrackingSheetCreate, current_user: d
     await create_notification_internal(
         sheet_data.student_id,
         "ورقة متابعة جديدة",
-        f"تم رفع ورقة المتابعة للأسبوع {sheet_data.week_start}",
+        f"تم رفع ورقة المتابعة للأسبوع {sheet_data.week_start} - حصلت على {points_breakdown['total_points']} نقطة",
         "info"
     )
     
