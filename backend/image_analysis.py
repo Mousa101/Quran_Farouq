@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import base64
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -8,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 async def analyze_tracking_sheet(image_base64: str) -> dict:
     """
-    Analyze tracking sheet image using Gemini 2.5 Flash
-    Returns extracted data for tracking sheet
+    تحليل صورة ورقة المتابعة باستخدام Gemini 2.5 Flash
+    يقوم بعدّ علامات الصح ✓ في كل خانة
     """
     try:
         from emergentintegrations.llm.chat import LlmChat
@@ -23,67 +24,115 @@ async def analyze_tracking_sheet(image_base64: str) -> dict:
             api_key=api_key,
             session_id=f"tracking-sheet-{os.urandom(4).hex()}",
             system_message="""أنت مساعد متخصص في قراءة وتحليل أوراق متابعة حفظ القرآن الكريم.
-            مهمتك هي استخراج البيانات التالية من الصورة:
-            1. عدد الصلوات المؤداة خلال الأسبوع (prayers_count) - الحد الأقصى 35
-            2. عدد أيام الأذكار بعد الصلاة (adhkar_count) - الحد الأقصى 7
-            3. عدد أيام الجلوس مع القرآن (quran_sitting_days) - الحد الأقصى 7
-            4. عدد أيام صلاة السنن الرواتب (sunnah_prayers_days) - الحد الأقصى 7
-            5. عدد أيام صلاة الوتر (witr_prayers_days) - الحد الأقصى 7
-            
-            أرجع البيانات بصيغة JSON فقط بدون أي نص إضافي.
-            مثال: {"prayers_count": 30, "adhkar_count": 5, "quran_sitting_days": 6, "sunnah_prayers_days": 4, "witr_prayers_days": 7}
-            
-            إذا لم تتمكن من قراءة قيمة معينة، ضع 0 كقيمة افتراضية."""
+
+مهمتك هي عدّ علامات الصح (✓ أو ✔ أو √) الموجودة في الصورة لكل فئة من الفئات التالية:
+
+1. الصلوات (prayers_count): عدد علامات الصح في خانة الصلوات - الحد الأقصى 35 (5 صلوات × 7 أيام)
+2. الجلوس مع القرآن (quran_sitting_days): عدد علامات الصح - الحد الأقصى 7
+3. صلاة الضحى (duha_prayers): عدد علامات الصح - الحد الأقصى 7
+4. التسميع للأهل (family_recitation): عدد علامات الصح - الحد الأقصى 7
+5. ساعات الدراسة (study_hours): عدد علامات الصح - الحد الأقصى 7
+6. الوتر (witr_prayers_days): عدد علامات الصح - الحد الأقصى 7
+7. قيام الليل (night_prayer): عدد علامات الصح - الحد الأقصى 1
+8. الصيام (fasting): عدد علامات الصح - الحد الأقصى 1
+
+قم بعدّ كل علامة صح تراها في الصورة لكل فئة.
+
+أرجع البيانات بصيغة JSON فقط بدون أي نص إضافي.
+مثال: 
+{
+  "prayers_count": 28,
+  "quran_sitting_days": 5,
+  "duha_prayers": 4,
+  "family_recitation": 6,
+  "study_hours": 5,
+  "witr_prayers_days": 7,
+  "night_prayer": 1,
+  "fasting": 0
+}
+
+إذا لم تتمكن من قراءة قيمة معينة أو لم تجد علامات صح، ضع 0 كقيمة افتراضية."""
         ).with_model("gemini", "gemini-2.5-flash")
         
-        # Send image with text using the correct method
-        prompt = f"""قم بتحليل ورقة المتابعة هذه واستخرج البيانات المطلوبة.
+        # Create message with image
+        prompt = """قم بتحليل هذه الصورة لورقة المتابعة الإيمانية.
         
-        الصورة (base64): {image_base64[:100]}...
-        
-        أرجع النتيجة بصيغة JSON فقط."""
-        
-        response = await chat.send_message(prompt)
+اعدّ جميع علامات الصح (✓) الموجودة في كل فئة:
+- الصلوات (35 خانة كحد أقصى)
+- الجلوس مع القرآن (7 خانات)
+- صلاة الضحى (7 خانات)
+- التسميع للأهل (7 خانات)
+- ساعات الدراسة (7 خانات)
+- الوتر (7 خانات)
+- قيام الليل (خانة واحدة)
+- الصيام (خانة واحدة)
+
+أرجع النتيجة بصيغة JSON فقط."""
+
+        # Use send_message_with_image for proper image analysis
+        response = await chat.send_message_with_image(
+            message=prompt,
+            image_base64=image_base64
+        )
         
         # Parse JSON response
         try:
             clean_response = response.strip()
-            if clean_response.startswith("```"):
-                clean_response = clean_response.split("```")[1]
-                if clean_response.startswith("json"):
-                    clean_response = clean_response[4:]
-            clean_response = clean_response.strip()
+            # Remove markdown code blocks if present
+            if "```" in clean_response:
+                parts = clean_response.split("```")
+                for part in parts:
+                    if part.strip().startswith("json"):
+                        clean_response = part.strip()[4:].strip()
+                        break
+                    elif part.strip().startswith("{"):
+                        clean_response = part.strip()
+                        break
+            
+            # Find JSON object
+            start_idx = clean_response.find("{")
+            end_idx = clean_response.rfind("}") + 1
+            if start_idx != -1 and end_idx > start_idx:
+                clean_response = clean_response[start_idx:end_idx]
             
             data = json.loads(clean_response)
-            return {
+            
+            result = {
                 "prayers_count": min(int(data.get("prayers_count", 0)), 35),
-                "adhkar_count": min(int(data.get("adhkar_count", 0)), 7),
                 "quran_sitting_days": min(int(data.get("quran_sitting_days", 0)), 7),
-                "sunnah_prayers_days": min(int(data.get("sunnah_prayers_days", 0)), 7),
+                "duha_prayers": min(int(data.get("duha_prayers", 0)), 7),
+                "family_recitation": min(int(data.get("family_recitation", 0)), 7),
+                "study_hours": min(int(data.get("study_hours", 0)), 7),
                 "witr_prayers_days": min(int(data.get("witr_prayers_days", 0)), 7),
-                "quran_sitting_minutes": 0,
-                "family_recitation_count": 0
+                "night_prayer": min(int(data.get("night_prayer", 0)), 1),
+                "fasting": min(int(data.get("fasting", 0)), 1)
             }
-        except json.JSONDecodeError:
-            logger.error(f"Failed to parse JSON response: {response}")
+            
+            logger.info(f"تم تحليل ورقة المتابعة بنجاح: {result}")
+            return result
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"فشل في تحليل JSON: {response[:200]}... Error: {e}")
             return get_default_response("تعذر تحليل الصورة - يرجى استخدام الإدخال اليدوي")
             
     except ImportError:
         logger.error("emergentintegrations not installed")
         return get_default_response("مكتبة التحليل غير مثبتة - يرجى استخدام الإدخال اليدوي")
     except Exception as e:
-        logger.error(f"Error analyzing image: {str(e)}")
-        return get_default_response(f"خطأ في التحليل - يرجى استخدام الإدخال اليدوي")
+        logger.error(f"خطأ في تحليل الصورة: {str(e)}")
+        return get_default_response(f"خطأ في التحليل: {str(e)[:50]} - يرجى استخدام الإدخال اليدوي")
+
 
 def get_default_response(notes: str = "") -> dict:
-    """Return default empty response"""
+    """إرجاع استجابة فارغة افتراضية"""
     return {
         "prayers_count": 0,
-        "adhkar_count": 0,
         "quran_sitting_days": 0,
-        "sunnah_prayers_days": 0,
+        "duha_prayers": 0,
+        "family_recitation": 0,
+        "study_hours": 0,
         "witr_prayers_days": 0,
-        "quran_sitting_minutes": 0,
-        "family_recitation_count": 0,
+        "night_prayer": 0,
+        "fasting": 0,
         "notes": notes
     }
