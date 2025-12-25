@@ -28,6 +28,7 @@ import {
   BookText,
   Award,
   Menu,
+  FileQuestion,
   X
 } from 'lucide-react';
 import { Button } from './ui/button';
