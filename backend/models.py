@@ -577,3 +577,65 @@ QURAN_JUZ = [
     "الجزء الحادي والعشرون", "الجزء الثاني والعشرون", "الجزء الثالث والعشرون", "الجزء الرابع والعشرون", "الجزء الخامس والعشرون",
     "الجزء السادس والعشرون", "الجزء السابع والعشرون", "الجزء الثامن والعشرون", "الجزء التاسع والعشرون", "الجزء الثلاثون (جزء عم)"
 ]
+
+# ============== ONLINE EXAMS (امتحانات إلكترونية) ==============
+
+class ExamQuestion(BaseModel):
+    """سؤال في الامتحان الإلكتروني"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    question_text: str  # نص السؤال
+    options: List[str]  # الخيارات (4 خيارات)
+    correct_answer: int  # فهرس الإجابة الصحيحة (0-3)
+    points: int = 1  # نقاط السؤال
+
+class OnlineExamCreate(BaseModel):
+    """إنشاء امتحان إلكتروني جديد"""
+    title: str  # عنوان الامتحان
+    description: Optional[str] = None  # وصف الامتحان
+    category: str = "general"  # تصنيف: quran, tajweed, general, islamic
+    target_groups: List[str] = []  # المجموعات المستهدفة (فارغ = الكل)
+    questions: List[ExamQuestion]  # أسئلة الامتحان
+    duration_minutes: int = 30  # مدة الامتحان بالدقائق
+    passing_score: int = 60  # درجة النجاح %
+    start_date: Optional[str] = None  # تاريخ بداية الامتحان
+    end_date: Optional[str] = None  # تاريخ نهاية الامتحان
+    is_active: bool = True  # هل الامتحان فعال
+
+class OnlineExam(BaseModel):
+    """الامتحان الإلكتروني"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    title: str
+    description: Optional[str] = None
+    category: str = "general"
+    target_groups: List[str] = []
+    questions: List[dict]  # أسئلة الامتحان (بدون الإجابات الصحيحة للطالب)
+    questions_with_answers: List[dict]  # أسئلة مع الإجابات (للمعلم)
+    duration_minutes: int = 30
+    passing_score: int = 60
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    is_active: bool = True
+    total_points: int = 0
+    created_by: str  # معرف المنشئ (شيخ/مدير)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ExamSubmissionCreate(BaseModel):
+    """تقديم إجابات الامتحان"""
+    exam_id: str
+    answers: List[int]  # قائمة فهارس الإجابات المختارة
+
+class ExamSubmission(BaseModel):
+    """نتيجة تقديم الامتحان"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    exam_id: str
+    student_id: str
+    answers: List[int]
+    correct_count: int = 0
+    total_questions: int = 0
+    score: int = 0  # النسبة المئوية
+    points_earned: int = 0
+    passed: bool = False
+    time_taken_minutes: int = 0
+    submitted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
