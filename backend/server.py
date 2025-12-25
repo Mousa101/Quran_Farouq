@@ -3936,6 +3936,270 @@ async def delete_tajweed_exam(exam_id: str, current_user: dict = Depends(get_cur
     
     return {"message": "تم حذف الامتحان بنجاح"}
 
+# ============== ONLINE EXAMS (امتحانات إلكترونية) ==============
+
+@api_router.post("/online-exams")
+async def create_online_exam(data: OnlineExamCreate, current_user: dict = Depends(get_current_user)):
+    """إنشاء امتحان إلكتروني جديد (للمعلم/المدير)"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك بإنشاء امتحانات")
+    
+    if len(data.questions) == 0:
+        raise HTTPException(status_code=400, detail="يجب إضافة سؤال واحد على الأقل")
+    
+    # حساب إجمالي النقاط
+    total_points = sum(q.points for q in data.questions)
+    
+    # إنشاء نسخة من الأسئلة بدون الإجابات الصحيحة (للطلاب)
+    questions_for_students = [
+        {
+            "id": q.id,
+            "question_text": q.question_text,
+            "options": q.options,
+            "points": q.points
+        }
+        for q in data.questions
+    ]
+    
+    # إنشاء نسخة كاملة من الأسئلة (للمعلمين)
+    questions_with_answers = [q.model_dump() for q in data.questions]
+    
+    exam = OnlineExam(
+        title=data.title,
+        description=data.description,
+        category=data.category,
+        target_groups=data.target_groups,
+        questions=questions_for_students,
+        questions_with_answers=questions_with_answers,
+        duration_minutes=data.duration_minutes,
+        passing_score=data.passing_score,
+        start_date=data.start_date,
+        end_date=data.end_date,
+        is_active=data.is_active,
+        total_points=total_points,
+        created_by=current_user["user_id"]
+    )
+    
+    exam_dict = exam.model_dump()
+    exam_dict["created_at"] = exam_dict["created_at"].isoformat()
+    
+    await db.online_exams.insert_one(exam_dict)
+    
+    return {
+        "message": "تم إنشاء الامتحان بنجاح",
+        "exam_id": exam.id,
+        "total_questions": len(data.questions),
+        "total_points": total_points
+    }
+
+@api_router.get("/online-exams")
+async def get_online_exams(current_user: dict = Depends(get_current_user)):
+    """الحصول على قائمة الامتحانات الإلكترونية"""
+    query = {}
+    
+    if current_user["role"] == "student":
+        # للطلاب: الامتحانات الفعالة فقط
+        query["is_active"] = True
+        # يمكن تصفية حسب المجموعة لاحقاً
+    
+    exams = await db.online_exams.find(query, {"_id": 0, "questions_with_answers": 0}).sort("created_at", -1).to_list(100)
+    
+    # إضافة معلومات إضافية
+    for exam in exams:
+        # الحصول على اسم المنشئ
+        creator = await db.users.find_one({"id": exam.get("created_by")}, {"_id": 0, "name": 1})
+        exam["creator_name"] = creator["name"] if creator else "غير معروف"
+        
+        # التحقق إذا كان الطالب قد أكمل الامتحان
+        if current_user["role"] == "student":
+            submission = await db.exam_submissions.find_one({
+                "exam_id": exam["id"],
+                "student_id": current_user["user_id"]
+            }, {"_id": 0})
+            exam["completed"] = submission is not None
+            exam["my_score"] = submission.get("score") if submission else None
+            exam["passed"] = submission.get("passed") if submission else None
+    
+    return exams
+
+@api_router.get("/online-exams/{exam_id}")
+async def get_online_exam(exam_id: str, current_user: dict = Depends(get_current_user)):
+    """الحصول على تفاصيل امتحان معين"""
+    exam = await db.online_exams.find_one({"id": exam_id}, {"_id": 0})
+    
+    if not exam:
+        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+    
+    # للطلاب: إخفاء الإجابات الصحيحة
+    if current_user["role"] == "student":
+        exam.pop("questions_with_answers", None)
+        
+        # التحقق إذا كان قد أكمل الامتحان
+        submission = await db.exam_submissions.find_one({
+            "exam_id": exam_id,
+            "student_id": current_user["user_id"]
+        }, {"_id": 0})
+        
+        if submission:
+            exam["already_submitted"] = True
+            exam["my_submission"] = submission
+    else:
+        # للمعلمين: إظهار الإجابات الصحيحة
+        exam["questions"] = exam.get("questions_with_answers", exam.get("questions"))
+    
+    return exam
+
+@api_router.post("/online-exams/{exam_id}/submit")
+async def submit_online_exam(exam_id: str, data: ExamSubmissionCreate, current_user: dict = Depends(get_current_user)):
+    """تقديم إجابات الامتحان (للطالب)"""
+    if current_user["role"] != "student":
+        raise HTTPException(status_code=403, detail="فقط الطلاب يمكنهم تقديم الامتحانات")
+    
+    # التحقق من وجود الامتحان
+    exam = await db.online_exams.find_one({"id": exam_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+    
+    # التحقق من عدم تقديم الامتحان سابقاً
+    existing = await db.exam_submissions.find_one({
+        "exam_id": exam_id,
+        "student_id": current_user["user_id"]
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="لقد قدمت هذا الامتحان سابقاً")
+    
+    # حساب النتيجة
+    questions = exam.get("questions_with_answers", [])
+    correct_count = 0
+    points_earned = 0
+    total_questions = len(questions)
+    
+    for i, q in enumerate(questions):
+        if i < len(data.answers):
+            if data.answers[i] == q.get("correct_answer"):
+                correct_count += 1
+                points_earned += q.get("points", 1)
+    
+    # حساب النسبة المئوية
+    total_points = exam.get("total_points", total_questions)
+    score = int((points_earned / total_points) * 100) if total_points > 0 else 0
+    passed = score >= exam.get("passing_score", 60)
+    
+    # إنشاء سجل التقديم
+    submission = ExamSubmission(
+        exam_id=exam_id,
+        student_id=current_user["user_id"],
+        answers=data.answers,
+        correct_count=correct_count,
+        total_questions=total_questions,
+        score=score,
+        points_earned=points_earned,
+        passed=passed
+    )
+    
+    submission_dict = submission.model_dump()
+    submission_dict["submitted_at"] = submission_dict["submitted_at"].isoformat()
+    
+    await db.exam_submissions.insert_one(submission_dict)
+    
+    # منح نقاط للطالب
+    await add_points(
+        current_user["user_id"],
+        points_earned,
+        "online_exam",
+        f"امتحان: {exam.get('title')} - الدرجة: {score}%"
+    )
+    
+    # إرسال إشعار
+    result_text = "ناجح ✅" if passed else "راسب ❌"
+    await create_notification_internal(
+        current_user["user_id"],
+        f"نتيجة الامتحان: {exam.get('title')}",
+        f"النتيجة: {result_text} - الدرجة: {score}% - الإجابات الصحيحة: {correct_count}/{total_questions}",
+        "success" if passed else "warning"
+    )
+    
+    return {
+        "message": "تم تقديم الامتحان بنجاح",
+        "score": score,
+        "correct_count": correct_count,
+        "total_questions": total_questions,
+        "points_earned": points_earned,
+        "passed": passed,
+        "passing_score": exam.get("passing_score", 60)
+    }
+
+@api_router.get("/online-exams/{exam_id}/results")
+async def get_exam_results(exam_id: str, current_user: dict = Depends(get_current_user)):
+    """الحصول على نتائج الامتحان (للمعلم/المدير)"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    # التحقق من وجود الامتحان
+    exam = await db.online_exams.find_one({"id": exam_id}, {"_id": 0})
+    if not exam:
+        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+    
+    # الحصول على جميع التقديمات
+    submissions = await db.exam_submissions.find({"exam_id": exam_id}, {"_id": 0}).to_list(1000)
+    
+    # إضافة أسماء الطلاب
+    for sub in submissions:
+        student = await db.users.find_one({"id": sub["student_id"]}, {"_id": 0, "name": 1})
+        sub["student_name"] = student["name"] if student else "غير معروف"
+    
+    # حساب الإحصائيات
+    total_submissions = len(submissions)
+    passed_count = sum(1 for s in submissions if s.get("passed"))
+    avg_score = sum(s.get("score", 0) for s in submissions) / max(total_submissions, 1)
+    
+    return {
+        "exam": {
+            "id": exam["id"],
+            "title": exam.get("title"),
+            "total_questions": len(exam.get("questions", [])),
+            "passing_score": exam.get("passing_score", 60)
+        },
+        "statistics": {
+            "total_submissions": total_submissions,
+            "passed_count": passed_count,
+            "failed_count": total_submissions - passed_count,
+            "pass_rate": int((passed_count / max(total_submissions, 1)) * 100),
+            "average_score": round(avg_score, 1)
+        },
+        "submissions": sorted(submissions, key=lambda x: x.get("score", 0), reverse=True)
+    }
+
+@api_router.delete("/online-exams/{exam_id}")
+async def delete_online_exam(exam_id: str, current_user: dict = Depends(get_current_user)):
+    """حذف امتحان إلكتروني"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    result = await db.online_exams.delete_one({"id": exam_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+    
+    # حذف جميع التقديمات المرتبطة
+    await db.exam_submissions.delete_many({"exam_id": exam_id})
+    
+    return {"message": "تم حذف الامتحان بنجاح"}
+
+@api_router.put("/online-exams/{exam_id}/toggle-active")
+async def toggle_exam_active(exam_id: str, current_user: dict = Depends(get_current_user)):
+    """تفعيل/إلغاء تفعيل امتحان"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    exam = await db.online_exams.find_one({"id": exam_id})
+    if not exam:
+        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+    
+    new_status = not exam.get("is_active", True)
+    await db.online_exams.update_one({"id": exam_id}, {"$set": {"is_active": new_status}})
+    
+    return {"message": f"تم {'تفعيل' if new_status else 'إلغاء تفعيل'} الامتحان", "is_active": new_status}
+
 @api_router.post("/curriculum/{curriculum_id}/upload-pdf")
 async def upload_curriculum_pdf(curriculum_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     """Upload PDF file for curriculum (Admin only)"""
