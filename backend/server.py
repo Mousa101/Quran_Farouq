@@ -27,7 +27,8 @@ from models import (
     FeeCreate, Fee,
     HomeworkCreate, Homework, HomeworkSubmission,
     AdminExamCreate, AdminExam,
-    TajweedExamCreate, TajweedExam
+    TajweedExamCreate, TajweedExam,
+    OnlineExamCreate, OnlineExam, ExamSubmissionCreate, ExamSubmission, ExamQuestion
 )
 
 class BaseModel(PydanticBaseModel):
