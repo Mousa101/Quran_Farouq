@@ -412,6 +412,17 @@ function AppRoutes() {
         }
       />
 
+      <Route
+        path="/online-exams"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <OnlineExams />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Default Route */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
