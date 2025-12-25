@@ -89,6 +89,7 @@ const Sidebar = () => {
         { to: '/fees', icon: DollarSign, label: 'الرسوم المالية' },
         { to: '/homework', icon: BookText, label: 'الواجبات' },
         { to: '/exams', icon: Award, label: 'الامتحانات' },
+        { to: '/online-exams', icon: FileQuestion, label: 'امتحانات إلكترونية' },
         { to: '/curriculum', icon: BookMarked, label: 'إدارة المنهج' },
         { to: '/schedule', icon: CalendarDays, label: 'إدارة الجداول' },
         { to: '/activities', icon: Calendar, label: 'الأنشطة' },
@@ -107,6 +108,7 @@ const Sidebar = () => {
         { to: '/attendance', icon: UserCheck, label: 'الحضور' },
         { to: '/homework', icon: BookText, label: 'الواجبات' },
         { to: '/exams', icon: Award, label: 'الامتحانات' },
+        { to: '/online-exams', icon: FileQuestion, label: 'امتحانات إلكترونية' },
         { to: '/sheikh-rankings', icon: TrendingUp, label: 'ترتيب طلابي' },
         { to: '/curriculum', icon: BookMarked, label: 'عرض المنهج' },
         { to: '/schedule', icon: CalendarDays, label: 'الجدول الدراسي' },
@@ -123,6 +125,7 @@ const Sidebar = () => {
       { to: '/fees', icon: DollarSign, label: 'المستحقات المالية' },
       { to: '/homework', icon: BookText, label: 'واجباتي' },
       { to: '/exams', icon: Award, label: 'امتحاناتي' },
+      { to: '/online-exams', icon: FileQuestion, label: 'امتحانات إلكترونية' },
       { to: '/edit-profile', icon: UserCog, label: 'تعديل بياناتي' },
       { to: '/notifications', icon: Bell, label: 'الإشعارات' },
     ];
