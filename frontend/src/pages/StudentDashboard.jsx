@@ -23,6 +23,19 @@ const StudentDashboard = () => {
   const [groupInfo, setGroupInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showMorePersonal, setShowMorePersonal] = useState(false);
+  const [trackingDialogOpen, setTrackingDialogOpen] = useState(false);
+  const [submittingTracking, setSubmittingTracking] = useState(false);
+  const [trackingForm, setTrackingForm] = useState({
+    prayers_count: 0,
+    quran_sitting_days: 0,
+    duha_prayers: 0,
+    family_recitation: 0,
+    study_hours: 0,
+    witr_prayers_days: 0,
+    night_prayer: 0,
+    fasting: 0,
+    notes: ''
+  });
 
   const fetchData = async () => {
     if (!user?.id) return;
