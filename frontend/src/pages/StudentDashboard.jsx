@@ -5,12 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Progress } from '../components/ui/progress';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { CircularGauge } from '../components/ui/circular-gauge';
+import { toast } from 'sonner';
 import { 
   BookOpen, Clock, Users, Trophy, Calendar, CheckCircle, 
   User, Phone, School, Home, Star, AlertTriangle, Award,
   Sunrise, Moon, BookMarked, Hand, Mail, Cake, MapPin, GraduationCap,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, Plus, Edit2
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
