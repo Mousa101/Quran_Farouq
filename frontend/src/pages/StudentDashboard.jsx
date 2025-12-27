@@ -20,6 +20,7 @@ const StudentDashboard = () => {
   const [rankings, setRankings] = useState({ scores: [] });
   const [groupInfo, setGroupInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showMorePersonal, setShowMorePersonal] = useState(false);
 
   const fetchData = async () => {
     if (!user?.id) return;
