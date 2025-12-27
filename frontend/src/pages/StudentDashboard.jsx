@@ -624,10 +624,20 @@ const StudentDashboard = () => {
       {/* ورقة المتابعة الإيمانية - الأسبوعية والفصلية */}
       <Card className="glass-card border-white/10">
         <CardHeader className="pb-2 md:pb-3">
-          <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
-            <Hand className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
-            ورقة المتابعة الإيمانية
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+              <Hand className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
+              ورقة المتابعة الإيمانية
+            </CardTitle>
+            <Button
+              onClick={() => setTrackingDialogOpen(true)}
+              size="sm"
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              <Edit2 className="w-4 h-4 ml-1" />
+              تعبئة الورقة
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {/* القيم الأسبوعية */}
