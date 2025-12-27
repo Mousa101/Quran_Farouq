@@ -410,19 +410,30 @@ const StudentDashboard = () => {
           <CardContent>
             <div className="space-y-3 md:space-y-4">
               
-              {/* تقسيم الحفظ إلى صفحات وأجزاء */}
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 text-center">
-                  <BookOpen className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
-                  <p className="text-2xl font-bold text-white">{stats?.memorization?.total_previous || 0}</p>
-                  <p className="text-emerald-400 text-sm">صفحة محفوظة</p>
+              {/* تقسيم الحفظ: القديم + الجديد */}
+              <div className="grid grid-cols-3 gap-3 mt-4">
+                {/* الحفظ القديم */}
+                <div className="p-3 md:p-4 rounded-xl bg-gradient-to-br from-slate-500/10 to-slate-500/5 border border-slate-500/20 text-center">
+                  <BookMarked className="w-6 h-6 md:w-8 md:h-8 mx-auto text-slate-400 mb-2" />
+                  <p className="text-xl md:text-2xl font-bold text-white">{stats?.memorization?.total_previous || 0}</p>
+                  <p className="text-slate-400 text-xs md:text-sm">الحفظ السابق</p>
+                  <p className="text-slate-500 text-[10px]">{stats?.memorization?.previous_juz?.length || 0} جزء</p>
                 </div>
-                <div className="p-4 rounded-xl bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20 text-center">
-                  <BookMarked className="w-8 h-8 mx-auto text-blue-400 mb-2" />
-                  <p className="text-2xl font-bold text-white">
-                    {stats?.memorization?.previous_juz?.length || Math.floor((stats?.memorization?.total_memorized || 0) / 20)}
-                  </p>
-                  <p className="text-blue-400 text-sm">جزء محفوظ</p>
+                
+                {/* الحفظ الجديد */}
+                <div className="p-3 md:p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 text-center">
+                  <BookOpen className="w-6 h-6 md:w-8 md:h-8 mx-auto text-emerald-400 mb-2" />
+                  <p className="text-xl md:text-2xl font-bold text-emerald-400">+{stats?.memorization?.new_pages || 0}</p>
+                  <p className="text-emerald-400 text-xs md:text-sm">الحفظ الجديد</p>
+                  <p className="text-emerald-500 text-[10px]">في المركز</p>
+                </div>
+                
+                {/* المجموع الكلي */}
+                <div className="p-3 md:p-4 rounded-xl bg-gradient-to-br from-amber-500/10 to-amber-500/5 border border-amber-500/20 text-center">
+                  <Trophy className="w-6 h-6 md:w-8 md:h-8 mx-auto text-amber-400 mb-2" />
+                  <p className="text-xl md:text-2xl font-bold text-amber-400">{stats?.memorization?.total_memorized || 0}</p>
+                  <p className="text-amber-400 text-xs md:text-sm">المجموع الكلي</p>
+                  <p className="text-amber-500 text-[10px]">{Math.floor((stats?.memorization?.total_memorized || 0) / 20)} جزء</p>
                 </div>
               </div>
               
@@ -438,6 +449,7 @@ const StudentDashboard = () => {
                   </div>
                 </div>
               )}
+              
               <div className="flex items-center justify-between">
                 <span className="text-slate-400 text-sm md:text-base">إجمالي الصفحات المحفوظة</span>
                 <span className="text-xl md:text-2xl font-bold text-emerald-400">
