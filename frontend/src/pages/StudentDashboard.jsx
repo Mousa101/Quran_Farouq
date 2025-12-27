@@ -135,6 +135,55 @@ const StudentDashboard = () => {
     });
   };
 
+  // تقديم ورقة المتابعة من حساب الطالب
+  const handleSubmitTracking = async () => {
+    setSubmittingTracking(true);
+    try {
+      // الحصول على تاريخ بداية الأسبوع الحالي (الأحد)
+      const today = new Date();
+      const sunday = new Date(today);
+      sunday.setDate(today.getDate() - today.getDay());
+      const week_start = sunday.toISOString().split('T')[0];
+      
+      await axios.post(`${API}/tracking-sheets/student`, {
+        week_start,
+        ...trackingForm
+      });
+      
+      toast.success('تم حفظ ورقة المتابعة بنجاح');
+      setTrackingDialogOpen(false);
+      fetchData(); // إعادة تحميل البيانات
+      
+      // إعادة تعيين النموذج
+      setTrackingForm({
+        prayers_count: 0,
+        quran_sitting_days: 0,
+        duha_prayers: 0,
+        family_recitation: 0,
+        study_hours: 0,
+        witr_prayers_days: 0,
+        night_prayer: 0,
+        fasting: 0,
+        notes: ''
+      });
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في حفظ ورقة المتابعة');
+    } finally {
+      setSubmittingTracking(false);
+    }
+  };
+
+  const calculateTrackingPoints = () => {
+    return Math.min(trackingForm.prayers_count, 35) +
+           Math.min(trackingForm.quran_sitting_days, 7) +
+           Math.min(trackingForm.duha_prayers, 7) +
+           Math.min(trackingForm.family_recitation, 7) +
+           Math.min(trackingForm.study_hours, 7) +
+           Math.min(trackingForm.witr_prayers_days, 7) +
+           Math.min(trackingForm.night_prayer, 1) +
+           Math.min(trackingForm.fasting, 1);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
