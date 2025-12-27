@@ -808,6 +808,176 @@ const StudentDashboard = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Dialog تعبئة ورقة المتابعة */}
+      <Dialog open={trackingDialogOpen} onOpenChange={setTrackingDialogOpen}>
+        <DialogContent className="bg-slate-900 border-white/10 max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white">تعبئة ورقة المتابعة الأسبوعية</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              {/* الصلوات */}
+              <div>
+                <Label className="text-slate-300 flex items-center gap-2">
+                  <Hand className="w-4 h-4 text-emerald-400" />
+                  الصلوات (من 35)
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="35"
+                  value={trackingForm.prayers_count}
+                  onChange={(e) => setTrackingForm({ ...trackingForm, prayers_count: parseInt(e.target.value) || 0 })}
+                  className="bg-slate-800 border-white/10 text-white"
+                />
+              </div>
+              
+              {/* الجلوس مع القرآن */}
+              <div>
+                <Label className="text-slate-300 flex items-center gap-2">
+                  <BookMarked className="w-4 h-4 text-blue-400" />
+                  القرآن (من 7)
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="7"
+                  value={trackingForm.quran_sitting_days}
+                  onChange={(e) => setTrackingForm({ ...trackingForm, quran_sitting_days: parseInt(e.target.value) || 0 })}
+                  className="bg-slate-800 border-white/10 text-white"
+                />
+              </div>
+
+              {/* صلاة الضحى */}
+              <div>
+                <Label className="text-slate-300 flex items-center gap-2">
+                  <Sunrise className="w-4 h-4 text-amber-400" />
+                  الضحى (من 7)
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="7"
+                  value={trackingForm.duha_prayers}
+                  onChange={(e) => setTrackingForm({ ...trackingForm, duha_prayers: parseInt(e.target.value) || 0 })}
+                  className="bg-slate-800 border-white/10 text-white"
+                />
+              </div>
+
+              {/* التسميع للأهل */}
+              <div>
+                <Label className="text-slate-300 flex items-center gap-2">
+                  <Users className="w-4 h-4 text-pink-400" />
+                  التسميع (من 7)
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="7"
+                  value={trackingForm.family_recitation}
+                  onChange={(e) => setTrackingForm({ ...trackingForm, family_recitation: parseInt(e.target.value) || 0 })}
+                  className="bg-slate-800 border-white/10 text-white"
+                />
+              </div>
+
+              {/* ساعات الدراسة */}
+              <div>
+                <Label className="text-slate-300 flex items-center gap-2">
+                  <GraduationCap className="w-4 h-4 text-purple-400" />
+                  الدراسة (من 7)
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="7"
+                  value={trackingForm.study_hours}
+                  onChange={(e) => setTrackingForm({ ...trackingForm, study_hours: parseInt(e.target.value) || 0 })}
+                  className="bg-slate-800 border-white/10 text-white"
+                />
+              </div>
+
+              {/* الوتر */}
+              <div>
+                <Label className="text-slate-300 flex items-center gap-2">
+                  <Moon className="w-4 h-4 text-indigo-400" />
+                  الوتر (من 7)
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="7"
+                  value={trackingForm.witr_prayers_days}
+                  onChange={(e) => setTrackingForm({ ...trackingForm, witr_prayers_days: parseInt(e.target.value) || 0 })}
+                  className="bg-slate-800 border-white/10 text-white"
+                />
+              </div>
+
+              {/* قيام الليل */}
+              <div>
+                <Label className="text-slate-300 flex items-center gap-2">
+                  <Star className="w-4 h-4 text-yellow-400" />
+                  قيام الليل (من 1)
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="1"
+                  value={trackingForm.night_prayer}
+                  onChange={(e) => setTrackingForm({ ...trackingForm, night_prayer: parseInt(e.target.value) || 0 })}
+                  className="bg-slate-800 border-white/10 text-white"
+                />
+              </div>
+
+              {/* الصيام */}
+              <div>
+                <Label className="text-slate-300 flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-cyan-400" />
+                  الصيام (من 1)
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="1"
+                  value={trackingForm.fasting}
+                  onChange={(e) => setTrackingForm({ ...trackingForm, fasting: parseInt(e.target.value) || 0 })}
+                  className="bg-slate-800 border-white/10 text-white"
+                />
+              </div>
+            </div>
+
+            {/* ملاحظات */}
+            <div>
+              <Label className="text-slate-300">ملاحظات (اختياري)</Label>
+              <Textarea
+                value={trackingForm.notes}
+                onChange={(e) => setTrackingForm({ ...trackingForm, notes: e.target.value })}
+                placeholder="أي ملاحظات إضافية..."
+                className="bg-slate-800 border-white/10 text-white"
+              />
+            </div>
+
+            {/* معاينة النقاط */}
+            <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30 text-center">
+              <p className="text-slate-300">النقاط المتوقعة</p>
+              <p className="text-3xl font-bold text-purple-400">{calculateTrackingPoints()} نقطة</p>
+              <p className="text-xs text-slate-500">من أصل 72 نقطة</p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTrackingDialogOpen(false)}>إلغاء</Button>
+            <Button 
+              onClick={handleSubmitTracking} 
+              disabled={submittingTracking}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {submittingTracking ? 'جاري الحفظ...' : 'حفظ ورقة المتابعة'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
