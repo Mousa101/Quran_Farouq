@@ -533,6 +533,46 @@ const StudentManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Key className="w-5 h-5 text-purple-400" />
+              تغيير كلمة المرور
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <p className="text-slate-300">
+              تغيير كلمة مرور الطالب <span className="text-purple-400 font-bold">{selectedStudent?.name}</span>
+            </p>
+            <p className="text-slate-500 text-sm">{selectedStudent?.email}</p>
+            
+            <div className="space-y-2">
+              <Label className="text-slate-300">كلمة المرور الجديدة</Label>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="bg-slate-800 border-slate-700 text-white"
+                placeholder="أدخل كلمة المرور الجديدة (6 أحرف على الأقل)"
+                dir="ltr"
+              />
+            </div>
+          </div>
+          <DialogFooter className="mt-6">
+            <Button variant="ghost" onClick={() => setPasswordDialogOpen(false)}>إلغاء</Button>
+            <Button 
+              className="bg-purple-500 hover:bg-purple-600" 
+              onClick={handleChangePassword} 
+              disabled={submitting || newPassword.length < 6}
+            >
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'تغيير كلمة المرور'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
