@@ -177,10 +177,6 @@ const StudentManagement = () => {
       setSubmitting(false);
     }
   };
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   const getGroupName = (groupId) => {
     const group = groups.find(g => g.id === groupId);
