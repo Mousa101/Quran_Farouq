@@ -115,7 +115,7 @@ def test_retesting_endpoints():
     
     # Test POST /api/curriculum
     curriculum_data = {
-        "title": "منهج حفظ القرآن الكريم",
+        "name": "منهج حفظ القرآن الكريم",
         "description": "منهج شامل لحفظ القرآن الكريم",
         "type": "manual"
     }
