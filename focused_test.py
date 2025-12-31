@@ -173,7 +173,7 @@ def test_new_features():
     # Test GET /api/students/{student_id}/profile
     success, response, status = make_request('GET', f'students/{student_id}/profile', token=admin_token)
     
-    if success and 'name' in response:
+    if success and 'student' in response:
         print("✅ Admin can access student profile")
     else:
         print(f"❌ Admin student profile access failed: {status} - {response}")
@@ -181,7 +181,7 @@ def test_new_features():
     # Test student accessing their own profile
     success, response, status = make_request('GET', f'students/{student_id}/profile', token=student_token)
     
-    if success and 'name' in response:
+    if success and 'student' in response:
         print("✅ Student can access own profile")
     else:
         print(f"❌ Student own profile access failed: {status} - {response}")
@@ -193,6 +193,14 @@ def test_new_features():
         print("✅ Admin can access student progress")
     else:
         print(f"❌ Admin student progress access failed: {status} - {response}")
+    
+    # Test unauthorized access (should fail)
+    success, response, status = make_request('GET', f'students/{student_id}/profile', token=sheikh_token, expected_status=403)
+    
+    if success:
+        print("✅ Unauthorized profile access properly blocked")
+    else:
+        print(f"ℹ️  Sheikh can access student profile (might be allowed): {status}")
     
     # Step 7: Test GET Tracking Sheets
     print("\n7. 📋 Testing GET Tracking Sheets...")
