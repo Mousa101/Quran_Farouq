@@ -75,6 +75,29 @@ const SheikhManagement = () => {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (!passwordTarget || !newPassword) return;
+    if (newPassword.length < 6) {
+      toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+      return;
+    }
+    setPasswordSubmitting(true);
+    try {
+      await axios.post(`${API}/admin/reset-password`, {
+        email: passwordTarget.email,
+        new_password: newPassword
+      });
+      toast.success('تم تغيير كلمة المرور بنجاح');
+      setShowPasswordModal(false);
+      setPasswordTarget(null);
+      setNewPassword('');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في تغيير كلمة المرور');
+    } finally {
+      setPasswordSubmitting(false);
+    }
+  };
+
   const filteredSheikhs = sheikhs.filter(s => 
     s.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.email?.toLowerCase().includes(searchQuery.toLowerCase())
