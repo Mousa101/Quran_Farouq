@@ -9,9 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { 
   BookOpen, Users, Search, Eye, Trash2, Phone, Mail, 
   Calendar, Award, GraduationCap, AlertTriangle, X,
-  Briefcase, MapPin, Star, UserCheck, FileText
+  Briefcase, MapPin, Star, UserCheck, FileText, Key
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
