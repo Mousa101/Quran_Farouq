@@ -229,13 +229,34 @@ const StudentProfile = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Personal Info */}
         <Card className="glass-card border-white/10">
-          <CardHeader>
-            <CardTitle className="text-lg text-white flex items-center gap-2">
-              <User className="w-5 h-5 text-emerald-400" />
-              المعلومات الشخصية
-            </CardTitle>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg text-white flex items-center gap-2">
+                <User className="w-5 h-5 text-emerald-400" />
+                المعلومات الشخصية
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAllPersonalInfo(!showAllPersonalInfo)}
+                className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+              >
+                {showAllPersonalInfo ? (
+                  <>
+                    <ChevronUp className="w-4 h-4 ml-1" />
+                    إخفاء
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="w-4 h-4 ml-1" />
+                    إظهار المزيد
+                  </>
+                )}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
+            {/* Always visible info */}
             <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50">
               <Calendar className="w-4 h-4 text-slate-400" />
               <div>
@@ -250,40 +271,46 @@ const StudentProfile = () => {
                 <p className="text-white text-sm">{student.mosque_name || '-'}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50">
-              <School className="w-4 h-4 text-slate-400" />
-              <div>
-                <p className="text-xs text-slate-400">المدرسة / الصف</p>
-                <p className="text-white text-sm">{student.school_name || '-'} {student.school_grade ? `(${student.school_grade})` : ''}</p>
-                {student.school_average && (
-                  <p className="text-emerald-400 text-xs mt-1">المعدل: {student.school_average}</p>
-                )}
-              </div>
-            </div>
-            
-            {/* Phone Numbers */}
-            {(student.student_phone || student.father_phone || student.mother_phone) && (
-              <div className="pt-2 border-t border-slate-700">
-                <p className="text-xs text-slate-400 flex items-center gap-1 mb-2">
-                  <Phone className="w-3 h-3" /> أرقام الهواتف
-                </p>
-                {student.student_phone && (
-                  <p className="text-white text-sm">الطالب: <span dir="ltr">{student.student_phone}</span></p>
-                )}
-                {student.father_phone && (
-                  <p className="text-white text-sm">الأب: <span dir="ltr">{student.father_phone}</span></p>
-                )}
-                {student.mother_phone && (
-                  <p className="text-white text-sm">الأم: <span dir="ltr">{student.mother_phone}</span></p>
-                )}
-              </div>
-            )}
 
-            {student.registration_date && (
-              <div className="pt-2 border-t border-slate-700">
-                <p className="text-xs text-slate-400">تاريخ التسجيل في المركز</p>
-                <p className="text-emerald-400 text-sm">{formatDate(student.registration_date)}</p>
-              </div>
+            {/* Expandable info */}
+            {showAllPersonalInfo && (
+              <>
+                <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50">
+                  <School className="w-4 h-4 text-slate-400" />
+                  <div>
+                    <p className="text-xs text-slate-400">المدرسة / الصف</p>
+                    <p className="text-white text-sm">{student.school_name || '-'} {student.school_grade ? `(${student.school_grade})` : ''}</p>
+                    {student.school_average && (
+                      <p className="text-emerald-400 text-xs mt-1">المعدل: {student.school_average}</p>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Phone Numbers */}
+                {(student.student_phone || student.father_phone || student.mother_phone) && (
+                  <div className="pt-2 border-t border-slate-700">
+                    <p className="text-xs text-slate-400 flex items-center gap-1 mb-2">
+                      <Phone className="w-3 h-3" /> أرقام الهواتف
+                    </p>
+                    {student.student_phone && (
+                      <p className="text-white text-sm">الطالب: <span dir="ltr">{student.student_phone}</span></p>
+                    )}
+                    {student.father_phone && (
+                      <p className="text-white text-sm">الأب: <span dir="ltr">{student.father_phone}</span></p>
+                    )}
+                    {student.mother_phone && (
+                      <p className="text-white text-sm">الأم: <span dir="ltr">{student.mother_phone}</span></p>
+                    )}
+                  </div>
+                )}
+
+                {student.registration_date && (
+                  <div className="pt-2 border-t border-slate-700">
+                    <p className="text-xs text-slate-400">تاريخ التسجيل في المركز</p>
+                    <p className="text-emerald-400 text-sm">{formatDate(student.registration_date)}</p>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
