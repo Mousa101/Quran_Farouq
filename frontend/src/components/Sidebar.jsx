@@ -122,6 +122,7 @@ const Sidebar = () => {
       ...baseItems,
       { to: '/my-progress', icon: Trophy, label: 'تقدمي' },
       { to: '/my-points', icon: Star, label: 'نقاطي' },
+      { to: '/student-tracking', icon: FileText, label: 'ورق المتابعة' },
       { to: '/fees', icon: DollarSign, label: 'المستحقات المالية' },
       { to: '/homework', icon: BookText, label: 'واجباتي' },
       { to: '/exams', icon: Award, label: 'امتحاناتي' },
