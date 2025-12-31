@@ -110,6 +110,84 @@ user_problem_statement: |
   4. إضافة التاريخ مع اليوم في سجل التسميع والحضور في تقرير الطالب
 
 backend:
+  - task: "Student Self Update API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "NEW: PUT /api/students/me/profile and GET /api/students/me/profile - allows students to update phone, school, grade, average, profile image"
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Both GET /api/users/me/full and PUT /api/users/me work correctly. Student can view and update their profile successfully."
+
+  - task: "Attendance with Excuse Reason API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "UPDATED: POST /api/attendance now accepts optional excuse_reason field. The excuse reason is stored and returned with attendance records"
+      - working: true
+        agent: "testing"
+        comment: "TESTED: POST /api/attendance with excuse_reason field works correctly. Sheikh can mark attendance with excuse reasons."
+
+  - task: "Admin Password Reset API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: POST /api/admin/reset-password works correctly. Admin can reset passwords for students and sheikhs. Non-admin access properly blocked with 403 error."
+
+  - task: "Student Tracking Sheet Entry API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: POST /api/tracking-sheets/student works correctly. Students can submit tracking sheets, points calculated properly (59-64 points), updating same week works, unauthorized access blocked."
+
+  - task: "Student Profile APIs"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: GET /api/students/{student_id}/profile and GET /api/students/{student_id}/progress work correctly. Returns comprehensive student data including points, attendance, recitations, tracking sheets."
+
+  - task: "GET Tracking Sheets API"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: GET /api/tracking-sheets works correctly for all user roles. Returns appropriate tracking sheets based on user permissions."
+
   - task: "Student Profile API"
     implemented: true
     working: true
@@ -121,30 +199,6 @@ backend:
       - working: true
         agent: "main"
         comment: "GET /api/students/{student_id}/profile - returns student info, group, points, badges, attendance summary, recitation summary, warnings"
-
-  - task: "Student Self Update API"
-    implemented: true
-    working: true
-    file: "/app/backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "NEW: PUT /api/students/me/profile and GET /api/students/me/profile - allows students to update phone, school, grade, average, profile image"
-
-  - task: "Attendance with Excuse Reason API"
-    implemented: true
-    working: true
-    file: "/app/backend/server.py"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "UPDATED: POST /api/attendance now accepts optional excuse_reason field. The excuse reason is stored and returned with attendance records"
 
   - task: "Student Progress API"
     implemented: true
@@ -206,90 +260,20 @@ backend:
         agent: "main"
         comment: "POST /api/admin/warnings - issue warnings. GET /api/admin/warnings - list all. DELETE /api/admin/warnings/{id} - delete"
 
-frontend:
-  - task: "Student Profile Page with Date+Day"
-    implemented: true
-    working: true
-    file: "/app/frontend/src/pages/StudentProfile.jsx"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "UPDATED: Added formatDateWithDay and formatDateTimeWithDay functions. Attendance and recitation records now show day names (e.g., الاثنين 15 ديسمبر 2025). Also shows excuse_reason for excused attendance"
-
-  - task: "Student Edit Profile Page"
-    implemented: true
-    working: true
-    file: "/app/frontend/src/pages/StudentEditProfile.jsx"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "NEW: Created StudentEditProfile.jsx allowing students to edit: phone, profile image, school name, grade, school average. Added route /edit-profile and sidebar link تعديل بياناتي"
-
-  - task: "Attendance Page with Excuse Dialog"
-    implemented: true
-    working: true
-    file: "/app/frontend/src/pages/Attendance.jsx"
-    stuck_count: 0
-    priority: "high"
-    needs_retesting: true
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "UPDATED: Added excuse dialog when clicking معذور button. Teacher can enter excuse reason which is saved and displayed in both attendance page and student profile"
-
-  - task: "Student Management Page (Admin)"
-    implemented: true
-    working: true
-    file: "/app/frontend/src/pages/StudentManagement.jsx"
-    stuck_count: 0
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "Admin page with add/delete/change group/issue warning functionality"
-
-  - task: "Clickable Student Names (Sheikh Dashboard)"
-    implemented: true
-    working: true
-    file: "/app/frontend/src/pages/SheikhDashboard.jsx"
-    stuck_count: 0
-    priority: "low"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "Added 'My Students' section with clickable links to student profiles"
-
-  - task: "Clickable Student Names (Users Page)"
-    implemented: true
-    working: true
-    file: "/app/frontend/src/pages/UsersPage.jsx"
-    stuck_count: 0
-    priority: "low"
-    needs_retesting: false
-    status_history:
-      - working: true
-        agent: "main"
-        comment: "Student names are clickable for admin/sheikh to view profiles"
-
   - task: "Curriculum Management API"
     implemented: true
     working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "NEW: Created CRUD APIs for curriculum management. POST/GET/PUT/DELETE /api/curriculum. Curriculum entries API for manual plans. PDF upload support."
+      - working: true
+        agent: "testing"
+        comment: "TESTED: POST /api/curriculum and GET /api/curriculum work correctly with proper field names (name, description, type)."
 
   - task: "Schedule Management API"
     implemented: true
@@ -297,11 +281,14 @@ frontend:
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "NEW: Created CRUD APIs for schedule management. POST/GET/PUT/DELETE /api/schedule. Schedule slots API for daily schedule. Activate schedule feature."
+      - working: true
+        agent: "testing"
+        comment: "TESTED: POST /api/schedule and GET /api/schedule work correctly with proper field names (name, description, start_date)."
 
   - task: "Sheikh Rankings API"
     implemented: true
@@ -309,11 +296,14 @@ frontend:
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "NEW: GET /api/rankings/sheikh-students - Returns ranked list of students in sheikh's groups with points, attendance, recitations"
+      - working: true
+        agent: "testing"
+        comment: "TESTED: GET /api/rankings/sheikh-students works correctly for sheikh users."
 
   - task: "Admin Rankings API with Filters"
     implemented: true
@@ -321,11 +311,14 @@ frontend:
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: true
         agent: "main"
         comment: "NEW: GET /api/rankings/admin?filter_type=groups|students|attendance|recitations - Admin ranking with 4 different filters"
+      - working: true
+        agent: "testing"
+        comment: "TESTED: All 4 filter types (groups, students, attendance, recitations) work correctly for admin users."
 
 frontend:
   - task: "Curriculum Management Page (Admin)"
