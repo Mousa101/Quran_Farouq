@@ -140,9 +140,9 @@ def test_retesting_endpoints():
     
     # Test POST /api/schedule
     schedule_data = {
-        "title": "جدول الحصص الأسبوعي",
+        "name": "جدول الحصص الأسبوعي",
         "description": "جدول حصص حفظ القرآن",
-        "is_active": True
+        "start_date": "2025-01-01"
     }
     
     success, response, status = make_request('POST', 'schedule', schedule_data, token=admin_token)
