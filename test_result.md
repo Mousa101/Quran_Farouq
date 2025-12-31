@@ -456,10 +456,9 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Curriculum Management (Admin + Sheikh View)"
-    - "Schedule Management (Admin + Sheikh View)"
-    - "Sheikh Rankings Page"
-    - "Admin Rankings with Filters"
+    - "Password Change for Student/Sheikh by Admin"
+    - "Student Profile Partial Info with Show More Button"
+    - "Student Tracking Sheet Entry"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -467,67 +466,41 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
-      Implemented Sheikh and Admin new features as requested:
+      ## تحديثات جديدة مطلوبة من المستخدم:
       
-      ## Backend APIs Created:
-      1. Curriculum Management:
-         - POST /api/curriculum - Create curriculum
-         - GET /api/curriculum - List all curricula
-         - GET /api/curriculum/{id} - Get curriculum with entries
-         - PUT /api/curriculum/{id} - Update curriculum
-         - DELETE /api/curriculum/{id} - Delete curriculum
-         - POST /api/curriculum/{id}/entries - Add entry (manual plan)
-         - PUT /api/curriculum/entries/{id} - Update entry
-         - DELETE /api/curriculum/entries/{id} - Delete entry
-         - POST /api/curriculum/{id}/upload-pdf - Upload PDF file
+      ### 1. تغيير كلمة المرور للطالب/المعلم (عند المدير) ✅
+      - أضفت زر Key (🔑) في StudentManagement.jsx
+      - أضفت زر Key (🔑) في SheikhManagement.jsx
+      - يستخدم API الموجود: POST /api/admin/reset-password
+      - نافذة حوار لإدخال كلمة المرور الجديدة
       
-      2. Schedule Management:
-         - POST /api/schedule - Create schedule
-         - GET /api/schedule - List all schedules
-         - GET /api/schedule/{id} - Get schedule with slots
-         - GET /api/schedule/active - Get active schedule
-         - PUT /api/schedule/{id} - Update schedule
-         - PUT /api/schedule/{id}/activate - Activate schedule
-         - DELETE /api/schedule/{id} - Delete schedule
-         - POST /api/schedule/{id}/slots - Add slot
-         - PUT /api/schedule/slots/{id} - Update slot
-         - DELETE /api/schedule/slots/{id} - Delete slot
+      ### 2. إظهار البيانات الشخصية جزئياً ✅
+      - تعديل StudentProfile.jsx
+      - يظهر فقط تاريخ الميلاد والمسجد افتراضياً
+      - زر "إظهار المزيد" يظهر باقي البيانات (المدرسة، الهواتف، تاريخ التسجيل)
       
-      3. Rankings:
-         - GET /api/rankings/sheikh-students - Sheikh's students ranking
-         - GET /api/rankings/admin?filter_type=groups|students|attendance|recitations
+      ### 3. ورق المتابعة للطالب ✅
+      - إنشاء صفحة جديدة: StudentTracking.jsx
+      - إضافة route: /student-tracking
+      - إضافة رابط في Sidebar للطالب
+      - الطالب يمكنه تعبئة ورق المتابعة من حسابه
+      - إذا كان هناك سجل سابق للأسبوع، يتم تحديثه
       
-      ## Frontend Pages Created:
-      1. CurriculumManagement.jsx - Admin creates/manages, Sheikh views
-      2. ScheduleManagement.jsx - Admin creates/manages, Sheikh views
-      3. SheikhRankings.jsx - Sheikh views ranked students
-      4. AdminRankings.jsx - Admin views rankings with 4 filters
-      
-      ## Sidebar Updated:
-      - Admin: الترتيب والإحصائيات, إدارة المنهج, إدارة الجداول
-      - Sheikh: ترتيب طلابي, عرض المنهج, الجدول الدراسي
+      ### الموجود مسبقاً:
+      - نظام الرسوم حسب الأشهر (مستحق/مدفوع/قائم) ✅
+      - ترتيب مفاصل القرآن (5,10,15,20,25,30) ✅
+      - الامتحانات في خانة واحدة (مفصل/تجويد/إلكتروني) ✅
       
       Test credentials:
       - Admin: test_admin@test.com / test123
       - Sheikh: test_sheikh@test.com / test123
+      - Student: test_student@test.com / test123
       
       Test scenarios:
-      1. Admin: Create curriculum → Add manual entries → Upload PDF
-      2. Admin: Create schedule → Add daily slots → Activate schedule
-      3. Admin: View rankings → Switch filters (groups/students/attendance/recitations)
-      4. Sheikh: View students ranking → Click student to see profile
-      5. Sheikh: View curriculum (read-only)
-      6. Sheikh: View schedule (read-only)
-      
-      1. تتبع التقدم (Progress Tracking) - VERIFIED:
-         - Student profile now shows combined progress (previous memorization + new recitations)
-         - Shows total pages, juz count, percentage of Quran
-         - Tajweed level displayed
-      
-      2. تعديل بيانات الطالب (Student Self Edit) - NEW:
-         - Created /app/frontend/src/pages/StudentEditProfile.jsx
-         - Added PUT/GET /api/students/me/profile endpoints
-         - Students can edit: phone, profile image, school, grade, average
+      1. Admin: إدارة الطلاب → اختر طالب → أيقونة المفتاح → تغيير كلمة المرور
+      2. Admin: إدارة المعلمين → اختر معلم → أيقونة المفتاح → تغيير كلمة المرور
+      3. Admin/Sheikh: عرض ملف طالب → المعلومات الشخصية → "إظهار المزيد"
+      4. Student: ورق المتابعة → تعبئة ورقة متابعة → حفظ
          - Added sidebar link "تعديل بياناتي"
       
       3. سبب العذر (Excuse Reason) - UPDATED:
