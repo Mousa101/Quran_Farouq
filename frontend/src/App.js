@@ -424,6 +424,17 @@ function AppRoutes() {
         }
       />
 
+      <Route
+        path="/student-tracking"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <StudentTracking />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Default Route */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
