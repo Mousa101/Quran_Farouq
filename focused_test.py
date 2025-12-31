@@ -85,9 +85,20 @@ def test_new_features():
     }, None, expected_status=401)
     
     if success:
-        print("✅ Unauthorized password reset properly blocked")
+        print("✅ Unauthorized password reset properly blocked (no token)")
     else:
         print(f"❌ Unauthorized access not properly blocked: {status}")
+        
+    # Test non-admin trying to reset password
+    success, response, status = make_request('POST', 'admin/reset-password', {
+        "email": "test_student@test.com",
+        "new_password": "hackpass"
+    }, student_token, expected_status=403)
+    
+    if success:
+        print("✅ Non-admin password reset properly blocked")
+    else:
+        print(f"❌ Non-admin access not properly blocked: {status}")
     
     # Step 3: Login as student with new password
     print("\n3. 👨‍🎓 Student Login...")
