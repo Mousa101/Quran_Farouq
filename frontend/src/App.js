@@ -36,6 +36,7 @@ import HomeworkManagement from './pages/HomeworkManagement';
 import ExamsManagement from './pages/ExamsManagement';
 import OnlineExams from './pages/OnlineExams';
 import SheikhManagement from './pages/SheikhManagement';
+import StudentTracking from './pages/StudentTracking';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
