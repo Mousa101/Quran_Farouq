@@ -188,6 +188,15 @@ const SheikhManagement = () => {
                 </Button>
                 <Button
                   size="sm"
+                  variant="outline"
+                  onClick={() => { setPasswordTarget(sheikh); setNewPassword(''); setShowPasswordModal(true); }}
+                  className={`text-xs ${isDark ? 'border-purple-500/50 text-purple-400 hover:bg-purple-500/10' : 'border-purple-500 text-purple-600'}`}
+                  title="تغيير كلمة المرور"
+                >
+                  <Key className="w-3 h-3" />
+                </Button>
+                <Button
+                  size="sm"
                   variant="destructive"
                   onClick={() => { setDeleteTarget(sheikh); setShowDeleteModal(true); }}
                   className="text-xs"
