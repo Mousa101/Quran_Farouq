@@ -401,6 +401,20 @@ const StudentManagement = () => {
                         <Button
                           size="sm"
                           variant="ghost"
+                          className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                          onClick={() => {
+                            setSelectedStudent(student);
+                            setNewPassword('');
+                            setPasswordDialogOpen(true);
+                          }}
+                          title="تغيير كلمة المرور"
+                        >
+                          <Key className="w-4 h-4" />
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                           onClick={() => {
                             setSelectedStudent(student);
