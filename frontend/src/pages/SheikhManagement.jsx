@@ -358,6 +358,48 @@ const SheikhManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Change Password Modal */}
+      <Dialog open={showPasswordModal} onOpenChange={setShowPasswordModal}>
+        <DialogContent className={isDark ? 'bg-slate-900 border-slate-700' : 'bg-white'}>
+          <DialogHeader>
+            <DialogTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <Key className="w-5 h-5 text-purple-400" />
+              تغيير كلمة المرور
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <p className={isDark ? 'text-slate-300' : 'text-slate-600'}>
+              تغيير كلمة مرور المعلم <span className="text-purple-400 font-bold">{passwordTarget?.name}</span>
+            </p>
+            <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{passwordTarget?.email}</p>
+            
+            <div className="space-y-2">
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>كلمة المرور الجديدة</Label>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''}
+                placeholder="أدخل كلمة المرور الجديدة (6 أحرف على الأقل)"
+                dir="ltr"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2 mt-6">
+            <Button variant="outline" onClick={() => setShowPasswordModal(false)}>
+              إلغاء
+            </Button>
+            <Button 
+              className="bg-purple-500 hover:bg-purple-600" 
+              onClick={handleChangePassword} 
+              disabled={passwordSubmitting || newPassword.length < 6}
+            >
+              {passwordSubmitting ? 'جاري التغيير...' : 'تغيير كلمة المرور'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
