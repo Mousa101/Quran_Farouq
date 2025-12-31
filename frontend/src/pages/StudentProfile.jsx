@@ -8,7 +8,8 @@ import { Badge } from '../components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   User, BookOpen, UserCheck, Star, Trophy, Calendar, ArrowRight,
-  CheckCircle, XCircle, Clock, FileText, AlertTriangle, School, Home, Phone, TrendingUp
+  CheckCircle, XCircle, Clock, FileText, AlertTriangle, School, Home, Phone, TrendingUp,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
@@ -23,6 +24,7 @@ const StudentProfile = () => {
   const [profileData, setProfileData] = useState(null);
   const [progressData, setProgressData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showAllPersonalInfo, setShowAllPersonalInfo] = useState(false);
 
   useEffect(() => {
     fetchData();
