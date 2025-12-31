@@ -75,13 +75,14 @@ class QuranAppAPITester:
                 self.log_test(f"Register {user_data['role']}", False, f"Status: {status}, Response: {response}")
 
     def test_user_login(self):
-        """Test user login"""
+        """Test user login with provided test credentials"""
         print("\n🔑 Testing User Login...")
         
+        # Use the provided test credentials from the review request
         login_data = [
-            {"email": "student@test.com", "password": "password123", "role": "student"},
-            {"email": "sheikh@test.com", "password": "password123", "role": "sheikh"},
-            {"email": "admin@test.com", "password": "password123", "role": "admin"}
+            {"email": "test_student@test.com", "password": "test123", "role": "student"},
+            {"email": "test_sheikh@test.com", "password": "test123", "role": "sheikh"},
+            {"email": "test_admin@test.com", "password": "test123", "role": "admin"}
         ]
 
         for login in login_data:
@@ -91,9 +92,10 @@ class QuranAppAPITester:
             if success and 'token' in response:
                 # Update tokens from login
                 self.tokens[login['role']] = response['token']
+                self.users[login['role']] = response['user']
                 self.log_test(f"Login {login['role']}", True)
             else:
-                self.log_test(f"Login {login['role']}", False, f"Status: {status}")
+                self.log_test(f"Login {login['role']}", False, f"Status: {status}, Response: {response}")
 
     def test_auth_me(self):
         """Test getting current user info"""
