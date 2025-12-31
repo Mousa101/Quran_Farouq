@@ -155,6 +155,33 @@ const StudentManagement = () => {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (!selectedStudent || !newPassword) return;
+    if (newPassword.length < 6) {
+      toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await axios.post(`${API}/admin/reset-password`, {
+        email: selectedStudent.email,
+        new_password: newPassword
+      });
+      toast.success('تم تغيير كلمة المرور بنجاح');
+      setPasswordDialogOpen(false);
+      setSelectedStudent(null);
+      setNewPassword('');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في تغيير كلمة المرور');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const getGroupName = (groupId) => {
     const group = groups.find(g => g.id === groupId);
     return group?.name || 'بدون مجموعة';
