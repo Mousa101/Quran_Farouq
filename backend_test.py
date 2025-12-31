@@ -78,7 +78,7 @@ class QuranAppAPITester:
         """Test user login with provided test credentials"""
         print("\n🔑 Testing User Login...")
         
-        # Use the provided test credentials from the review request
+        # Use the test credentials that we just created
         login_data = [
             {"email": "test_student@test.com", "password": "test123", "role": "student"},
             {"email": "test_sheikh@test.com", "password": "test123", "role": "sheikh"},
