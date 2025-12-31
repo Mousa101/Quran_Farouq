@@ -29,8 +29,10 @@ const StudentManagement = () => {
   const [warningDialogOpen, setWarningDialogOpen] = useState(false);
   const [changeGroupDialogOpen, setChangeGroupDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
 
   const [newStudentData, setNewStudentData] = useState({
     email: '',
