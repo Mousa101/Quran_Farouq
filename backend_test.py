@@ -487,6 +487,25 @@ class QuranAppAPITester:
         self.test_student_self_update()
         self.test_attendance_with_excuse()
 
+    def run_new_features_tests(self):
+        """Run tests for new features mentioned in review request"""
+        print("🚀 Starting New Features Backend API Tests...")
+        print(f"🌐 Testing against: {self.base_url}")
+        
+        try:
+            # Core authentication tests (required for other tests)
+            self.test_user_login()
+            self.test_auth_me()
+            
+            # New features tests
+            self.test_new_features_comprehensive()
+            
+        except Exception as e:
+            print(f"💥 Critical error during testing: {str(e)}")
+            return False
+
+        return True
+
     def run_all_tests(self):
         """Run all test suites"""
         print("🚀 Starting Quran App Backend API Tests...")
