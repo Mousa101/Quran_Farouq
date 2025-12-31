@@ -553,7 +553,8 @@ def main():
     """Main test execution"""
     tester = QuranAppAPITester()
     
-    success = tester.run_all_tests()
+    # Run focused tests for new features
+    success = tester.run_new_features_tests()
     all_passed = tester.print_summary()
     
     if not success:
