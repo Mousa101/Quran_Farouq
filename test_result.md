@@ -450,8 +450,8 @@ frontend:
 
 metadata:
   created_by: "main_agent"
-  version: "1.2"
-  test_sequence: 3
+  version: "1.3"
+  test_sequence: 4
   run_ui: true
 
 test_plan:
@@ -466,57 +466,41 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: |
-      ## تحديثات جديدة مطلوبة من المستخدم:
+      ## تحديثات جديدة تم تنفيذها:
       
-      ### 1. تغيير كلمة المرور للطالب/المعلم (عند المدير) ✅
+      ### 1. تغيير كلمة المرور للطالب/المعلم (عند المدير) ✅ NEW
       - أضفت زر Key (🔑) في StudentManagement.jsx
       - أضفت زر Key (🔑) في SheikhManagement.jsx
       - يستخدم API الموجود: POST /api/admin/reset-password
       - نافذة حوار لإدخال كلمة المرور الجديدة
       
-      ### 2. إظهار البيانات الشخصية جزئياً ✅
+      ### 2. إظهار البيانات الشخصية جزئياً ✅ NEW
       - تعديل StudentProfile.jsx
       - يظهر فقط تاريخ الميلاد والمسجد افتراضياً
       - زر "إظهار المزيد" يظهر باقي البيانات (المدرسة، الهواتف، تاريخ التسجيل)
       
-      ### 3. ورق المتابعة للطالب ✅
+      ### 3. ورق المتابعة للطالب ✅ NEW
       - إنشاء صفحة جديدة: StudentTracking.jsx
       - إضافة route: /student-tracking
       - إضافة رابط في Sidebar للطالب
       - الطالب يمكنه تعبئة ورق المتابعة من حسابه
       - إذا كان هناك سجل سابق للأسبوع، يتم تحديثه
       
-      ### الموجود مسبقاً:
+      ### الموجود مسبقاً (تم التحقق منه):
       - نظام الرسوم حسب الأشهر (مستحق/مدفوع/قائم) ✅
       - ترتيب مفاصل القرآن (5,10,15,20,25,30) ✅
       - الامتحانات في خانة واحدة (مفصل/تجويد/إلكتروني) ✅
       
-      Test credentials:
+      ### Test credentials:
       - Admin: test_admin@test.com / test123
       - Sheikh: test_sheikh@test.com / test123
       - Student: test_student@test.com / test123
       
-      Test scenarios:
-      1. Admin: إدارة الطلاب → اختر طالب → أيقونة المفتاح → تغيير كلمة المرور
-      2. Admin: إدارة المعلمين → اختر معلم → أيقونة المفتاح → تغيير كلمة المرور
+      ### Test scenarios:
+      1. Admin: إدارة الطلاب → اختر طالب → أيقونة المفتاح (🔑) → تغيير كلمة المرور
+      2. Admin: إدارة المعلمين → اختر معلم → أيقونة المفتاح (🔑) → تغيير كلمة المرور
       3. Admin/Sheikh: عرض ملف طالب → المعلومات الشخصية → "إظهار المزيد"
       4. Student: ورق المتابعة → تعبئة ورقة متابعة → حفظ
-         - Added sidebar link "تعديل بياناتي"
-      
-      3. سبب العذر (Excuse Reason) - UPDATED:
-         - Updated AttendanceCreate model with excuse_reason field
-         - Updated Attendance page with dialog for entering excuse reason
-         - Excuse reason displayed in student profile attendance tab
-      
-      4. التاريخ مع اليوم (Date with Day Name) - UPDATED:
-         - Updated StudentProfile.jsx with formatDateWithDay function
-         - Recitation records show: الاثنين 15 ديسمبر 2025 - 5:52 م
-         - Attendance records show: الجمعة 12 ديسمبر 2025
-      
-      Test credentials:
-      - Admin: test_admin@test.com / test123
-      - Sheikh: test_sheikh@test.com / test123
-      - Student: test_student@test.com / test123
       
       Test scenarios:
       1. Login as student → تعديل بياناتي → Edit phone/school/grade → Save
