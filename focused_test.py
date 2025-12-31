@@ -88,17 +88,6 @@ def test_new_features():
         print("✅ Unauthorized password reset properly blocked (no token)")
     else:
         print(f"❌ Unauthorized access not properly blocked: {status}")
-        
-    # Test non-admin trying to reset password
-    success, response, status = make_request('POST', 'admin/reset-password', {
-        "email": "test_student@test.com",
-        "new_password": "hackpass"
-    }, student_token, expected_status=403)
-    
-    if success:
-        print("✅ Non-admin password reset properly blocked")
-    else:
-        print(f"❌ Non-admin access not properly blocked: {status}")
     
     # Step 3: Login as student with new password
     print("\n3. 👨‍🎓 Student Login...")
@@ -114,6 +103,17 @@ def test_new_features():
     student_token = response['token']
     student_user = response['user']
     print(f"✅ Student logged in: {student_user['name']}")
+        
+    # Test non-admin trying to reset password
+    success, response, status = make_request('POST', 'admin/reset-password', {
+        "email": "test_student@test.com",
+        "new_password": "hackpass"
+    }, student_token, expected_status=403)
+    
+    if success:
+        print("✅ Non-admin password reset properly blocked")
+    else:
+        print(f"❌ Non-admin access not properly blocked: {status}")
     
     # Step 4: Login as sheikh with new password
     print("\n4. 👨‍🏫 Sheikh Login...")
