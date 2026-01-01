@@ -409,13 +409,13 @@ class QuranAppAPITester:
             # Students can view their own profile, admin/sheikh can view any profile
             expected_success = role in ['admin', 'sheikh'] or (role == 'student' and token == self.tokens['student'])
             
-            if expected_success and success and 'name' in response:
+            if expected_success and success and status == 200 and 'name' in response:
                 self.log_test(f"Get student profile - {role}", True)
             elif not expected_success and status == 403:
                 # Should be forbidden for other students
                 self.log_test(f"Get student profile unauthorized - {role}", True)
             else:
-                self.log_test(f"Get student profile - {role}", False, f"Status: {status}, Expected: {expected_success}")
+                self.log_test(f"Get student profile - {role}", False, f"Status: {status}, Success: {success}, Has name: {'name' in response if response else False}")
         
         # Test GET /api/students/{student_id}/progress
         for role, token in self.tokens.items():
