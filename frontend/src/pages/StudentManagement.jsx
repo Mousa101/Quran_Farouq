@@ -432,6 +432,20 @@ const StudentManagement = () => {
                         <Button
                           size="sm"
                           variant="ghost"
+                          className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                          onClick={() => {
+                            setSelectedStudent(student);
+                            setBonusReason('');
+                            setBonusDialogOpen(true);
+                          }}
+                          title="منح نقاط التميز (50 نقطة)"
+                        >
+                          <Award className="w-4 h-4" />
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
                           onClick={() => {
                             setSelectedStudent(student);
