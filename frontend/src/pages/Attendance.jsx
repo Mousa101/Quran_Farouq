@@ -125,12 +125,42 @@ const Attendance = () => {
   };
 
   const handleExcuseSubmit = async () => {
-    if (!selectedStudentForExcuse) return;
+    if (!selectedStudentForExcuse || !excuseReason.trim()) {
+      toast.error('يرجى إدخال سبب العذر');
+      return;
+    }
     
     await handleStatusChange(selectedStudentForExcuse.id, 'excused', excuseReason);
     setExcuseDialogOpen(false);
-    setSelectedStudentForExcuse(null);
     setExcuseReason('');
+    setSelectedStudentForExcuse(null);
+  };
+
+  // منح شارة التفاعل
+  const handleInteractionClick = (student) => {
+    setSelectedStudentForInteraction(student);
+    setInteractionNotes('');
+    setInteractionDialogOpen(true);
+  };
+
+  const handleInteractionSubmit = async () => {
+    if (!selectedStudentForInteraction) return;
+    
+    setSaving(true);
+    try {
+      await axios.post(`${API}/badges/interaction`, {
+        student_id: selectedStudentForInteraction.id,
+        notes: interactionNotes
+      });
+      toast.success(`تم منح شارة التفاعل و10 نقاط للطالب ${selectedStudentForInteraction.name}`);
+      setInteractionDialogOpen(false);
+      setInteractionNotes('');
+      setSelectedStudentForInteraction(null);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في منح شارة التفاعل');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getStatusIcon = (status) => {
