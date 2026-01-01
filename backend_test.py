@@ -475,13 +475,213 @@ class QuranAppAPITester:
                                                     token=self.tokens['sheikh'])
         self.log_test("Mark regular attendance", success, f"Status: {status}")
 
+    def test_new_tracking_sheet_system(self):
+        """Test new tracking sheet system with 100 points calculation"""
+        print("\n📋 Testing New Tracking Sheet System (100 points)...")
+        
+        if 'student' not in self.tokens:
+            self.log_test("New tracking sheet system", False, "Student token not available")
+            return
+            
+        # Calculate current week start (Saturday)
+        from datetime import timedelta
+        today = datetime.now()
+        # Saturday = 5 in Python (Monday = 0)
+        days_since_saturday = (today.weekday() + 2) % 7
+        saturday = today - timedelta(days=days_since_saturday)
+        week_start = saturday.strftime('%Y-%m-%d')
+        
+        # Test creating a new tracking sheet with new fields
+        tracking_data = {
+            "week_start": week_start,  # Must be Saturday (current week)
+            "prayers_count": 30,       # Max 35 points
+            "quran_sitting_days": 6,   # Max 7 points
+            "duha_prayers": 5,         # Max 7 points
+            "family_recitation": 6,    # Max 7 points
+            "study_hours": 5,          # Max 7 points
+            "witr_prayers_days": 7,    # Max 7 points
+            "sunnah_prayers": 6,       # NEW FIELD - Max 7 points
+            "night_prayer": 1,         # 1 = 8 points
+            "fasting": 1,              # 1 = 8 points
+            "notes": "test tracking sheet"
+        }
+        
+        success, response, status = self.make_request('POST', 'tracking-sheets/student', tracking_data, 
+                                                    token=self.tokens['student'])
+        
+        if success:
+            self.log_test("Create new tracking sheet (100 points system)", True)
+            # Expected points: 30+6+5+6+5+7+6+8+8 = 81 points
+            
+            # Test updating the same week (should update existing)
+            updated_tracking_data = {
+                "week_start": week_start,
+                "prayers_count": 35,       # Max out prayers
+                "quran_sitting_days": 7,   # Max out
+                "duha_prayers": 7,         # Max out
+                "family_recitation": 7,    # Max out
+                "study_hours": 7,          # Max out
+                "witr_prayers_days": 7,    # Max out
+                "sunnah_prayers": 7,       # Max out
+                "night_prayer": 1,         # 8 points
+                "fasting": 1,              # 8 points
+                "notes": "updated - maximum points"
+            }
+            
+            success, response, status = self.make_request('POST', 'tracking-sheets/student', updated_tracking_data, 
+                                                        token=self.tokens['student'])
+            self.log_test("Update tracking sheet (max 100 points)", success, f"Status: {status}")
+            
+        else:
+            self.log_test("Create new tracking sheet (100 points system)", False, f"Status: {status}, Response: {response}")
+        
+        # Test unauthorized access (non-student)
+        if 'sheikh' in self.tokens:
+            success, response, status = self.make_request('POST', 'tracking-sheets/student', tracking_data, 
+                                                        token=self.tokens['sheikh'], expected_status=403)
+            self.log_test("Unauthorized tracking sheet access (sheikh)", success, f"Status: {status}")
+
+    def test_sheikh_interaction_badge(self):
+        """Test sheikh granting interaction badge (+10 points)"""
+        print("\n⭐ Testing Sheikh Interaction Badge...")
+        
+        if 'sheikh' not in self.tokens or 'student' not in self.users:
+            self.log_test("Sheikh interaction badge", False, "Sheikh token or student not available")
+            return
+            
+        # Test granting interaction badge
+        interaction_data = {
+            "student_id": self.users['student']['id'],
+            "notes": "good participation in class discussion"
+        }
+        
+        success, response, status = self.make_request('POST', 'badges/interaction', interaction_data, 
+                                                    token=self.tokens['sheikh'])
+        
+        if success:
+            self.log_test("Grant interaction badge (sheikh)", True)
+            
+            # Test duplicate grant (should fail - once per week)
+            success, response, status = self.make_request('POST', 'badges/interaction', interaction_data, 
+                                                        token=self.tokens['sheikh'], expected_status=400)
+            self.log_test("Prevent duplicate interaction badge", success, f"Status: {status}")
+        else:
+            self.log_test("Grant interaction badge (sheikh)", False, f"Status: {status}, Response: {response}")
+        
+        # Test unauthorized access (non-sheikh)
+        if 'student' in self.tokens:
+            success, response, status = self.make_request('POST', 'badges/interaction', interaction_data, 
+                                                        token=self.tokens['student'], expected_status=403)
+            self.log_test("Unauthorized interaction badge (student)", success, f"Status: {status}")
+
+    def test_admin_bonus_points(self):
+        """Test admin granting bonus points (+50 points, once per week)"""
+        print("\n🏆 Testing Admin Bonus Points...")
+        
+        if 'admin' not in self.tokens or 'student' not in self.users:
+            self.log_test("Admin bonus points", False, "Admin token or student not available")
+            return
+            
+        # Test granting admin bonus
+        bonus_data = {
+            "student_id": self.users['student']['id'],
+            "reason": "excellent behavior and dedication"
+        }
+        
+        success, response, status = self.make_request('POST', 'badges/admin-bonus', bonus_data, 
+                                                    token=self.tokens['admin'])
+        
+        if success:
+            self.log_test("Grant admin bonus points", True)
+            
+            # Test duplicate grant (should fail - once per week)
+            success, response, status = self.make_request('POST', 'badges/admin-bonus', bonus_data, 
+                                                        token=self.tokens['admin'], expected_status=400)
+            self.log_test("Prevent duplicate admin bonus", success, f"Status: {status}")
+        else:
+            self.log_test("Grant admin bonus points", False, f"Status: {status}, Response: {response}")
+        
+        # Test unauthorized access (non-admin)
+        if 'sheikh' in self.tokens:
+            success, response, status = self.make_request('POST', 'badges/admin-bonus', bonus_data, 
+                                                        token=self.tokens['sheikh'], expected_status=403)
+            self.log_test("Unauthorized admin bonus (sheikh)", success, f"Status: {status}")
+
+    def test_student_badges_api(self):
+        """Test getting student badges"""
+        print("\n🏅 Testing Student Badges API...")
+        
+        if 'student' not in self.users:
+            self.log_test("Student badges API", False, "Student not available")
+            return
+            
+        student_id = self.users['student']['id']
+        
+        # Test getting student badges
+        for role, token in self.tokens.items():
+            success, response, status = self.make_request('GET', f'badges/student/{student_id}', token=token)
+            
+            if success and 'current_week_badges' in response and 'total_badges_count' in response:
+                self.log_test(f"Get student badges - {role}", True)
+            else:
+                self.log_test(f"Get student badges - {role}", False, f"Status: {status}, Response: {response}")
+
+    def test_available_badges_api(self):
+        """Test getting available badges list"""
+        print("\n📋 Testing Available Badges API...")
+        
+        # Test getting available badges (should be public)
+        success, response, status = self.make_request('GET', 'badges/available')
+        
+        if success and isinstance(response, list):
+            self.log_test("Get available badges", True)
+            
+            # Check if response contains expected badge structure
+            if len(response) > 0 and 'name' in response[0] and 'icon' in response[0]:
+                self.log_test("Available badges structure", True)
+            else:
+                self.log_test("Available badges structure", False, "Missing expected fields")
+        else:
+            self.log_test("Get available badges", False, f"Status: {status}, Response: {response}")
+
+    def test_points_system_1000_limit(self):
+        """Test 1000 points limit enforcement"""
+        print("\n💯 Testing Points System (1000 max limit)...")
+        
+        if 'student' not in self.users:
+            self.log_test("Points system limit", False, "Student not available")
+            return
+            
+        student_id = self.users['student']['id']
+        
+        # Get current student points
+        success, response, status = self.make_request('GET', f'students/{student_id}/profile', 
+                                                    token=self.tokens.get('admin') or self.tokens.get('sheikh'))
+        
+        if success and 'points' in response:
+            current_points = response['points']
+            self.log_test("Get current student points", True, f"Current points: {current_points}")
+            
+            # Verify points are within 1000 limit
+            if current_points <= 1000:
+                self.log_test("Points within 1000 limit", True)
+            else:
+                self.log_test("Points within 1000 limit", False, f"Points exceed limit: {current_points}")
+        else:
+            self.log_test("Get current student points", False, f"Status: {status}")
+
     def test_new_features_comprehensive(self):
         """Comprehensive test for all new features mentioned in review request"""
         print("\n🆕 Testing New Features Comprehensively...")
         
         # Test all the new features together
         self.test_admin_password_reset()
-        self.test_student_tracking_sheet()
+        self.test_new_tracking_sheet_system()
+        self.test_sheikh_interaction_badge()
+        self.test_admin_bonus_points()
+        self.test_student_badges_api()
+        self.test_available_badges_api()
+        self.test_points_system_1000_limit()
         self.test_student_profile_apis()
         self.test_tracking_sheets_get()
         self.test_student_self_update()
