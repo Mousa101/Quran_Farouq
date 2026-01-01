@@ -518,10 +518,11 @@ class ScheduleSlot(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ScheduleCreate(BaseModel):
-    name: str  # اسم الجدول
+    name: str  # اسم الجدول/الفصل
     description: Optional[str] = None
-    start_date: str  # تاريخ البداية
-    end_date: Optional[str] = None  # تاريخ النهاية
+    start_date: str  # تاريخ بداية الفصل
+    end_date: str  # تاريخ نهاية الفصل
+    lesson_days: List[str] = []  # أيام الدروس: ["السبت", "الأحد", ...]
 
 class Schedule(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -529,7 +530,8 @@ class Schedule(BaseModel):
     name: str
     description: Optional[str] = None
     start_date: str
-    end_date: Optional[str] = None
+    end_date: str
+    lesson_days: List[str] = []  # أيام الدروس
     is_active: bool = True
     created_by: str  # Admin ID
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
