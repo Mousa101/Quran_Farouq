@@ -409,7 +409,7 @@ const TrackingSheets = () => {
                     <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
                       <p className={isDark ? 'text-slate-300' : 'text-slate-600'}>النقاط المتوقعة</p>
                       <p className="text-3xl font-bold text-emerald-400">{calculatePoints()} نقطة</p>
-                      <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>الحد الأقصى: 72 نقطة</p>
+                      <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>الحد الأقصى: 100 نقطة</p>
                     </div>
 
                     <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={submitting}>
@@ -492,7 +492,7 @@ const TrackingSheets = () => {
           <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>دليل النقاط (الأسبوعية)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3">
             <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
               <Hand className="w-5 h-5 mx-auto mb-1 text-emerald-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصلوات</p>
@@ -523,20 +523,25 @@ const TrackingSheets = () => {
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الوتر</p>
               <p className="text-sm font-bold text-indigo-400">7</p>
             </div>
+            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
+              <Sparkles className="w-5 h-5 mx-auto mb-1 text-orange-400" />
+              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>السنن</p>
+              <p className="text-sm font-bold text-orange-400">7</p>
+            </div>
             <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-yellow-500/10' : 'bg-yellow-50'}`}>
               <Star className="w-5 h-5 mx-auto mb-1 text-yellow-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>قيام الليل</p>
-              <p className="text-sm font-bold text-yellow-400">1</p>
+              <p className="text-sm font-bold text-yellow-400">8</p>
             </div>
             <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-cyan-500/10' : 'bg-cyan-50'}`}>
               <Calendar className="w-5 h-5 mx-auto mb-1 text-cyan-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصيام</p>
-              <p className="text-sm font-bold text-cyan-400">1</p>
+              <p className="text-sm font-bold text-cyan-400">8</p>
             </div>
           </div>
           <div className={`mt-4 p-3 rounded-lg text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
             <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>الحد الأقصى الأسبوعي</p>
-            <p className="text-2xl font-bold text-emerald-400">72 نقطة</p>
+            <p className="text-2xl font-bold text-emerald-400">100 نقطة</p>
           </div>
         </CardContent>
       </Card>
@@ -567,9 +572,9 @@ const TrackingSheets = () => {
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-left">
-                      <p className="text-emerald-400 font-bold">{sheet.points_earned || 0} نقطة</p>
+                      <p className="text-emerald-400 font-bold">{sheet.points_earned || sheet.total_points || 0} / 100</p>
                       <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        صلوات: {sheet.data?.prayers_count || 0}/35
+                        نقطة أسبوعية
                       </p>
                     </div>
                     <Button variant="ghost" size="sm" onClick={() => viewSheet(sheet)}>
@@ -602,53 +607,82 @@ const TrackingSheets = () => {
                 </div>
               </div>
               
-              <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                <h4 className={`font-bold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>التفاصيل</h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="flex justify-between">
-                    <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>الصلوات:</span>
-                    <span className="text-emerald-400 font-bold">{selectedSheet.data?.prayers_count || 0}/35</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>القرآن:</span>
-                    <span className="text-blue-400 font-bold">{selectedSheet.data?.quran_sitting_days || 0}/7</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>الضحى:</span>
-                    <span className="text-amber-400 font-bold">{selectedSheet.data?.duha_prayers || 0}/7</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>التسميع:</span>
-                    <span className="text-pink-400 font-bold">{selectedSheet.data?.family_recitation || 0}/7</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>الدراسة:</span>
-                    <span className="text-purple-400 font-bold">{selectedSheet.data?.study_hours || 0}/7</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>الوتر:</span>
-                    <span className="text-indigo-400 font-bold">{selectedSheet.data?.witr_prayers_days || 0}/7</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>قيام الليل:</span>
-                    <span className="text-yellow-400 font-bold">{selectedSheet.data?.night_prayer || 0}/1</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>الصيام:</span>
-                    <span className="text-cyan-400 font-bold">{selectedSheet.data?.fasting || 0}/1</span>
+              {/* إجمالي النقاط - العرض الرئيسي */}
+              <div className={`p-6 rounded-xl text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
+                <p className={`text-lg ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>إجمالي النقاط الأسبوعية</p>
+                <p className="text-4xl font-bold text-emerald-400 my-2">
+                  {selectedSheet.points_earned || selectedSheet.total_points || 0} / 100
+                </p>
+                <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>نقطة</p>
+              </div>
+
+              {/* تفاصيل توزيع النقاط */}
+              {selectedSheet.points_breakdown && (
+                <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                  <h4 className={`font-bold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>توزيع النقاط</h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className={`flex items-center gap-2 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <Hand className="w-4 h-4 text-emerald-400" /> الصلوات
+                      </span>
+                      <span className="text-emerald-400 font-bold">{selectedSheet.points_breakdown.prayers || 0}/35</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className={`flex items-center gap-2 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <BookOpen className="w-4 h-4 text-blue-400" /> القرآن
+                      </span>
+                      <span className="text-blue-400 font-bold">{selectedSheet.points_breakdown.quran_sitting || 0}/7</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className={`flex items-center gap-2 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <Sunrise className="w-4 h-4 text-amber-400" /> الضحى
+                      </span>
+                      <span className="text-amber-400 font-bold">{selectedSheet.points_breakdown.duha || 0}/7</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className={`flex items-center gap-2 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <Users className="w-4 h-4 text-pink-400" /> التسميع للأهل
+                      </span>
+                      <span className="text-pink-400 font-bold">{selectedSheet.points_breakdown.family_recitation || 0}/7</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className={`flex items-center gap-2 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <GraduationCap className="w-4 h-4 text-purple-400" /> الدراسة
+                      </span>
+                      <span className="text-purple-400 font-bold">{selectedSheet.points_breakdown.study || 0}/7</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className={`flex items-center gap-2 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <Moon className="w-4 h-4 text-indigo-400" /> الوتر
+                      </span>
+                      <span className="text-indigo-400 font-bold">{selectedSheet.points_breakdown.witr || 0}/7</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className={`flex items-center gap-2 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <Sparkles className="w-4 h-4 text-orange-400" /> السنن
+                      </span>
+                      <span className="text-orange-400 font-bold">{selectedSheet.points_breakdown.sunnah || 0}/7</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className={`flex items-center gap-2 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <Star className="w-4 h-4 text-yellow-400" /> قيام الليل
+                      </span>
+                      <span className="text-yellow-400 font-bold">{selectedSheet.points_breakdown.night_prayer || 0}/8</span>
+                    </div>
+                    <div className="flex justify-between items-center col-span-2">
+                      <span className={`flex items-center gap-2 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <Calendar className="w-4 h-4 text-cyan-400" /> الصيام
+                      </span>
+                      <span className="text-cyan-400 font-bold">{selectedSheet.points_breakdown.fasting || 0}/8</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
               
-              <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
-                <p className={isDark ? 'text-slate-300' : 'text-slate-600'}>إجمالي النقاط</p>
-                <p className="text-3xl font-bold text-emerald-400">{selectedSheet.points_earned || 0} نقطة</p>
-              </div>
-              
-              {selectedSheet.data?.notes && (
+              {(selectedSheet.data?.notes || selectedSheet.notes) && (
                 <div className={`p-3 rounded-lg ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
                   <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>ملاحظات</p>
-                  <p className={isDark ? 'text-white' : 'text-slate-900'}>{selectedSheet.data.notes}</p>
+                  <p className={isDark ? 'text-white' : 'text-slate-900'}>{selectedSheet.data?.notes || selectedSheet.notes}</p>
                 </div>
               )}
             </div>
