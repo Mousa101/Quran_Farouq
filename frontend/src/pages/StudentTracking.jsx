@@ -9,12 +9,24 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { 
-  FileText, Plus, Loader2, BookOpen, Moon, Star, Hand, Clock, Eye, 
-  Sunrise, Users, GraduationCap, Calendar, CheckCircle
+  FileText, Plus, Loader2, BookOpen, Moon, Star, Hand, Eye, 
+  Sunrise, Users, GraduationCap, Calendar, CheckCircle, Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// دالة للحصول على بداية الأسبوع الحالي (السبت)
+const getCurrentWeekStart = () => {
+  const today = new Date();
+  // في JavaScript: 0=الأحد، 6=السبت
+  // نحتاج السبت كبداية الأسبوع
+  const dayOfWeek = today.getDay();
+  const daysToSubtract = dayOfWeek === 6 ? 0 : dayOfWeek + 1;
+  const saturday = new Date(today);
+  saturday.setDate(today.getDate() - daysToSubtract);
+  return saturday.toISOString().split('T')[0];
+};
 
 const StudentTracking = () => {
   const { user } = useAuth();
@@ -25,15 +37,17 @@ const StudentTracking = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [selectedSheet, setSelectedSheet] = useState(null);
+  const [currentWeekSheet, setCurrentWeekSheet] = useState(null);
   
   const [formData, setFormData] = useState({
-    week_start: '',
+    week_start: getCurrentWeekStart(),
     prayers_count: 0,
     quran_sitting_days: 0,
     duha_prayers: 0,
     family_recitation: 0,
     study_hours: 0,
     witr_prayers_days: 0,
+    sunnah_prayers: 0,
     night_prayer: 0,
     fasting: 0,
     notes: ''
@@ -41,17 +55,33 @@ const StudentTracking = () => {
 
   useEffect(() => {
     fetchData();
-    // Set default week start to current week's Sunday
-    const today = new Date();
-    const sunday = new Date(today);
-    sunday.setDate(today.getDate() - today.getDay());
-    setFormData(prev => ({ ...prev, week_start: sunday.toISOString().split('T')[0] }));
   }, []);
 
   const fetchData = async () => {
     try {
       const res = await axios.get(`${API}/tracking-sheets`);
       setSheets(res.data);
+      
+      // البحث عن ورقة الأسبوع الحالي
+      const currentWeek = getCurrentWeekStart();
+      const existingSheet = res.data.find(s => s.week_start === currentWeek);
+      if (existingSheet) {
+        setCurrentWeekSheet(existingSheet);
+        // تحميل البيانات الموجودة
+        setFormData({
+          week_start: currentWeek,
+          prayers_count: existingSheet.data?.prayers_count || 0,
+          quran_sitting_days: existingSheet.data?.quran_sitting_days || 0,
+          duha_prayers: existingSheet.data?.duha_prayers || 0,
+          family_recitation: existingSheet.data?.family_recitation || 0,
+          study_hours: existingSheet.data?.study_hours || 0,
+          witr_prayers_days: existingSheet.data?.witr_prayers_days || 0,
+          sunnah_prayers: existingSheet.data?.sunnah_prayers || 0,
+          night_prayer: existingSheet.data?.night_prayer || 0,
+          fasting: existingSheet.data?.fasting || 0,
+          notes: existingSheet.data?.notes || ''
+        });
+      }
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -61,41 +91,28 @@ const StudentTracking = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.week_start) {
-      toast.error('يرجى اختيار تاريخ الأسبوع');
+    
+    // التأكد من أن التاريخ هو بداية الأسبوع الحالي
+    const currentWeek = getCurrentWeekStart();
+    if (formData.week_start !== currentWeek) {
+      toast.error(`يمكنك فقط تعبئة ورقة الأسبوع الحالي (${currentWeek})`);
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await axios.post(`${API}/tracking-sheets/student`, formData);
+      const res = await axios.post(`${API}/tracking-sheets/student`, {
+        ...formData,
+        week_start: currentWeek
+      });
       toast.success(res.data.message || 'تم حفظ ورقة المتابعة بنجاح');
       setDialogOpen(false);
-      resetForm();
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'فشل في حفظ ورقة المتابعة');
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const resetForm = () => {
-    const today = new Date();
-    const sunday = new Date(today);
-    sunday.setDate(today.getDate() - today.getDay());
-    setFormData({
-      week_start: sunday.toISOString().split('T')[0],
-      prayers_count: 0,
-      quran_sitting_days: 0,
-      duha_prayers: 0,
-      family_recitation: 0,
-      study_hours: 0,
-      witr_prayers_days: 0,
-      night_prayer: 0,
-      fasting: 0,
-      notes: ''
-    });
   };
 
   const calculatePoints = () => {
@@ -105,40 +122,17 @@ const StudentTracking = () => {
     const family = Math.min(formData.family_recitation, 7);
     const study = Math.min(formData.study_hours, 7);
     const witr = Math.min(formData.witr_prayers_days, 7);
-    const night = Math.min(formData.night_prayer, 1);
-    const fasting = Math.min(formData.fasting, 1);
-    return prayers + quran + duha + family + study + witr + night + fasting;
+    const sunnah = Math.min(formData.sunnah_prayers, 7);
+    // قيام الليل: إذا أتم يوم = 8 نقاط كاملة
+    const night = formData.night_prayer >= 1 ? 8 : 0;
+    // الصيام: إذا أتم يوم = 8 نقاط كاملة
+    const fasting = formData.fasting >= 1 ? 8 : 0;
+    return Math.min(prayers + quran + duha + family + study + witr + sunnah + night + fasting, 100);
   };
 
   const viewSheet = (sheet) => {
     setSelectedSheet(sheet);
     setViewDialogOpen(true);
-  };
-
-  // Check if there's already a sheet for this week
-  const checkExistingSheet = (weekStart) => {
-    return sheets.find(s => s.week_start === weekStart);
-  };
-
-  // Load existing sheet data when date changes
-  const handleWeekChange = (newWeekStart) => {
-    setFormData(prev => ({ ...prev, week_start: newWeekStart }));
-    const existing = checkExistingSheet(newWeekStart);
-    if (existing) {
-      setFormData({
-        week_start: newWeekStart,
-        prayers_count: existing.data?.prayers_count || 0,
-        quran_sitting_days: existing.data?.quran_sitting_days || 0,
-        duha_prayers: existing.data?.duha_prayers || 0,
-        family_recitation: existing.data?.family_recitation || 0,
-        study_hours: existing.data?.study_hours || 0,
-        witr_prayers_days: existing.data?.witr_prayers_days || 0,
-        night_prayer: existing.data?.night_prayer || 0,
-        fasting: existing.data?.fasting || 0,
-        notes: existing.data?.notes || ''
-      });
-      toast.info('تم تحميل بيانات هذا الأسبوع - يمكنك تعديلها');
-    }
   };
 
   if (loading) {
@@ -148,6 +142,8 @@ const StudentTracking = () => {
       </div>
     );
   }
+
+  const currentWeekStart = getCurrentWeekStart();
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -160,39 +156,38 @@ const StudentTracking = () => {
             </div>
             <div>
               <h1 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>ورق المتابعة</h1>
-              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>سجّل أنشطتك وعباداتك الأسبوعية</p>
+              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                سجّل أنشطتك وعباداتك الأسبوعية (الأسبوع من السبت للسبت)
+              </p>
             </div>
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-purple-600 hover:bg-purple-700">
                 <Plus className="w-4 h-4 ml-2" />
-                تعبئة ورقة متابعة
+                {currentWeekSheet ? 'تعديل ورقة الأسبوع' : 'تعبئة ورقة متابعة'}
               </Button>
             </DialogTrigger>
             <DialogContent className={`max-w-2xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white'}`}>
               <DialogHeader>
-                <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>تعبئة ورقة المتابعة</DialogTitle>
+                <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>
+                  {currentWeekSheet ? 'تعديل ورقة المتابعة' : 'تعبئة ورقة المتابعة'}
+                </DialogTitle>
               </DialogHeader>
               
               <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-                <div>
-                  <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>بداية الأسبوع</Label>
-                  <Input
-                    type="date"
-                    value={formData.week_start}
-                    onChange={(e) => handleWeekChange(e.target.value)}
-                    required
-                    className={isDark ? 'bg-slate-800 border-white/10 text-white' : ''}
-                  />
-                  {checkExistingSheet(formData.week_start) && (
-                    <p className="text-amber-400 text-xs mt-1">* يوجد سجل سابق لهذا الأسبوع - سيتم تحديثه</p>
+                <div className={`p-3 rounded-lg ${isDark ? 'bg-purple-500/10 border border-purple-500/30' : 'bg-purple-50 border border-purple-200'}`}>
+                  <p className={`text-sm ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
+                    📅 أسبوع: <strong>{currentWeekStart}</strong>
+                  </p>
+                  {currentWeekSheet && (
+                    <p className="text-xs text-amber-400 mt-1">* يوجد سجل سابق - سيتم تحديثه</p>
                   )}
                 </div>
 
                 {/* Points Entry Fields */}
                 <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                  <h3 className={`font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>بيانات الأسبوع</h3>
+                  <h3 className={`font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>بيانات الأسبوع (المجموع 100 نقطة)</h3>
                   
                   <div className="grid grid-cols-2 gap-4">
                     {/* الصلوات */}
@@ -292,11 +287,27 @@ const StudentTracking = () => {
                       />
                     </div>
 
+                    {/* السنن */}
+                    <div>
+                      <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <Sparkles className="w-4 h-4 text-teal-400" />
+                        السنن (من 7)
+                      </Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="7"
+                        value={formData.sunnah_prayers}
+                        onChange={(e) => setFormData({ ...formData, sunnah_prayers: parseInt(e.target.value) || 0 })}
+                        className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                      />
+                    </div>
+
                     {/* قيام الليل */}
                     <div>
                       <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                         <Star className="w-4 h-4 text-yellow-400" />
-                        قيام الليل (من 1)
+                        قيام الليل (0 أو 1) = 8 نقاط
                       </Label>
                       <Input
                         type="number"
@@ -306,13 +317,14 @@ const StudentTracking = () => {
                         onChange={(e) => setFormData({ ...formData, night_prayer: parseInt(e.target.value) || 0 })}
                         className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                       />
+                      <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>إذا أتممت يوم واحد = 8 نقاط كاملة</p>
                     </div>
 
                     {/* الصيام */}
                     <div>
                       <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                         <Calendar className="w-4 h-4 text-cyan-400" />
-                        الصيام (من 1)
+                        الصيام (0 أو 1) = 8 نقاط
                       </Label>
                       <Input
                         type="number"
@@ -322,6 +334,7 @@ const StudentTracking = () => {
                         onChange={(e) => setFormData({ ...formData, fasting: parseInt(e.target.value) || 0 })}
                         className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                       />
+                      <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>إذا أتممت يوم واحد = 8 نقاط كاملة</p>
                     </div>
                   </div>
                 </div>
@@ -340,12 +353,15 @@ const StudentTracking = () => {
                 <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
                   <p className={isDark ? 'text-slate-300' : 'text-slate-600'}>النقاط المتوقعة</p>
                   <p className="text-3xl font-bold text-emerald-400">{calculatePoints()} نقطة</p>
-                  <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>الحد الأقصى: 72 نقطة</p>
+                  <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>الحد الأقصى: 100 نقطة</p>
+                  {calculatePoints() >= 90 && (
+                    <p className="text-amber-400 text-sm mt-2">🏅 ستحصل على شارة العابد!</p>
+                  )}
                 </div>
 
                 <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={submitting}>
                   {submitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
-                  {checkExistingSheet(formData.week_start) ? 'تحديث ورقة المتابعة' : 'حفظ ورقة المتابعة'}
+                  {currentWeekSheet ? 'تحديث ورقة المتابعة' : 'حفظ ورقة المتابعة'}
                 </Button>
               </form>
             </DialogContent>
@@ -356,57 +372,89 @@ const StudentTracking = () => {
       {/* Points Guide */}
       <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
         <CardHeader>
-          <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>دليل النقاط (الأسبوعية)</CardTitle>
+          <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>دليل النقاط (المجموع 100 نقطة)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-              <Hand className="w-5 h-5 mx-auto mb-1 text-emerald-400" />
+          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+              <Hand className="w-4 h-4 mx-auto mb-1 text-emerald-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصلوات</p>
               <p className="text-sm font-bold text-emerald-400">35</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
-              <BookOpen className="w-5 h-5 mx-auto mb-1 text-blue-400" />
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
+              <BookOpen className="w-4 h-4 mx-auto mb-1 text-blue-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>القرآن</p>
               <p className="text-sm font-bold text-blue-400">7</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
-              <Sunrise className="w-5 h-5 mx-auto mb-1 text-amber-400" />
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+              <Sunrise className="w-4 h-4 mx-auto mb-1 text-amber-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الضحى</p>
               <p className="text-sm font-bold text-amber-400">7</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-pink-500/10' : 'bg-pink-50'}`}>
-              <Users className="w-5 h-5 mx-auto mb-1 text-pink-400" />
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-pink-500/10' : 'bg-pink-50'}`}>
+              <Users className="w-4 h-4 mx-auto mb-1 text-pink-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>التسميع</p>
               <p className="text-sm font-bold text-pink-400">7</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
-              <GraduationCap className="w-5 h-5 mx-auto mb-1 text-purple-400" />
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
+              <GraduationCap className="w-4 h-4 mx-auto mb-1 text-purple-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الدراسة</p>
               <p className="text-sm font-bold text-purple-400">7</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
-              <Moon className="w-5 h-5 mx-auto mb-1 text-indigo-400" />
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
+              <Moon className="w-4 h-4 mx-auto mb-1 text-indigo-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الوتر</p>
               <p className="text-sm font-bold text-indigo-400">7</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-yellow-500/10' : 'bg-yellow-50'}`}>
-              <Star className="w-5 h-5 mx-auto mb-1 text-yellow-400" />
-              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>قيام الليل</p>
-              <p className="text-sm font-bold text-yellow-400">1</p>
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
+              <Sparkles className="w-4 h-4 mx-auto mb-1 text-teal-400" />
+              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>السنن</p>
+              <p className="text-sm font-bold text-teal-400">7</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-cyan-500/10' : 'bg-cyan-50'}`}>
-              <Calendar className="w-5 h-5 mx-auto mb-1 text-cyan-400" />
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-yellow-500/10' : 'bg-yellow-50'}`}>
+              <Star className="w-4 h-4 mx-auto mb-1 text-yellow-400" />
+              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>قيام</p>
+              <p className="text-sm font-bold text-yellow-400">8</p>
+            </div>
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-cyan-500/10' : 'bg-cyan-50'}`}>
+              <Calendar className="w-4 h-4 mx-auto mb-1 text-cyan-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصيام</p>
-              <p className="text-sm font-bold text-cyan-400">1</p>
+              <p className="text-sm font-bold text-cyan-400">8</p>
             </div>
           </div>
-          <div className={`mt-4 p-3 rounded-lg text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
-            <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>الحد الأقصى الأسبوعي</p>
-            <p className="text-2xl font-bold text-emerald-400">72 نقطة</p>
+          <div className={`mt-3 p-2 rounded-lg text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
+            <p className="text-lg font-bold text-emerald-400">المجموع الأسبوعي: 100 نقطة</p>
           </div>
         </CardContent>
       </Card>
+
+      {/* Current Week Status */}
+      {currentWeekSheet && (
+        <Card className={isDark ? 'glass-card border-emerald-500/30' : 'bg-white border-emerald-200'}>
+          <CardHeader>
+            <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <CheckCircle className="w-5 h-5 text-emerald-400" />
+              ورقة الأسبوع الحالي
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className={isDark ? 'text-slate-300' : 'text-slate-600'}>
+                  تم تعبئة ورقة أسبوع {currentWeekSheet.week_start}
+                </p>
+                <p className="text-emerald-400 font-bold text-xl mt-1">
+                  {currentWeekSheet.points_earned || 0} نقطة
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => viewSheet(currentWeekSheet)}>
+                <Eye className="w-4 h-4 ml-2" />
+                عرض التفاصيل
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* My Sheets List */}
       <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
@@ -495,12 +543,16 @@ const StudentTracking = () => {
                     <span className="text-indigo-400 font-bold">{selectedSheet.data?.witr_prayers_days || 0}/7</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>السنن:</span>
+                    <span className="text-teal-400 font-bold">{selectedSheet.data?.sunnah_prayers || 0}/7</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>قيام الليل:</span>
-                    <span className="text-yellow-400 font-bold">{selectedSheet.data?.night_prayer || 0}/1</span>
+                    <span className="text-yellow-400 font-bold">{selectedSheet.data?.night_prayer >= 1 ? '8' : '0'}/8</span>
                   </div>
                   <div className="flex justify-between">
                     <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>الصيام:</span>
-                    <span className="text-cyan-400 font-bold">{selectedSheet.data?.fasting || 0}/1</span>
+                    <span className="text-cyan-400 font-bold">{selectedSheet.data?.fasting >= 1 ? '8' : '0'}/8</span>
                   </div>
                 </div>
               </div>
