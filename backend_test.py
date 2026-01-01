@@ -660,6 +660,10 @@ class QuranAppAPITester:
         
         if success and 'points' in response:
             current_points = response['points']
+            # Handle case where points might be a dict or int
+            if isinstance(current_points, dict):
+                current_points = current_points.get('total_points', 0)
+            
             self.log_test("Get current student points", True, f"Current points: {current_points}")
             
             # Verify points are within 1000 limit
