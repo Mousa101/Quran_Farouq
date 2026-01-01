@@ -81,7 +81,7 @@ const ScheduleManagement = () => {
       const res = await axios.post(`${API}/schedule`, formData);
       toast.success('تم إنشاء الجدول بنجاح');
       setDialogOpen(false);
-      setFormData({ name: '', description: '', start_date: '', end_date: '' });
+      setFormData({ name: '', description: '', start_date: '', end_date: '', lesson_days: [] });
       fetchSchedules();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'فشل في إنشاء الجدول');
