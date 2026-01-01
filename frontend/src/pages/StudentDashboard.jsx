@@ -978,7 +978,10 @@ const StudentDashboard = () => {
             <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30 text-center">
               <p className="text-slate-300">النقاط المتوقعة</p>
               <p className="text-3xl font-bold text-purple-400">{calculateTrackingPoints()} نقطة</p>
-              <p className="text-xs text-slate-500">من أصل 72 نقطة</p>
+              <p className="text-xs text-slate-500">من أصل 100 نقطة</p>
+              {calculateTrackingPoints() >= 90 && (
+                <p className="text-amber-400 text-sm mt-2">🏅 ستحصل على شارة العابد!</p>
+              )}
             </div>
           </div>
 
