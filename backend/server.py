@@ -1482,7 +1482,7 @@ async def get_tracking_stats(student_id: str, current_user: dict = Depends(get_c
         "semester_start": semester_start,
         "weekly": weekly_data,
         "semester": semester_data,
-        "max_weekly_points": 72,  # الحد الأقصى للنقاط الأسبوعية
+        "max_weekly_points": 100,  # الحد الأقصى للنقاط الأسبوعية
         "categories": {
             "prayers": {"max_weekly": 35, "label": "الصلوات"},
             "quran_sitting": {"max_weekly": 7, "label": "الجلوس مع القرآن"},
@@ -1490,6 +1490,7 @@ async def get_tracking_stats(student_id: str, current_user: dict = Depends(get_c
             "family_recitation": {"max_weekly": 7, "label": "التسميع للأهل"},
             "study_hours": {"max_weekly": 7, "label": "ساعات الدراسة"},
             "witr": {"max_weekly": 7, "label": "الوتر"},
+            "sunnah_prayers": {"max_weekly": 7, "label": "السنن"},
             "night_prayer": {"max_weekly": 1, "label": "قيام الليل"},
             "fasting": {"max_weekly": 1, "label": "الصيام"}
         }
