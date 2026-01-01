@@ -1338,7 +1338,8 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
         
         return {
             "message": "تم تحديث ورقة المتابعة بنجاح",
-            "points_earned": points_breakdown["total_points"]
+            "points_earned": points_breakdown["total_points"],
+            "week_start": week_start_to_use
         }
     
     # إنشاء ورقة جديدة
@@ -1358,7 +1359,7 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
     sheet = TrackingSheet(
         student_id=current_user["user_id"],
         sheikh_id="",  # بدون شيخ - مقدم من الطالب
-        week_start=data.week_start,
+        week_start=week_start_to_use,
         data=sheet_data,
         points_earned=points_breakdown["total_points"]
     )
