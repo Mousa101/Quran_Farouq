@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Textarea } from '../components/ui/textarea';
 import {
   Users, Plus, Trash2, Edit, Search, AlertTriangle,
-  UserPlus, Eye, RefreshCcw, Loader2, Key
+  UserPlus, Eye, RefreshCcw, Loader2, Key, Award
 } from 'lucide-react';
 import { toast } from 'sonner';
 
