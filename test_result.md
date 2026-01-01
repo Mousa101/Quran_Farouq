@@ -449,7 +449,11 @@ metadata:
 
 test_plan:
   current_focus:
-    - "All new features tested successfully"
+    - "New Tracking Sheet System (100 points)"
+    - "Weekly Badges System"
+    - "Points System (1000 max)"
+    - "Admin Bonus & Sheikh Interaction"
+    - "My Progress Page"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
