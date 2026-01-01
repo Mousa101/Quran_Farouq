@@ -144,17 +144,20 @@ const TrackingSheets = () => {
 
   const resetForm = () => {
     const today = new Date();
-    const sunday = new Date(today);
-    sunday.setDate(today.getDate() - today.getDay());
+    const dayOfWeek = today.getDay();
+    const daysToSubtract = dayOfWeek === 6 ? 0 : dayOfWeek + 1;
+    const saturday = new Date(today);
+    saturday.setDate(today.getDate() - daysToSubtract);
     setFormData({
       student_id: '',
-      week_start: sunday.toISOString().split('T')[0],
+      week_start: saturday.toISOString().split('T')[0],
       prayers_count: 0,
       quran_sitting_days: 0,
       duha_prayers: 0,
       family_recitation: 0,
       study_hours: 0,
       witr_prayers_days: 0,
+      sunnah_prayers: 0,
       night_prayer: 0,
       fasting: 0,
       notes: ''
@@ -170,9 +173,12 @@ const TrackingSheets = () => {
     const family = Math.min(formData.family_recitation, 7);
     const study = Math.min(formData.study_hours, 7);
     const witr = Math.min(formData.witr_prayers_days, 7);
-    const night = Math.min(formData.night_prayer, 1);
-    const fasting = Math.min(formData.fasting, 1);
-    return prayers + quran + duha + family + study + witr + night + fasting;
+    const sunnah = Math.min(formData.sunnah_prayers, 7);
+    // قيام الليل: إذا أتم يوم = 8 نقاط كاملة
+    const night = formData.night_prayer >= 1 ? 8 : 0;
+    // الصيام: إذا أتم يوم = 8 نقاط كاملة
+    const fasting = formData.fasting >= 1 ? 8 : 0;
+    return Math.min(prayers + quran + duha + family + study + witr + sunnah + night + fasting, 100);
   };
 
   const viewSheet = (sheet) => {
