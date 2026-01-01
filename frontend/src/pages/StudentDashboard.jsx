@@ -914,11 +914,27 @@ const StudentDashboard = () => {
                 />
               </div>
 
+              {/* السنن */}
+              <div>
+                <Label className="text-slate-300 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-teal-400" />
+                  السنن (من 7)
+                </Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="7"
+                  value={trackingForm.sunnah_prayers}
+                  onChange={(e) => setTrackingForm({ ...trackingForm, sunnah_prayers: parseInt(e.target.value) || 0 })}
+                  className="bg-slate-800 border-white/10 text-white"
+                />
+              </div>
+
               {/* قيام الليل */}
               <div>
                 <Label className="text-slate-300 flex items-center gap-2">
                   <Star className="w-4 h-4 text-yellow-400" />
-                  قيام الليل (من 1)
+                  قيام الليل (0 أو 1) = 8 نقاط
                 </Label>
                 <Input
                   type="number"
@@ -934,7 +950,7 @@ const StudentDashboard = () => {
               <div>
                 <Label className="text-slate-300 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-cyan-400" />
-                  الصيام (من 1)
+                  الصيام (0 أو 1) = 8 نقاط
                 </Label>
                 <Input
                   type="number"
