@@ -362,6 +362,22 @@ const TrackingSheets = () => {
                           />
                         </div>
 
+                        {/* السنن */}
+                        <div>
+                          <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                            <Sparkles className="w-4 h-4 text-orange-400" />
+                            السنن (من 7)
+                          </Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="7"
+                            value={formData.sunnah_prayers}
+                            onChange={(e) => setFormData({ ...formData, sunnah_prayers: parseInt(e.target.value) || 0 })}
+                            className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                          />
+                        </div>
+
                         {/* قيام الليل */}
                         <div>
                           <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
