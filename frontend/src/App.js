@@ -210,7 +210,7 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <StudentDashboard />
+              <MyProgress />
             </Layout>
           </ProtectedRoute>
         }
