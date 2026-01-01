@@ -618,7 +618,7 @@ const StudentDashboard = () => {
           <div className="flex items-center justify-between">
             <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
               <Hand className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
-              ورقة المتابعة الإيمانية
+              ورقة المتابعة الإيمانية (100 نقطة)
             </CardTitle>
             <Button
               onClick={() => setTrackingDialogOpen(true)}
@@ -637,7 +637,7 @@ const StudentDashboard = () => {
               <Calendar className="w-4 h-4" />
               هذا الأسبوع
             </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
               <div className="p-2 md:p-3 rounded-xl bg-emerald-500/10 text-center">
                 <Hand className="w-5 h-5 md:w-6 md:h-6 mx-auto text-emerald-400 mb-1" />
                 <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.prayers || 0}<span className="text-xs text-slate-500">/35</span></p>
@@ -668,21 +668,26 @@ const StudentDashboard = () => {
                 <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.witr || 0}<span className="text-xs text-slate-500">/7</span></p>
                 <p className="text-indigo-400 text-[10px] md:text-xs">الوتر</p>
               </div>
+              <div className="p-2 md:p-3 rounded-xl bg-teal-500/10 text-center">
+                <Sparkles className="w-5 h-5 md:w-6 md:h-6 mx-auto text-teal-400 mb-1" />
+                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.sunnah_prayers || 0}<span className="text-xs text-slate-500">/7</span></p>
+                <p className="text-teal-400 text-[10px] md:text-xs">السنن</p>
+              </div>
               <div className="p-2 md:p-3 rounded-xl bg-yellow-500/10 text-center">
                 <Star className="w-5 h-5 md:w-6 md:h-6 mx-auto text-yellow-400 mb-1" />
-                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.night_prayer || 0}<span className="text-xs text-slate-500">/1</span></p>
+                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.night_prayer >= 1 ? '8' : '0'}<span className="text-xs text-slate-500">/8</span></p>
                 <p className="text-yellow-400 text-[10px] md:text-xs">قيام الليل</p>
               </div>
               <div className="p-2 md:p-3 rounded-xl bg-cyan-500/10 text-center">
                 <Calendar className="w-5 h-5 md:w-6 md:h-6 mx-auto text-cyan-400 mb-1" />
-                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.fasting || 0}<span className="text-xs text-slate-500">/1</span></p>
+                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.fasting >= 1 ? '8' : '0'}<span className="text-xs text-slate-500">/8</span></p>
                 <p className="text-cyan-400 text-[10px] md:text-xs">الصيام</p>
               </div>
             </div>
             <div className="mt-2 text-center">
               <span className="text-sm text-slate-400">نقاط الأسبوع: </span>
               <span className="text-lg font-bold text-emerald-400">{stats?.tracking?.weekly?.total_points || 0}</span>
-              <span className="text-sm text-slate-500">/72</span>
+              <span className="text-sm text-slate-500">/100</span>
             </div>
           </div>
 
@@ -695,7 +700,7 @@ const StudentDashboard = () => {
               <Trophy className="w-4 h-4" />
               المجموع الفصلي
             </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
               <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-emerald-500/20">
                 <p className="text-lg md:text-xl font-bold text-emerald-400">{stats?.tracking?.semester?.prayers || 0}</p>
                 <p className="text-slate-400 text-[10px] md:text-xs">الصلوات</p>
