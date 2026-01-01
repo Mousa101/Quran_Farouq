@@ -29,7 +29,8 @@ const ScheduleManagement = () => {
     name: '',
     description: '',
     start_date: '',
-    end_date: ''
+    end_date: '',
+    lesson_days: []
   });
   const [slotData, setSlotData] = useState({
     day: 'السبت',
