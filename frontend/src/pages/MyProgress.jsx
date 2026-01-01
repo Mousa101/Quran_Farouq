@@ -131,37 +131,17 @@ const MyProgress = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            {/* الحفظ السابق */}
-            <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-slate-500/10 border border-slate-500/20' : 'bg-slate-50 border border-slate-200'}`}>
-              <BookMarked className={`w-8 h-8 mx-auto mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
-              <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                {stats?.memorization?.total_previous || 0}
-              </p>
-              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>صفحة سابقة</p>
-              <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                ({Math.floor((stats?.memorization?.total_previous || 0) / 20)} جزء)
-              </p>
-            </div>
+          <div className="grid grid-cols-1 gap-4 mb-6">
             
-            {/* الحفظ الجديد */}
+            
+            {/* المجموع */}
             <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'}`}>
               <BookOpen className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
               <p className="text-2xl font-bold text-emerald-400">
-                +{stats?.memorization?.new_pages || 0}
-              </p>
-              <p className={`text-sm ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>صفحة جديدة</p>
-              <p className={`text-xs ${isDark ? 'text-emerald-500' : 'text-emerald-500'}`}>في هذا الفصل</p>
-            </div>
-            
-            {/* المجموع */}
-            <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
-              <Trophy className="w-8 h-8 mx-auto text-amber-400 mb-2" />
-              <p className="text-2xl font-bold text-amber-400">
                 {stats?.memorization?.total_memorized || 0}
               </p>
-              <p className={`text-sm ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>إجمالي الحفظ</p>
-              <p className={`text-xs ${isDark ? 'text-amber-500' : 'text-amber-500'}`}>
+              <p className={`text-sm ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>إجمالي الحفظ</p>
+              <p className={`text-xs ${isDark ? 'text-emerald-500' : 'text-emerald-500'}`}>
                 ({Math.floor((stats?.memorization?.total_memorized || 0) / 20)} جزء)
               </p>
             </div>
