@@ -1380,7 +1380,7 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
             current_user["user_id"],
             points_to_add,
             "tracking",
-            f"ورقة متابعة أسبوع {data.week_start}"
+            f"ورقة متابعة أسبوع {week_start_to_use}"
         )
     
     # فحص ومنح شارة العابد
@@ -1389,7 +1389,8 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
     return {
         "message": "تم حفظ ورقة المتابعة بنجاح",
         "sheet_id": sheet.id,
-        "points_earned": points_to_add
+        "points_earned": points_to_add,
+        "week_start": week_start_to_use
     }
 
 @api_router.get("/tracking-sheets")
