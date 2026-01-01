@@ -411,7 +411,7 @@ class QuranAppAPITester:
             
             if expected_success and success and status == 200:
                 # Check if response has expected student profile data
-                has_profile_data = any(key in response for key in ['name', 'student_name', 'email', 'id'])
+                has_profile_data = 'student' in response or any(key in response for key in ['name', 'email', 'id'])
                 if has_profile_data:
                     self.log_test(f"Get student profile - {role}", True)
                 else:
