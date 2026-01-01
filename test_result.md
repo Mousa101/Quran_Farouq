@@ -520,12 +520,7 @@ metadata:
   run_ui: true
 
 test_plan:
-  current_focus:
-    - "New Tracking Sheet System (100 points)"
-    - "Weekly Badges System"
-    - "Points System (1000 max)"
-    - "Admin Bonus & Sheikh Interaction"
-    - "My Progress Page"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
