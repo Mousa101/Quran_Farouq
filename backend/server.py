@@ -1250,68 +1250,39 @@ async def create_tracking_sheet(sheet_data: TrackingSheetCreate, current_user: d
 
 # Endpoint للطالب لتعبئة ورقة المتابعة
 class StudentTrackingCreate(BaseModel):
-    """إدخال ورقة متابعة من الطالب"""
-    week_start: str
-    prayers_count: int = 0
-    quran_sitting_days: int = 0
-    duha_prayers: int = 0
-    family_recitation: int = 0
-    study_hours: int = 0
-    witr_prayers_days: int = 0
-    night_prayer: int = 0
-    fasting: int = 0
+    """ورقة المتابعة للطالب - الأسبوع يبدأ وينتهي السبت"""
+    week_start: str  # تاريخ بداية الأسبوع (السبت)
+    prayers_count: int = 0  # الصلوات (0-35)
+    quran_sitting_days: int = 0  # الجلوس مع القرآن (0-7)
+    duha_prayers: int = 0  # صلاة الضحى (0-7)
+    family_recitation: int = 0  # التسميع للأهل (0-7)
+    study_hours: int = 0  # ساعات الدراسة (0-7)
+    witr_prayers_days: int = 0  # الوتر (0-7)
+    sunnah_prayers: int = 0  # السنن (0-7)
+    night_prayer: int = 0  # قيام الليل (0-1) = 8 نقاط
+    fasting: int = 0  # الصيام (0-1) = 8 نقاط
     notes: Optional[str] = None
 
 @api_router.post("/tracking-sheets/student")
 async def create_tracking_sheet_student(data: StudentTrackingCreate, current_user: dict = Depends(get_current_user)):
-    """تعبئة ورقة المتابعة من حساب الطالب"""
+    """تعبئة ورقة المتابعة من حساب الطالب - مرة واحدة في الأسبوع"""
     if current_user["role"] != "student":
         raise HTTPException(status_code=403, detail="هذا الخيار متاح للطلاب فقط")
     
-    # التحقق من عدم وجود ورقة سابقة لنفس الأسبوع
+    # الحصول على بداية الأسبوع الحالي (السبت)
+    current_week_start = get_current_week_start()
+    
+    # التحقق من أن التاريخ هو بداية الأسبوع الحالي
+    if data.week_start != current_week_start:
+        raise HTTPException(status_code=400, detail=f"يمكنك فقط تعبئة ورقة الأسبوع الحالي. بداية الأسبوع: {current_week_start}")
+    
+    # التحقق من عدم وجود ورقة سابقة لنفس الأسبوع (مرة واحدة فقط)
     existing = await db.tracking_sheets.find_one({
         "student_id": current_user["user_id"],
         "week_start": data.week_start
     })
     
-    if existing:
-        # تحديث الورقة الموجودة
-        points_breakdown = calculate_tracking_points({
-            "prayers_count": data.prayers_count,
-            "quran_sitting_days": data.quran_sitting_days,
-            "duha_prayers": data.duha_prayers,
-            "family_recitation": data.family_recitation,
-            "study_hours": data.study_hours,
-            "witr_prayers_days": data.witr_prayers_days,
-            "night_prayer": data.night_prayer,
-            "fasting": data.fasting
-        })
-        
-        await db.tracking_sheets.update_one(
-            {"id": existing["id"]},
-            {"$set": {
-                "data": {
-                    "prayers_count": min(data.prayers_count, 35),
-                    "quran_sitting_days": min(data.quran_sitting_days, 7),
-                    "duha_prayers": min(data.duha_prayers, 7),
-                    "family_recitation": min(data.family_recitation, 7),
-                    "study_hours": min(data.study_hours, 7),
-                    "witr_prayers_days": min(data.witr_prayers_days, 7),
-                    "night_prayer": min(data.night_prayer, 1),
-                    "fasting": min(data.fasting, 1),
-                    "notes": data.notes
-                },
-                "points_earned": points_breakdown["total_points"],
-                "submitted_by_student": True
-            }}
-        )
-        
-        return {
-            "message": "تم تحديث ورقة المتابعة بنجاح",
-            "points_earned": points_breakdown["total_points"]
-        }
-    
-    # إنشاء ورقة جديدة
+    # حساب النقاط
     points_breakdown = calculate_tracking_points({
         "prayers_count": data.prayers_count,
         "quran_sitting_days": data.quran_sitting_days,
@@ -1319,10 +1290,44 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
         "family_recitation": data.family_recitation,
         "study_hours": data.study_hours,
         "witr_prayers_days": data.witr_prayers_days,
+        "sunnah_prayers": data.sunnah_prayers,
         "night_prayer": data.night_prayer,
         "fasting": data.fasting
     })
     
+    sheet_data_dict = {
+        "prayers_count": min(data.prayers_count, 35),
+        "quran_sitting_days": min(data.quran_sitting_days, 7),
+        "duha_prayers": min(data.duha_prayers, 7),
+        "family_recitation": min(data.family_recitation, 7),
+        "study_hours": min(data.study_hours, 7),
+        "witr_prayers_days": min(data.witr_prayers_days, 7),
+        "sunnah_prayers": min(data.sunnah_prayers, 7),
+        "night_prayer": min(data.night_prayer, 1),
+        "fasting": min(data.fasting, 1),
+        "notes": data.notes
+    }
+    
+    if existing:
+        # تحديث الورقة الموجودة
+        await db.tracking_sheets.update_one(
+            {"id": existing["id"]},
+            {"$set": {
+                "data": sheet_data_dict,
+                "points_earned": points_breakdown["total_points"],
+                "submitted_by_student": True
+            }}
+        )
+        
+        # فحص ومنح شارة العابد
+        await check_worshipper_badge(current_user["user_id"], points_breakdown["total_points"])
+        
+        return {
+            "message": "تم تحديث ورقة المتابعة بنجاح",
+            "points_earned": points_breakdown["total_points"]
+        }
+    
+    # إنشاء ورقة جديدة
     sheet_data = TrackingSheetData(
         prayers_count=min(data.prayers_count, 35),
         quran_sitting_days=min(data.quran_sitting_days, 7),
@@ -1330,6 +1335,7 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
         family_recitation=min(data.family_recitation, 7),
         study_hours=min(data.study_hours, 7),
         witr_prayers_days=min(data.witr_prayers_days, 7),
+        sunnah_prayers=min(data.sunnah_prayers, 7),
         night_prayer=min(data.night_prayer, 1),
         fasting=min(data.fasting, 1),
         notes=data.notes
@@ -1349,19 +1355,26 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
     
     await db.tracking_sheets.insert_one(sheet_dict)
     
-    # منح النقاط
-    if points_breakdown["total_points"] > 0:
+    # منح النقاط (مع الحد الأقصى 1000)
+    student_points = await db.student_points.find_one({"student_id": current_user["user_id"]})
+    current_total = student_points.get("total_points", 0) if student_points else 0
+    points_to_add = min(points_breakdown["total_points"], 1000 - current_total)
+    
+    if points_to_add > 0:
         await add_points(
             current_user["user_id"],
-            points_breakdown["total_points"],
+            points_to_add,
             "tracking",
             f"ورقة متابعة أسبوع {data.week_start}"
         )
     
+    # فحص ومنح شارة العابد
+    await check_worshipper_badge(current_user["user_id"], points_breakdown["total_points"])
+    
     return {
         "message": "تم حفظ ورقة المتابعة بنجاح",
         "sheet_id": sheet.id,
-        "points_earned": points_breakdown["total_points"]
+        "points_earned": points_to_add
     }
 
 @api_router.get("/tracking-sheets")
