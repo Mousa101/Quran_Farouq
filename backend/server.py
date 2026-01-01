@@ -28,6 +28,7 @@ from models import (
     HomeworkCreate, Homework, HomeworkSubmission,
     AdminExamCreate, AdminExam,
     TajweedExamCreate, TajweedExam,
+    WEEKLY_BADGES, WeeklyBadge,
     OnlineExamCreate, OnlineExam, ExamSubmissionCreate, ExamSubmission, ExamQuestion
 )
 
