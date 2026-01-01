@@ -180,6 +180,25 @@ const StudentManagement = () => {
     }
   };
 
+  const handleGrantBonus = async () => {
+    if (!selectedStudent) return;
+    setSubmitting(true);
+    try {
+      await axios.post(`${API}/badges/admin-bonus`, {
+        student_id: selectedStudent.id,
+        reason: bonusReason
+      });
+      toast.success(`تم منح 50 نقطة تميز للطالب ${selectedStudent.name}`);
+      setBonusDialogOpen(false);
+      setSelectedStudent(null);
+      setBonusReason('');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في منح النقاط');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const getGroupName = (groupId) => {
     const group = groups.find(g => g.id === groupId);
     return group?.name || 'بدون مجموعة';
