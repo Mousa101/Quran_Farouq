@@ -477,6 +477,18 @@ frontend:
         agent: "main"
         comment: "UPDATED: Added excuse dialog when clicking معذور button. Teacher can enter excuse reason which is saved and displayed in both attendance page and student profile"
 
+  - task: "TrackingSheets Page UI Update (100 points system)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/TrackingSheets.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "UPDATED: Fixed TrackingSheets.jsx to display new 100-point system. Updated: (1) Sheet list shows 'X/100 نقطة أسبوعية' instead of old format, (2) View dialog shows total points prominently with optional breakdown, (3) Points guide shows all 9 items with correct max values (35+7+7+7+7+7+7+8+8=100), (4) Form shows max 100 points, (5) Added Sunnah field to manual entry form"
+
   - task: "Student Management Page (Admin)"
     implemented: true
     working: true
@@ -520,7 +532,8 @@ metadata:
   run_ui: true
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "TrackingSheets Page UI Update"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
