@@ -163,6 +163,7 @@ const StudentDashboard = () => {
         family_recitation: 0,
         study_hours: 0,
         witr_prayers_days: 0,
+        sunnah_prayers: 0,
         night_prayer: 0,
         fasting: 0,
         notes: ''
@@ -175,14 +176,18 @@ const StudentDashboard = () => {
   };
 
   const calculateTrackingPoints = () => {
-    return Math.min(trackingForm.prayers_count, 35) +
-           Math.min(trackingForm.quran_sitting_days, 7) +
-           Math.min(trackingForm.duha_prayers, 7) +
-           Math.min(trackingForm.family_recitation, 7) +
-           Math.min(trackingForm.study_hours, 7) +
-           Math.min(trackingForm.witr_prayers_days, 7) +
-           Math.min(trackingForm.night_prayer, 1) +
-           Math.min(trackingForm.fasting, 1);
+    const prayers = Math.min(trackingForm.prayers_count, 35);
+    const quran = Math.min(trackingForm.quran_sitting_days, 7);
+    const duha = Math.min(trackingForm.duha_prayers, 7);
+    const family = Math.min(trackingForm.family_recitation, 7);
+    const study = Math.min(trackingForm.study_hours, 7);
+    const witr = Math.min(trackingForm.witr_prayers_days, 7);
+    const sunnah = Math.min(trackingForm.sunnah_prayers, 7);
+    // قيام الليل: إذا أتم يوم = 8 نقاط كاملة
+    const night = trackingForm.night_prayer >= 1 ? 8 : 0;
+    // الصيام: إذا أتم يوم = 8 نقاط كاملة
+    const fasting = trackingForm.fasting >= 1 ? 8 : 0;
+    return Math.min(prayers + quran + duha + family + study + witr + sunnah + night + fasting, 100);
   };
 
   if (loading) {
