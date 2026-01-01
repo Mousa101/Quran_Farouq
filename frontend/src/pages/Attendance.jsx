@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Calendar } from '../components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
-import { UserCheck, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react';
+import { Textarea } from '../components/ui/textarea';
+import { UserCheck, CheckCircle, XCircle, Clock, Loader2, Star, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -28,6 +29,11 @@ const Attendance = () => {
   const [excuseDialogOpen, setExcuseDialogOpen] = useState(false);
   const [selectedStudentForExcuse, setSelectedStudentForExcuse] = useState(null);
   const [excuseReason, setExcuseReason] = useState('');
+  
+  // Interaction badge dialog state
+  const [interactionDialogOpen, setInteractionDialogOpen] = useState(false);
+  const [selectedStudentForInteraction, setSelectedStudentForInteraction] = useState(null);
+  const [interactionNotes, setInteractionNotes] = useState('');
 
   useEffect(() => {
     fetchGroups();
