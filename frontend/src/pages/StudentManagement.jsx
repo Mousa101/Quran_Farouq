@@ -604,6 +604,45 @@ const StudentManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Admin Bonus Dialog */}
+      <Dialog open={bonusDialogOpen} onOpenChange={setBonusDialogOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Award className="w-5 h-5 text-amber-400" />
+              منح نقاط التميز
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center">
+              <p className="text-amber-400 text-lg font-bold">{selectedStudent?.name}</p>
+              <p className="text-slate-400 text-sm mt-1">سيحصل على 🏆 50 نقطة تميز</p>
+              <p className="text-slate-500 text-xs mt-1">(مرة واحدة في الأسبوع)</p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-slate-300">سبب المكافأة (اختياري)</Label>
+              <Textarea
+                value={bonusReason}
+                onChange={(e) => setBonusReason(e.target.value)}
+                className="bg-slate-800 border-slate-700 text-white"
+                placeholder="مثال: تميز في الحفظ، سلوك ممتاز..."
+              />
+            </div>
+          </div>
+          <DialogFooter className="mt-6">
+            <Button variant="ghost" onClick={() => setBonusDialogOpen(false)}>إلغاء</Button>
+            <Button 
+              className="bg-amber-500 hover:bg-amber-600" 
+              onClick={handleGrantBonus} 
+              disabled={submitting}
+            >
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'منح النقاط'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
