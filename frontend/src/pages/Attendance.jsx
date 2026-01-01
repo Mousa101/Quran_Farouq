@@ -387,6 +387,49 @@ const Attendance = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Interaction Badge Dialog */}
+      <Dialog open={interactionDialogOpen} onOpenChange={setInteractionDialogOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-pink-400" />
+              منح شارة التفاعل
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="p-4 rounded-xl bg-pink-500/10 border border-pink-500/30 text-center">
+              <p className="text-pink-400 text-lg font-bold">{selectedStudentForInteraction?.name}</p>
+              <p className="text-slate-400 text-sm mt-1">سيحصل على شارة ⭐ المتفاعل و +10 نقاط</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-slate-300">ملاحظات (اختياري)</Label>
+              <Textarea
+                value={interactionNotes}
+                onChange={(e) => setInteractionNotes(e.target.value)}
+                placeholder="سبب منح الشارة..."
+                className="bg-slate-800 border-slate-700 text-white"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="ghost" 
+              onClick={() => setInteractionDialogOpen(false)}
+              className="text-slate-400"
+            >
+              إلغاء
+            </Button>
+            <Button 
+              onClick={handleInteractionSubmit}
+              className="bg-pink-600 hover:bg-pink-700"
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'منح الشارة'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
