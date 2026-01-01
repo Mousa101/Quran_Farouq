@@ -1186,6 +1186,7 @@ async def create_tracking_sheet(sheet_data: TrackingSheetCreate, current_user: d
             "family_recitation": 0,
             "study_hours": 0,
             "witr_prayers_days": 0,
+            "sunnah_prayers": 0,
             "night_prayer": 0,
             "fasting": 0
         }
@@ -1201,6 +1202,7 @@ async def create_tracking_sheet(sheet_data: TrackingSheetCreate, current_user: d
         family_recitation=analysis_result.get("family_recitation", 0),
         study_hours=analysis_result.get("study_hours", 0),
         witr_prayers_days=analysis_result.get("witr_prayers_days", 0),
+        sunnah_prayers=analysis_result.get("sunnah_prayers", 0),
         night_prayer=analysis_result.get("night_prayer", 0),
         fasting=analysis_result.get("fasting", 0),
         notes=analysis_result.get("notes", "")
