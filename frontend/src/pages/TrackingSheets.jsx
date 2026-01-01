@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   FileText, Upload, Plus, Loader2, BookOpen, Moon, Star, Hand, Clock, Eye, 
-  Sunrise, Users, GraduationCap, Calendar
+  Sunrise, Users, GraduationCap, Calendar, Sparkles
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -39,6 +39,7 @@ const TrackingSheets = () => {
     family_recitation: 0,
     study_hours: 0,
     witr_prayers_days: 0,
+    sunnah_prayers: 0,
     night_prayer: 0,
     fasting: 0,
     notes: ''
@@ -46,11 +47,13 @@ const TrackingSheets = () => {
 
   useEffect(() => {
     fetchData();
-    // Set default week start to current week's Sunday
+    // Set default week start to current week's Saturday
     const today = new Date();
-    const sunday = new Date(today);
-    sunday.setDate(today.getDate() - today.getDay());
-    setFormData(prev => ({ ...prev, week_start: sunday.toISOString().split('T')[0] }));
+    const dayOfWeek = today.getDay();
+    const daysToSubtract = dayOfWeek === 6 ? 0 : dayOfWeek + 1;
+    const saturday = new Date(today);
+    saturday.setDate(today.getDate() - daysToSubtract);
+    setFormData(prev => ({ ...prev, week_start: saturday.toISOString().split('T')[0] }));
   }, []);
 
   const fetchData = async () => {
