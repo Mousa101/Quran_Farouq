@@ -947,16 +947,17 @@ async def get_students_pending_assessment(current_user: dict = Depends(get_curre
 
 def calculate_tracking_points(data: dict) -> dict:
     """
-    حساب نقاط ورقة المتابعة:
-    - الصلوات: من 35 (كل صلاة نقطة خلال الأسبوع)
+    حساب نقاط ورقة المتابعة - المجموع 100 نقطة:
+    - الصلوات: 35 نقطة (5 صلوات × 7 أيام)
     - الجلوس مع القرآن: 7 نقاط
     - صلاة الضحى: 7 نقاط
     - التسميع للأهل: 7 نقاط
     - ساعات الدراسة: 7 نقاط
     - الوتر: 7 نقاط
-    - قيام الليل: 1 نقطة
-    - الصيام: 1 نقطة
-    الحد الأقصى: 72 نقطة
+    - السنن: 7 نقاط
+    - قيام الليل: 8 نقاط (إذا أتم يوم = 8 نقاط كاملة)
+    - الصيام: 8 نقاط (إذا أتم يوم = 8 نقاط كاملة)
+    المجموع: 100 نقطة كحد أقصى
     """
     prayers = min(data.get("prayers_count", 0), 35)  # Max 35
     quran = min(data.get("quran_sitting_days", 0), 7)  # Max 7
@@ -964,10 +965,13 @@ def calculate_tracking_points(data: dict) -> dict:
     family = min(data.get("family_recitation", 0), 7)  # Max 7
     study = min(data.get("study_hours", 0), 7)  # Max 7
     witr = min(data.get("witr_prayers_days", 0), 7)  # Max 7
-    night = min(data.get("night_prayer", 0), 1)  # Max 1
-    fasting = min(data.get("fasting", 0), 1)  # Max 1
+    sunnah = min(data.get("sunnah_prayers", 0), 7)  # Max 7 (جديد)
+    # قيام الليل: إذا أتم يوم واحد = 8 نقاط كاملة
+    night = 8 if data.get("night_prayer", 0) >= 1 else 0
+    # الصيام: إذا أتم يوم واحد = 8 نقاط كاملة
+    fasting = 8 if data.get("fasting", 0) >= 1 else 0
     
-    total = prayers + quran + duha + family + study + witr + night + fasting
+    total = min(prayers + quran + duha + family + study + witr + sunnah + night + fasting, 100)
     
     return {
         "prayers_points": prayers,
@@ -976,10 +980,119 @@ def calculate_tracking_points(data: dict) -> dict:
         "family_points": family,
         "study_points": study,
         "witr_points": witr,
+        "sunnah_points": sunnah,
         "night_prayer_points": night,
         "fasting_points": fasting,
         "total_points": total
     }
+
+def get_current_week_start():
+    """الحصول على بداية الأسبوع الحالي (السبت)"""
+    from datetime import timedelta
+    today = datetime.now(timezone.utc).date()
+    # السبت = 5 في Python (Monday = 0)
+    days_since_saturday = (today.weekday() + 2) % 7
+    saturday = today - timedelta(days=days_since_saturday)
+    return saturday.isoformat()
+
+async def check_and_reset_weekly_badges():
+    """فحص وإعادة تعيين الشارات في بداية كل أسبوع"""
+    current_week = get_current_week_start()
+    # تحديث جميع الطلاب - إعادة تعيين الشارات الأسبوعية
+    await db.student_points.update_many(
+        {"last_badge_week": {"$ne": current_week}},
+        {"$set": {"weekly_badges": [], "last_badge_week": current_week}}
+    )
+
+async def grant_badge_to_student(student_id: str, badge_id: str, granted_by: str = "system"):
+    """منح شارة للطالب"""
+    from models import WEEKLY_BADGES, WeeklyBadge
+    
+    if badge_id not in WEEKLY_BADGES:
+        return False
+    
+    badge_info = WEEKLY_BADGES[badge_id]
+    week_start = get_current_week_start()
+    
+    # التحقق من عدم وجود نفس الشارة لهذا الأسبوع
+    existing = await db.weekly_badges.find_one({
+        "student_id": student_id,
+        "badge_id": badge_id,
+        "week_start": week_start
+    })
+    
+    if existing:
+        return False
+    
+    # إنشاء الشارة
+    badge = WeeklyBadge(
+        student_id=student_id,
+        badge_id=badge_id,
+        badge_name=badge_info["name"],
+        badge_icon=badge_info["icon"],
+        week_start=week_start,
+        granted_by=granted_by
+    )
+    
+    badge_dict = badge.model_dump()
+    badge_dict["granted_at"] = badge_dict["granted_at"].isoformat()
+    await db.weekly_badges.insert_one(badge_dict)
+    
+    # تحديث عداد الشارات للطالب
+    await db.student_points.update_one(
+        {"student_id": student_id},
+        {
+            "$addToSet": {"weekly_badges": badge_id},
+            "$inc": {"badges_count": 1}
+        },
+        upsert=True
+    )
+    
+    return True
+
+async def check_worshipper_badge(student_id: str, tracking_points: int):
+    """فحص ومنح شارة العابد (90% أو أكثر من ورق المتابعة)"""
+    if tracking_points >= 90:  # 90% من 100 نقطة
+        await grant_badge_to_student(student_id, "worshipper", "system")
+
+async def check_committed_badge(student_id: str):
+    """فحص ومنح شارة الملتزم (حضور كل الدروس)"""
+    # الحصول على الجدول النشط
+    schedule = await db.schedules.find_one({"is_active": True})
+    if not schedule or not schedule.get("lesson_days"):
+        return
+    
+    week_start = get_current_week_start()
+    # حساب عدد أيام الدروس في الأسبوع
+    expected_days = len(schedule.get("lesson_days", []))
+    
+    # حساب الحضور الفعلي
+    attendance_count = await db.attendance.count_documents({
+        "student_id": student_id,
+        "status": "present",
+        "date": {"$gte": week_start}
+    })
+    
+    if attendance_count >= expected_days:
+        await grant_badge_to_student(student_id, "committed", "system")
+
+async def check_memorizer_badge(student_id: str):
+    """فحص ومنح شارة الحافظ (تسميع في كل درس)"""
+    schedule = await db.schedules.find_one({"is_active": True})
+    if not schedule or not schedule.get("lesson_days"):
+        return
+    
+    week_start = get_current_week_start()
+    expected_days = len(schedule.get("lesson_days", []))
+    
+    # حساب عدد التسميعات
+    recitation_count = await db.recitations.count_documents({
+        "student_id": student_id,
+        "created_at": {"$gte": week_start}
+    })
+    
+    if recitation_count >= expected_days:
+        await grant_badge_to_student(student_id, "memorizer", "system")
 
 @api_router.post("/tracking-sheets/manual")
 async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_user: dict = Depends(get_current_user)):
