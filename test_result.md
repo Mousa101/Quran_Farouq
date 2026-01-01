@@ -110,6 +110,78 @@ user_problem_statement: |
   4. إضافة التاريخ مع اليوم في سجل التسميع والحضور في تقرير الطالب
 
 backend:
+  - task: "New Tracking Sheet System (100 points)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: POST /api/tracking-sheets/student works perfectly. Students can submit tracking sheets with new 100-point system. Points calculated correctly (prayers:35, quran_sitting:7, duha:7, family_recitation:7, study_hours:7, witr:7, sunnah_prayers:7, night_prayer:8, fasting:8). Week must start on Saturday. Update existing week works. Unauthorized access properly blocked."
+
+  - task: "Sheikh Grant Interaction Badge"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: POST /api/badges/interaction works correctly. Sheikh can grant interaction badge (+10 points) to students. Once per week limit enforced. Unauthorized access blocked for non-sheikhs."
+
+  - task: "Admin Grant Bonus Points"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: POST /api/badges/admin-bonus works correctly. Admin can grant bonus points (+50 points) to students. Once per week per student limit enforced. Unauthorized access blocked for non-admins."
+
+  - task: "Get Student Badges"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: GET /api/badges/student/{student_id} works correctly. Returns current week badges and total badges count for all user roles."
+
+  - task: "Available Badges"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: GET /api/badges/available works correctly. Returns list of all available badges with proper structure (name, icon fields)."
+
+  - task: "Points System (1000 max)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "TESTED: Points system enforces 1000 point maximum limit correctly. All point-awarding APIs respect this limit."
+
   - task: "Student Self Update API"
     implemented: true
     working: true
