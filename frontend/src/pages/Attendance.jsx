@@ -292,6 +292,15 @@ const Attendance = () => {
                         >
                           معذور
                         </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleInteractionClick(student)}
+                          className="bg-pink-500/20 text-pink-400 hover:bg-pink-500/30 transition-all"
+                          disabled={saving}
+                          title="منح شارة التفاعل"
+                        >
+                          <Sparkles className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
                     
