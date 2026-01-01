@@ -3841,6 +3841,152 @@ async def delete_fee(fee_id: str, current_user: dict = Depends(get_current_user)
     
     return {"message": "تم حذف الرسوم بنجاح"}
 
+# ============== BADGES & INTERACTION SYSTEM ==============
+
+class InteractionGrantCreate(BaseModel):
+    student_id: str
+    notes: Optional[str] = None
+
+@api_router.post("/badges/interaction")
+async def grant_interaction_badge(data: InteractionGrantCreate, current_user: dict = Depends(get_current_user)):
+    """منح شارة المتفاعل ونقاط التفاعل - للمعلم فقط"""
+    if current_user["role"] != "sheikh":
+        raise HTTPException(status_code=403, detail="فقط المعلم يمكنه منح شارة التفاعل")
+    
+    week_start = get_current_week_start()
+    
+    # التحقق من عدم منح التفاعل مسبقاً لهذا الأسبوع
+    existing = await db.interaction_grants.find_one({
+        "student_id": data.student_id,
+        "sheikh_id": current_user["user_id"],
+        "week_start": week_start
+    })
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="تم منح نقاط التفاعل لهذا الطالب هذا الأسبوع مسبقاً")
+    
+    # إنشاء سجل التفاعل
+    interaction = {
+        "id": str(uuid.uuid4()),
+        "student_id": data.student_id,
+        "sheikh_id": current_user["user_id"],
+        "points": 10,
+        "week_start": week_start,
+        "notes": data.notes,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.interaction_grants.insert_one(interaction)
+    
+    # منح الشارة
+    await grant_badge_to_student(data.student_id, "interactive", current_user["user_id"])
+    
+    # منح النقاط (مع الحد الأقصى 1000)
+    student_points = await db.student_points.find_one({"student_id": data.student_id})
+    current_total = student_points.get("total_points", 0) if student_points else 0
+    points_to_add = min(10, 1000 - current_total)
+    
+    if points_to_add > 0:
+        await add_points(data.student_id, points_to_add, "interaction", "نقاط تفاعل من المعلم")
+        await db.student_points.update_one(
+            {"student_id": data.student_id},
+            {"$inc": {"interaction_points": points_to_add}},
+            upsert=True
+        )
+    
+    # إشعار الطالب
+    await create_notification_internal(
+        data.student_id,
+        "🌟 شارة المتفاعل",
+        f"حصلت على شارة المتفاعل و{points_to_add} نقطة من المعلم!",
+        "success"
+    )
+    
+    return {"message": "تم منح شارة التفاعل بنجاح", "points_added": points_to_add}
+
+class AdminBonusCreate(BaseModel):
+    student_id: str
+    reason: Optional[str] = None
+
+@api_router.post("/badges/admin-bonus")
+async def grant_admin_bonus(data: AdminBonusCreate, current_user: dict = Depends(get_current_user)):
+    """منح النقاط الإدارية للتميز - للمدير فقط (50 نقطة مرة واحدة في الأسبوع)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه منح النقاط الإدارية")
+    
+    week_start = get_current_week_start()
+    
+    # التحقق من عدم منح النقاط الإدارية مسبقاً لهذا الأسبوع
+    existing = await db.admin_bonus_grants.find_one({
+        "student_id": data.student_id,
+        "week_start": week_start
+    })
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="تم منح النقاط الإدارية لهذا الطالب هذا الأسبوع مسبقاً")
+    
+    # إنشاء سجل النقاط الإدارية
+    bonus = {
+        "id": str(uuid.uuid4()),
+        "student_id": data.student_id,
+        "admin_id": current_user["user_id"],
+        "points": 50,
+        "week_start": week_start,
+        "reason": data.reason,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.admin_bonus_grants.insert_one(bonus)
+    
+    # منح النقاط (مع الحد الأقصى 1000)
+    student_points = await db.student_points.find_one({"student_id": data.student_id})
+    current_total = student_points.get("total_points", 0) if student_points else 0
+    points_to_add = min(50, 1000 - current_total)
+    
+    if points_to_add > 0:
+        await add_points(data.student_id, points_to_add, "admin_bonus", data.reason or "نقاط إدارية للتميز")
+        await db.student_points.update_one(
+            {"student_id": data.student_id},
+            {"$inc": {"admin_bonus_points": points_to_add}},
+            upsert=True
+        )
+    
+    # إشعار الطالب
+    await create_notification_internal(
+        data.student_id,
+        "🏆 نقاط التميز",
+        f"حصلت على {points_to_add} نقطة إدارية للتميز من المدير!",
+        "success"
+    )
+    
+    return {"message": "تم منح النقاط الإدارية بنجاح", "points_added": points_to_add}
+
+@api_router.get("/badges/student/{student_id}")
+async def get_student_badges(student_id: str, current_user: dict = Depends(get_current_user)):
+    """الحصول على شارات الطالب للأسبوع الحالي"""
+    week_start = get_current_week_start()
+    
+    badges = await db.weekly_badges.find({
+        "student_id": student_id,
+        "week_start": week_start
+    }, {"_id": 0}).to_list(10)
+    
+    # الحصول على إجمالي عدد الشارات
+    student_points = await db.student_points.find_one({"student_id": student_id})
+    total_badges_count = student_points.get("badges_count", 0) if student_points else 0
+    
+    return {
+        "current_week_badges": badges,
+        "total_badges_count": total_badges_count,
+        "week_start": week_start
+    }
+
+@api_router.get("/badges/available")
+async def get_available_badges():
+    """الحصول على قائمة الشارات المتاحة"""
+    from models import WEEKLY_BADGES
+    return list(WEEKLY_BADGES.values())
+
 # ============== HOMEWORK/ASSIGNMENTS ==============
 
 @api_router.post("/homework")
