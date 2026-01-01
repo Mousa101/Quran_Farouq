@@ -1276,14 +1276,24 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
     # الحصول على بداية الأسبوع الحالي (السبت)
     current_week_start = get_current_week_start()
     
-    # التحقق من أن التاريخ هو بداية الأسبوع الحالي
-    if data.week_start != current_week_start:
-        raise HTTPException(status_code=400, detail=f"يمكنك فقط تعبئة ورقة الأسبوع الحالي. بداية الأسبوع: {current_week_start}")
+    # السماح بتعبئة ورقة الأسبوع الحالي أو استخدام التاريخ المرسل مع التحقق من صحته
+    week_start_to_use = data.week_start if data.week_start else current_week_start
+    
+    # التحقق من أن التاريخ المرسل صحيح (يجب أن يكون يوم سبت)
+    try:
+        from datetime import datetime as dt
+        date_obj = dt.strptime(week_start_to_use, '%Y-%m-%d')
+        # السبت = 5 في Python
+        if date_obj.weekday() != 5:
+            # إذا لم يكن سبت، استخدم السبت الحالي
+            week_start_to_use = current_week_start
+    except:
+        week_start_to_use = current_week_start
     
     # التحقق من عدم وجود ورقة سابقة لنفس الأسبوع (مرة واحدة فقط)
     existing = await db.tracking_sheets.find_one({
         "student_id": current_user["user_id"],
-        "week_start": data.week_start
+        "week_start": week_start_to_use
     })
     
     # حساب النقاط
