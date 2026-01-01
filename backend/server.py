@@ -1007,7 +1007,6 @@ async def check_and_reset_weekly_badges():
 
 async def grant_badge_to_student(student_id: str, badge_id: str, granted_by: str = "system"):
     """منح شارة للطالب"""
-    from models import WEEKLY_BADGES, WeeklyBadge
     
     if badge_id not in WEEKLY_BADGES:
         return False
