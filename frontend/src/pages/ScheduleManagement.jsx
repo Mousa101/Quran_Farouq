@@ -230,10 +230,45 @@ const ScheduleManagement = () => {
                         type="date"
                         value={formData.end_date}
                         onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
+                        required
                         className={isDark ? 'bg-slate-800 border-white/10 text-white' : ''}
                       />
                     </div>
                   </div>
+                  
+                  {/* أيام الدروس */}
+                  <div>
+                    <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>أيام الدروس</Label>
+                    <div className="grid grid-cols-4 gap-2 mt-2">
+                      {DAYS.map((day) => (
+                        <label
+                          key={day}
+                          className={`flex items-center justify-center p-2 rounded-lg cursor-pointer transition-all ${
+                            formData.lesson_days?.includes(day)
+                              ? 'bg-blue-500/20 border-2 border-blue-500 text-blue-400'
+                              : isDark
+                              ? 'bg-slate-800 border border-white/10 text-slate-400 hover:border-blue-500/50'
+                              : 'bg-slate-100 border border-slate-200 text-slate-600 hover:border-blue-500'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="hidden"
+                            checked={formData.lesson_days?.includes(day)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFormData({ ...formData, lesson_days: [...(formData.lesson_days || []), day] });
+                              } else {
+                                setFormData({ ...formData, lesson_days: formData.lesson_days?.filter(d => d !== day) || [] });
+                              }
+                            }}
+                          />
+                          <span className="text-xs font-medium">{day}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  
                   <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">إنشاء</Button>
                 </form>
               </DialogContent>
