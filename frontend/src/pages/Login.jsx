@@ -36,7 +36,7 @@ const Login = () => {
       <div className="hidden lg:flex lg:w-1/2 relative">
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/80 via-slate-900/90 to-background" />
         <img
-          src="https://images.unsplash.com/photo-1674847719309-9fc2692b02bd?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwxfHxxdXJhbiUyMG9wZW4lMjBkYXJrJTIwbW9vZHklMjBsaWdodGluZ3xlbnwwfHx8fDE3NjU1NjQ5NjZ8MA&ixlib=rb-4.1.0&q=85"
+          src="/backGround_url.png"
           alt="Quran"
           className="w-full h-full object-cover"
         />

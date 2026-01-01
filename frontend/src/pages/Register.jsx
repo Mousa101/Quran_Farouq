@@ -31,6 +31,7 @@ const Register = () => {
     birthDate: '',
     joinDate: '',
     schoolGrade: '',
+    
     studentPhone: '',
     fatherPhone: '',
     motherPhone: '',
@@ -250,7 +251,7 @@ const Register = () => {
       <div className="hidden lg:flex lg:w-1/2 relative">
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/80 via-slate-900/90 to-background" />
         <img
-          src="https://images.unsplash.com/photo-1565221406225-40d1b01a52d6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODF8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBtb3NxdWUlMjBhcmNoaXRlY3R1cmUlMjBpbnRlcmlvciUyMGRhcmt8ZW58MHx8fHwxNzY1NTY0OTY5fDA&ixlib=rb-4.1.0&q=85"
+          src="/backGround_url.png"
           alt="Mosque"
           className="w-full h-full object-cover"
         />
@@ -482,23 +483,6 @@ const Register = () => {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-slate-400 text-xs flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    تاريخ الميلاد
-                  </Label>
-                  <Input
-                    type="date"
-                    value={formData.birthDate}
-                    onChange={(e) => handleChange('birthDate', e.target.value)}
-                    className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
-                  />
-                </div>
-              </div>
-
-              {/* School & Grade - Students only */}
-              {selectedRole === 'student' && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
                     <Label className="text-slate-400 text-xs flex items-center gap-1">
                       <School className="w-3 h-3" />
                       المدرسة
@@ -511,6 +495,12 @@ const Register = () => {
                       className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
                     />
                   </div>
+                
+              </div>
+
+              {/* School & Grade - Students only */}
+              {selectedRole === 'student' && (
+                <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-slate-400 text-xs">الصف الدراسي</Label>
                     <Input
@@ -521,10 +511,34 @@ const Register = () => {
                       className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
                     />
                   </div>
+                 <div className="space-y-1">
+              <Label className="text-slate-400 text-xs">المعدل الدراسي</Label>
+              <Input
+                name="school_average"
+                value={formData.school_average}
+                onChange={handleChange}
+                placeholder="مثال: 95%"
+                className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
+                    
+              />
+            </div>
+                
                 </div>
               )}
 
               {/* Join Date */}
+              <div className="space-y-1">
+                  <Label className="text-slate-400 text-xs flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    تاريخ الميلاد
+                  </Label>
+                  <Input
+                    type="date"
+                    value={formData.birthDate}
+                    onChange={(e) => handleChange('birthDate', e.target.value)}
+                    className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
+                  />
+                </div>  
               <div className="space-y-1">
                 <Label className="text-slate-400 text-xs flex items-center gap-1">
                   <UserPlus className="w-3 h-3" />
