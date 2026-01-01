@@ -422,14 +422,25 @@ class AdminBonusGrant(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class StudentPoints(BaseModel):
+    """
+    نظام النقاط - الحد الأقصى في الفصل: 1000 نقطة
+    - ورقة المتابعة: 100 نقطة/أسبوع
+    - كل تسميع: 10 نقاط
+    - كل يوم حضور: 10 نقاط
+    - تفاعل من المعلم: 10 نقاط
+    - نقاط إدارية للتميز: 50 نقطة/أسبوع (من المدير)
+    """
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     student_id: str
-    total_points: int = 0
-    attendance_points: int = 0
-    recitation_points: int = 0
-    tracking_points: int = 0
-    badges: List[str] = []  # List of badge IDs
+    total_points: int = 0  # الحد الأقصى 1000
+    attendance_points: int = 0  # نقاط الحضور
+    recitation_points: int = 0  # نقاط التسميع
+    tracking_points: int = 0  # نقاط ورق المتابعة
+    interaction_points: int = 0  # نقاط التفاعل من المعلم
+    admin_bonus_points: int = 0  # نقاط إدارية للتميز
+    weekly_badges: List[str] = []  # شارات الأسبوع الحالي
+    badges_count: int = 0  # عدد الشارات المكتسبة (إجمالي)
     level: int = 1
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
