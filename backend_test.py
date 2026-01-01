@@ -96,7 +96,7 @@ class QuranAppAPITester:
                 self.log_test(f"Login {login['role']}", True)
             else:
                 # Try alternative passwords that might have been reset
-                alt_passwords = ["newpass123", "newpassword123", "password123"]
+                alt_passwords = ["newpass123", "newpassword123", "password123", "newpassword456"]
                 login_success = False
                 
                 for alt_pass in alt_passwords:
