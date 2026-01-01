@@ -725,6 +725,10 @@ const StudentDashboard = () => {
                 <p className="text-lg md:text-xl font-bold text-indigo-400">{stats?.tracking?.semester?.witr || 0}</p>
                 <p className="text-slate-400 text-[10px] md:text-xs">الوتر</p>
               </div>
+              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-teal-500/20">
+                <p className="text-lg md:text-xl font-bold text-teal-400">{stats?.tracking?.semester?.sunnah_prayers || 0}</p>
+                <p className="text-slate-400 text-[10px] md:text-xs">السنن</p>
+              </div>
               <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-yellow-500/20">
                 <p className="text-lg md:text-xl font-bold text-yellow-400">{stats?.tracking?.semester?.night_prayer || 0}</p>
                 <p className="text-slate-400 text-[10px] md:text-xs">قيام الليل</p>
