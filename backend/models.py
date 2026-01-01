@@ -199,6 +199,7 @@ class TrackingSheetManualCreate(BaseModel):
     family_recitation: int = 0  # التسميع للأهل (0-7)
     study_hours: int = 0  # ساعات الدراسة (0-7)
     witr_prayers_days: int = 0  # الوتر (0-7)
+    sunnah_prayers: int = 0  # السنن (0-7)
     night_prayer: int = 0  # قيام الليل (0-1)
     fasting: int = 0  # الصيام (0-1)
     notes: Optional[str] = None
