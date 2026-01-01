@@ -15,7 +15,7 @@ import {
   BookOpen, Clock, Users, Trophy, Calendar, CheckCircle, 
   User, Phone, School, Home, Star, AlertTriangle, Award,
   Sunrise, Moon, BookMarked, Hand, Mail, Cake, MapPin, GraduationCap,
-  ChevronDown, ChevronUp, Plus, Edit2
+  ChevronDown, ChevronUp, Plus, Edit2, Sparkles
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
