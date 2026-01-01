@@ -37,6 +37,7 @@ const StudentDashboard = () => {
     family_recitation: 0,
     study_hours: 0,
     witr_prayers_days: 0,
+    sunnah_prayers: 0,
     night_prayer: 0,
     fasting: 0,
     notes: ''
