@@ -1439,6 +1439,7 @@ async def get_tracking_stats(student_id: str, current_user: dict = Depends(get_c
         "family_recitation": 0,
         "study_hours": 0,
         "witr": 0,
+        "sunnah_prayers": 0,
         "night_prayer": 0,
         "fasting": 0,
         "total_points": 0
@@ -1453,6 +1454,7 @@ async def get_tracking_stats(student_id: str, current_user: dict = Depends(get_c
             "family_recitation": data.get("family_recitation", 0),
             "study_hours": data.get("study_hours", 0),
             "witr": data.get("witr_prayers_days", 0),
+            "sunnah_prayers": data.get("sunnah_prayers", 0),
             "night_prayer": data.get("night_prayer", 0),
             "fasting": data.get("fasting", 0),
             "total_points": current_week_sheet.get("points_earned", 0)
@@ -1468,6 +1470,7 @@ async def get_tracking_stats(student_id: str, current_user: dict = Depends(get_c
         "family_recitation": sum(s["data"].get("family_recitation", 0) for s in semester_sheets if s.get("data")),
         "study_hours": sum(s["data"].get("study_hours", 0) for s in semester_sheets if s.get("data")),
         "witr": sum(s["data"].get("witr_prayers_days", 0) for s in semester_sheets if s.get("data")),
+        "sunnah_prayers": sum(s["data"].get("sunnah_prayers", 0) for s in semester_sheets if s.get("data")),
         "night_prayer": sum(s["data"].get("night_prayer", 0) for s in semester_sheets if s.get("data")),
         "fasting": sum(s["data"].get("fasting", 0) for s in semester_sheets if s.get("data")),
         "total_points": sum(s.get("points_earned", 0) for s in semester_sheets),
