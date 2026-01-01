@@ -347,14 +347,79 @@ class WeeklyRanking(BaseModel):
     scores: List[StudentScore] = []
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-# Points & Badges System
+# Points & Badges System - Updated
+WEEKLY_BADGES = {
+    "worshipper": {
+        "id": "worshipper",
+        "name": "العابد",
+        "description": "إتمام ورق المتابعة بنسبة 90% أو أكثر",
+        "icon": "🏅",
+        "category": "tracking"
+    },
+    "interactive": {
+        "id": "interactive",
+        "name": "المتفاعل",
+        "description": "يمنحها المعلم للطالب المتفاعل",
+        "icon": "⭐",
+        "category": "interaction"
+    },
+    "committed": {
+        "id": "committed",
+        "name": "الملتزم",
+        "description": "الالتزام بحضور كل الدروس",
+        "icon": "📅",
+        "category": "attendance"
+    },
+    "memorizer": {
+        "id": "memorizer",
+        "name": "الحافظ",
+        "description": "التسميع في كل درس",
+        "icon": "📖",
+        "category": "recitation"
+    }
+}
+
 class Badge(BaseModel):
     id: str
     name: str
     description: str
     icon: str
-    points_required: int
-    category: str  # attendance, recitation, tracking, special
+    points_required: int = 0
+    category: str  # attendance, recitation, tracking, interaction, special
+
+class WeeklyBadge(BaseModel):
+    """شارة أسبوعية للطالب"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    student_id: str
+    badge_id: str  # worshipper, interactive, committed, memorizer
+    badge_name: str
+    badge_icon: str
+    week_start: str  # بداية الأسبوع
+    granted_by: Optional[str] = None  # من منحها (sheikh_id or system)
+    granted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class InteractionGrant(BaseModel):
+    """منح نقاط التفاعل من المعلم"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    student_id: str
+    sheikh_id: str
+    points: int = 10
+    week_start: str
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class AdminBonusGrant(BaseModel):
+    """منح نقاط إدارية للتميز من المدير"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    student_id: str
+    admin_id: str
+    points: int = 50
+    week_start: str
+    reason: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class StudentPoints(BaseModel):
     model_config = ConfigDict(extra="ignore")
