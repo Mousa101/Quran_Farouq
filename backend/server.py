@@ -1108,6 +1108,7 @@ async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_
         "family_recitation": data.family_recitation,
         "study_hours": data.study_hours,
         "witr_prayers_days": data.witr_prayers_days,
+        "sunnah_prayers": data.sunnah_prayers,
         "night_prayer": data.night_prayer,
         "fasting": data.fasting
     })
@@ -1119,6 +1120,7 @@ async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_
         family_recitation=min(data.family_recitation, 7),
         study_hours=min(data.study_hours, 7),
         witr_prayers_days=min(data.witr_prayers_days, 7),
+        sunnah_prayers=min(data.sunnah_prayers, 7),
         night_prayer=min(data.night_prayer, 1),
         fasting=min(data.fasting, 1),
         notes=data.notes
