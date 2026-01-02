@@ -38,6 +38,7 @@ import OnlineExams from './pages/OnlineExams';
 import SheikhManagement from './pages/SheikhManagement';
 import StudentTracking from './pages/StudentTracking';
 import MyProgress from './pages/MyProgress';
+import StudentHomework from './pages/StudentHomework';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
