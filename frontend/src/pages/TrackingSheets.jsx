@@ -527,11 +527,16 @@ const TrackingSheets = () => {
           <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>دليل النقاط (الأسبوعية)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
             <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
               <Hand className="w-5 h-5 mx-auto mb-1 text-emerald-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصلوات</p>
               <p className="text-sm font-bold text-emerald-400">35</p>
+            </div>
+            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
+              <MessageCircle className="w-5 h-5 mx-auto mb-1 text-teal-400" />
+              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>أذكار الصلاة</p>
+              <p className="text-sm font-bold text-teal-400">7</p>
             </div>
             <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
               <BookOpen className="w-5 h-5 mx-auto mb-1 text-blue-400" />
@@ -566,17 +571,18 @@ const TrackingSheets = () => {
             <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-yellow-500/10' : 'bg-yellow-50'}`}>
               <Star className="w-5 h-5 mx-auto mb-1 text-yellow-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>قيام الليل</p>
-              <p className="text-sm font-bold text-yellow-400">8</p>
+              <p className="text-sm font-bold text-yellow-400">4</p>
             </div>
             <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-cyan-500/10' : 'bg-cyan-50'}`}>
               <Calendar className="w-5 h-5 mx-auto mb-1 text-cyan-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصيام</p>
-              <p className="text-sm font-bold text-cyan-400">8</p>
+              <p className="text-sm font-bold text-cyan-400">5</p>
             </div>
           </div>
           <div className={`mt-4 p-3 rounded-lg text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
             <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>الحد الأقصى الأسبوعي</p>
             <p className="text-2xl font-bold text-emerald-400">100 نقطة</p>
+            <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>35+7+7+7+7+7+7+7+4+5=93 (مع حد أقصى 100)</p>
           </div>
         </CardContent>
       </Card>
