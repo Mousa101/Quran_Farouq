@@ -1524,11 +1524,22 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     if current_user["role"] != "sheikh":
         raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تسجيل التسميع")
     
-    # كل تسميع = 10 نقاط (النظام الجديد المبسط)
+    # كل تسميع = 20 نقطة (النظام الجديد)
     points = 20
-    description = ""
+    description_parts = []
     
-    if recitation_data.recitation_type == "new_memorization":
+    # تحقق إذا كان حفظ جديد (سواء combined أو new_memorization)
+    has_new = recitation_data.recitation_type in ["new_memorization", "combined"] and recitation_data.has_new_memorization
+    # تحقق إذا كان مراجعة (سواء combined أو review)
+    has_review = recitation_data.recitation_type in ["review", "combined"] and recitation_data.has_review
+    
+    # للتوافق مع النظام القديم
+    if recitation_data.recitation_type == "new_memorization" and not hasattr(recitation_data, 'has_new_memorization'):
+        has_new = True
+    if recitation_data.recitation_type == "review" and not hasattr(recitation_data, 'has_review'):
+        has_review = True
+    
+    if has_new or recitation_data.recitation_type == "new_memorization":
         # حفظ جديد
         pages_count = 1
         if recitation_data.page_from and recitation_data.page_to:
@@ -1543,20 +1554,26 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
         error_text = f"- الأخطاء: {recitation_data.error_count}" if recitation_data.error_count else ""
         pass_text = "✓ اجتاز" if recitation_data.passed_minimum else ""
         
-        description = f"حفظ جديد: {juz_text} {page_range} {rating_text} {error_text} {pass_text}".strip()
-    else:
+        description_parts.append(f"حفظ جديد: {juz_text} {page_range} {rating_text} {error_text} {pass_text}".strip())
+    
+    if has_review or recitation_data.recitation_type == "review":
         # مراجعة
-        desc_parts = []
+        review_parts = []
         if recitation_data.review_juz and len(recitation_data.review_juz) > 0:
             juz_list = ", ".join([str(j) for j in sorted(recitation_data.review_juz)])
-            desc_parts.append(f"مراجعة الأجزاء {juz_list}")
+            review_parts.append(f"الأجزاء {juz_list}")
         
         if recitation_data.partial_review_pages and recitation_data.partial_review_pages > 0:
             partial_juz = recitation_data.partial_review_juz or ""
             if partial_juz:
-                desc_parts.append(f"و {recitation_data.partial_review_pages} صفحات من جزء {partial_juz}")
+                review_parts.append(f"{recitation_data.partial_review_pages} صفحات من جزء {partial_juz}")
             else:
-                desc_parts.append(f"و {recitation_data.partial_review_pages} صفحات")
+                review_parts.append(f"{recitation_data.partial_review_pages} صفحات")
+        
+        if review_parts:
+            description_parts.append(f"مراجعة: {' و '.join(review_parts)}")
+    
+    description = " | ".join(description_parts) if description_parts else "تسميع"
         
         if recitation_data.passed_review_minimum:
             desc_parts.append("✓ اجتاز")
