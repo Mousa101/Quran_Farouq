@@ -3399,6 +3399,11 @@ async def get_sheikh_students_ranking(current_user: dict = Depends(get_current_u
         total_recitations = len(recitations)
         total_pages = sum(r.get("page_to", 0) - r.get("page_from", 0) + 1 for r in recitations if r.get("page_from") and r.get("page_to"))
         
+        # Get tracking sheets total points - مجموع نقاط ورق المتابعة
+        tracking_sheets = await db.tracking_sheets.find({"student_id": student["id"]}, {"_id": 0}).to_list(100)
+        tracking_points_total = sum(sheet.get("points_earned", 0) for sheet in tracking_sheets)
+        tracking_sheets_count = len(tracking_sheets)
+        
         # Get group name
         group = next((g for g in groups if g["id"] == student.get("group_id")), None)
         
@@ -3411,6 +3416,8 @@ async def get_sheikh_students_ranking(current_user: dict = Depends(get_current_u
             "attendance_rate": attendance_rate,
             "total_recitations": total_recitations,
             "total_pages": total_pages,
+            "tracking_points": tracking_points_total,  # مجموع نقاط ورق المتابعة
+            "tracking_sheets_count": tracking_sheets_count,  # عدد ورق المتابعة
             "level": points_data.get("level", 1) if points_data else 1
         })
     
