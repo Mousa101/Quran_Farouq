@@ -529,7 +529,7 @@ const TrackingSheets = () => {
           <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>دليل النقاط (الأسبوعية)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-9 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2">
             <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
               <Hand className="w-4 h-4 mx-auto mb-1 text-emerald-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصلوات</p>
@@ -544,6 +544,11 @@ const TrackingSheets = () => {
               <BookOpen className="w-4 h-4 mx-auto mb-1 text-blue-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>القرآن</p>
               <p className="text-sm font-bold text-blue-400">7</p>
+            </div>
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+              <Sunrise className="w-4 h-4 mx-auto mb-1 text-amber-400" />
+              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الضحى</p>
+              <p className="text-sm font-bold text-amber-400">7</p>
             </div>
             <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-pink-500/10' : 'bg-pink-50'}`}>
               <Users className="w-4 h-4 mx-auto mb-1 text-pink-400" />
@@ -579,7 +584,7 @@ const TrackingSheets = () => {
           <div className={`mt-3 p-2 rounded-lg text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
             <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>الحد الأقصى الأسبوعي</p>
             <p className="text-xl font-bold text-emerald-400">100 نقطة</p>
-            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>35+7+7+7+7+7+7+8+8=93</p>
+            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>35+7+7+7+7+7+7+7+8+8=100</p>
           </div>
         </CardContent>
       </Card>
