@@ -31,7 +31,7 @@ const Register = () => {
     birthDate: '',
     joinDate: '',
     schoolGrade: '',
-    
+    school_average:'',
     studentPhone: '',
     fatherPhone: '',
     motherPhone: '',
@@ -135,6 +135,7 @@ const Register = () => {
         payload.school_grade = formData.schoolGrade;
         payload.father_phone = formData.fatherPhone;
         payload.mother_phone = formData.motherPhone;
+        payload.school_average = formData.school_average ? parseInt(formData.school_average) : null;
       } else if (selectedRole === 'sheikh' || selectedRole === 'admin') {
         payload.specialization = formData.specialization;
         payload.experience_years = formData.experienceYears ? parseInt(formData.experienceYears) : null;
