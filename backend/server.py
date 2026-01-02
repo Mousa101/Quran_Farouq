@@ -1353,6 +1353,7 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
     # إنشاء ورقة جديدة
     sheet_data = TrackingSheetData(
         prayers_count=min(data.prayers_count, 35),
+        adhkar_after_prayer=min(data.adhkar_after_prayer, 7),
         quran_sitting_days=min(data.quran_sitting_days, 7),
         duha_prayers=min(data.duha_prayers, 7),
         family_recitation=min(data.family_recitation, 7),
