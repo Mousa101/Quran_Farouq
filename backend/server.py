@@ -1623,8 +1623,29 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     if current_user["role"] != "sheikh":
         raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تسجيل التسميع")
     
-    # كل تسميع = 20 نقطة (النظام الجديد)
-    points = 20
+    # إذا لم يسمع - لا يُسجل التسميع ولا نقاط
+    if recitation_data.did_not_recite:
+        recitation = Recitation(
+            student_id=recitation_data.student_id,
+            sheikh_id=current_user["user_id"],
+            recitation_type="did_not_recite",
+            did_not_recite=True,
+            passed_minimum=False,
+            passed_review_minimum=False,
+            notes=recitation_data.notes or "لم يسمع",
+            points_earned=0
+        )
+        
+        recitation_dict = recitation.model_dump()
+        recitation_dict["created_at"] = recitation_dict["created_at"].isoformat()
+        await db.recitations.insert_one(recitation_dict)
+        
+        return {"message": "تم تسجيل عدم التسميع", "recitation_id": recitation.id, "points_earned": 0}
+    
+    # النقاط فقط إذا اجتاز الحد الأدنى - 20 نقطة
+    passed = recitation_data.passed_minimum or recitation_data.passed_review_minimum
+    points = 20 if passed else 0
+    
     description_parts = []
     
     # تحقق إذا كان حفظ جديد (سواء combined أو new_memorization)
@@ -1646,14 +1667,13 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
         elif recitation_data.pages_count:
             pages_count = recitation_data.pages_count
         
-        # Build description
+        # Build description - بدون التقييم
         juz_text = f"الجزء {recitation_data.juz_number}" if recitation_data.juz_number else ""
         page_range = f"من صفحة {recitation_data.page_from} إلى {recitation_data.page_to}" if recitation_data.page_from and recitation_data.page_to else f"{pages_count} صفحة"
-        rating_text = f"- التقييم: {recitation_data.rating}/10" if recitation_data.rating else ""
         error_text = f"- الأخطاء: {recitation_data.error_count}" if recitation_data.error_count else ""
-        pass_text = "✓ اجتاز" if recitation_data.passed_minimum else ""
+        pass_text = "✓ اجتاز" if recitation_data.passed_minimum else "✗ لم يجتز"
         
-        description_parts.append(f"حفظ جديد: {juz_text} {page_range} {rating_text} {error_text} {pass_text}".strip())
+        description_parts.append(f"حفظ جديد: {juz_text} {page_range} {error_text} {pass_text}".strip())
     
     if has_review or recitation_data.recitation_type == "review":
         # مراجعة
@@ -1669,8 +1689,9 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
             else:
                 review_parts.append(f"{recitation_data.partial_review_pages} صفحات")
         
+        pass_text = "✓ اجتاز" if recitation_data.passed_review_minimum else "✗ لم يجتز"
         if review_parts:
-            description_parts.append(f"مراجعة: {' و '.join(review_parts)}")
+            description_parts.append(f"مراجعة: {' و '.join(review_parts)} {pass_text}")
     
     description = " | ".join(description_parts) if description_parts else "تسميع"
     
@@ -1682,7 +1703,6 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
         juz_number=recitation_data.juz_number,
         page_from=recitation_data.page_from,
         page_to=recitation_data.page_to,
-        rating=recitation_data.rating,
         error_count=recitation_data.error_count,
         partial_review_juz=recitation_data.partial_review_juz,
         partial_review_pages=recitation_data.partial_review_pages,
@@ -1692,6 +1712,7 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
         passed_review_minimum=recitation_data.passed_review_minimum,
         has_new_memorization=recitation_data.has_new_memorization,
         has_review=recitation_data.has_review,
+        did_not_recite=recitation_data.did_not_recite,
         notes=recitation_data.notes,
         points_earned=points,
         # Legacy
