@@ -1108,11 +1108,12 @@ async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_
     if current_user["role"] != "sheikh":
         raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه إدخال ورقة المتابعة")
     
-    # Calculate points
+    # Calculate points - تضمين جميع الحقول بما فيها صلاة الضحى
     points_breakdown = calculate_tracking_points({
         "prayers_count": data.prayers_count,
         "adhkar_after_prayer": data.adhkar_after_prayer,
         "quran_sitting_days": data.quran_sitting_days,
+        "duha_prayers": data.duha_prayers,  # تم إضافة صلاة الضحى
         "family_recitation": data.family_recitation,
         "study_hours": data.study_hours,
         "witr_prayers_days": data.witr_prayers_days,
