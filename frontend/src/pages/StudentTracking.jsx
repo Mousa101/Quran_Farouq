@@ -10,7 +10,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { 
   FileText, Plus, Loader2, BookOpen, Moon, Star, Hand, Eye, 
-  Sunrise, Users, GraduationCap, Calendar, CheckCircle, Sparkles
+  Users, GraduationCap, Calendar, CheckCircle, Sparkles, MessageCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -42,8 +42,8 @@ const StudentTracking = () => {
   const [formData, setFormData] = useState({
     week_start: getCurrentWeekStart(),
     prayers_count: 0,
+    adhkar_after_prayer: 0,
     quran_sitting_days: 0,
-    duha_prayers: 0,
     family_recitation: 0,
     study_hours: 0,
     witr_prayers_days: 0,
