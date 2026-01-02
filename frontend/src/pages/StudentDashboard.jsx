@@ -81,12 +81,15 @@ const StudentDashboard = () => {
   }, [user?.id]);
 
   const getMyRank = () => {
-    const myScore = rankings.scores.find(s => s.student_id === user?.id);
+    // استخدم my_rank من API الجديد أو ابحث في القائمة
+    if (rankings.my_rank) return rankings.my_rank;
+    const myScore = rankings.scores?.find(s => s.student_id === user?.id);
     return myScore || null;
   };
 
   const myRank = getMyRank();
-  const myPosition = rankings.scores.findIndex(s => s.student_id === user?.id) + 1;
+  const myPosition = myRank?.position || (rankings.scores?.findIndex(s => s.student_id === user?.id) + 1) || 0;
+  const totalInGroup = rankings.total_in_group || rankings.scores?.length || 0;
 
   const getRankStyle = (rank) => {
     switch (rank) {
