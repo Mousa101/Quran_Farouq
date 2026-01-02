@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   FileText, Upload, Plus, Loader2, BookOpen, Moon, Star, Hand, Clock, Eye, 
-  Sunrise, Users, GraduationCap, Calendar, Sparkles
+  Sunrise, Users, GraduationCap, Calendar, Sparkles, MessageCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
