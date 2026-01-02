@@ -801,6 +801,213 @@ const TrackingSheets = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Edit Sheet Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => {
+        setEditDialogOpen(open);
+        if (!open) setSelectedSheet(null);
+      }}>
+        <DialogContent className={`max-w-2xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white'}`}>
+          <DialogHeader>
+            <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>
+              تعديل ورقة المتابعة - {selectedSheet && getStudentName(selectedSheet.student_id)}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <form onSubmit={handleEditSubmit} className="space-y-4 mt-4">
+            <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+              <h3 className={`font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>بيانات الأسبوع</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                {/* الصلوات */}
+                <div>
+                  <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <Hand className="w-4 h-4 text-emerald-400" />
+                    الصلوات (من 35)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="35"
+                    value={editFormData.prayers_count}
+                    onChange={(e) => setEditFormData({ ...editFormData, prayers_count: parseInt(e.target.value) || 0 })}
+                    className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                  />
+                </div>
+
+                {/* أذكار بعد الصلاة */}
+                <div>
+                  <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <MessageCircle className="w-4 h-4 text-teal-400" />
+                    أذكار بعد الصلاة (من 7)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="7"
+                    value={editFormData.adhkar_after_prayer}
+                    onChange={(e) => setEditFormData({ ...editFormData, adhkar_after_prayer: parseInt(e.target.value) || 0 })}
+                    className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                  />
+                </div>
+                
+                {/* الجلوس مع القرآن */}
+                <div>
+                  <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <BookOpen className="w-4 h-4 text-blue-400" />
+                    الجلوس مع القرآن (من 7)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="7"
+                    value={editFormData.quran_sitting_days}
+                    onChange={(e) => setEditFormData({ ...editFormData, quran_sitting_days: parseInt(e.target.value) || 0 })}
+                    className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                  />
+                </div>
+
+                {/* صلاة الضحى */}
+                <div>
+                  <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <Sunrise className="w-4 h-4 text-amber-400" />
+                    صلاة الضحى (من 7)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="7"
+                    value={editFormData.duha_prayers}
+                    onChange={(e) => setEditFormData({ ...editFormData, duha_prayers: parseInt(e.target.value) || 0 })}
+                    className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                  />
+                </div>
+
+                {/* التسميع للأهل */}
+                <div>
+                  <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <Users className="w-4 h-4 text-pink-400" />
+                    التسميع للأهل (من 7)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="7"
+                    value={editFormData.family_recitation}
+                    onChange={(e) => setEditFormData({ ...editFormData, family_recitation: parseInt(e.target.value) || 0 })}
+                    className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                  />
+                </div>
+
+                {/* ساعات الدراسة */}
+                <div>
+                  <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <GraduationCap className="w-4 h-4 text-purple-400" />
+                    ساعات الدراسة (من 7)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="7"
+                    value={editFormData.study_hours}
+                    onChange={(e) => setEditFormData({ ...editFormData, study_hours: parseInt(e.target.value) || 0 })}
+                    className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                  />
+                </div>
+
+                {/* الوتر */}
+                <div>
+                  <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <Moon className="w-4 h-4 text-indigo-400" />
+                    الوتر (من 7)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="7"
+                    value={editFormData.witr_prayers_days}
+                    onChange={(e) => setEditFormData({ ...editFormData, witr_prayers_days: parseInt(e.target.value) || 0 })}
+                    className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                  />
+                </div>
+
+                {/* السنن */}
+                <div>
+                  <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <Sparkles className="w-4 h-4 text-orange-400" />
+                    السنن (من 7)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="7"
+                    value={editFormData.sunnah_prayers}
+                    onChange={(e) => setEditFormData({ ...editFormData, sunnah_prayers: parseInt(e.target.value) || 0 })}
+                    className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                  />
+                </div>
+
+                {/* قيام الليل */}
+                <div>
+                  <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <Star className="w-4 h-4 text-yellow-400" />
+                    قيام الليل (8 نقاط)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="7"
+                    value={editFormData.night_prayer}
+                    onChange={(e) => setEditFormData({ ...editFormData, night_prayer: parseInt(e.target.value) || 0 })}
+                    className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                  />
+                  <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>ليلة واحدة = 8 نقاط</p>
+                </div>
+
+                {/* الصيام */}
+                <div>
+                  <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    <Calendar className="w-4 h-4 text-cyan-400" />
+                    الصيام (8 نقاط)
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="7"
+                    value={editFormData.fasting}
+                    onChange={(e) => setEditFormData({ ...editFormData, fasting: parseInt(e.target.value) || 0 })}
+                    className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                  />
+                  <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>يوم واحد = 8 نقاط</p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>ملاحظات</Label>
+              <Textarea
+                value={editFormData.notes}
+                onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                className={isDark ? 'bg-slate-800 border-white/10 text-white' : ''}
+              />
+            </div>
+
+            {/* Points Preview */}
+            <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
+              <p className={isDark ? 'text-slate-300' : 'text-slate-600'}>النقاط الجديدة</p>
+              <p className="text-3xl font-bold text-emerald-400">{calculateEditPoints()} نقطة</p>
+              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                النقاط السابقة: {selectedSheet?.points_earned || 0} نقطة
+              </p>
+            </div>
+
+            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={submitting}>
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin ml-2" /> : null}
+              تحديث ورقة المتابعة
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
