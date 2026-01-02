@@ -356,29 +356,6 @@ const Recitations = () => {
             </span>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-slate-300">تقييم التسميع</Label>
-              <span className="text-emerald-400 font-bold text-lg flex items-center gap-1">
-                <Star className="w-4 h-4" />
-                {formData.rating}/10
-              </span>
-            </div>
-            <Slider
-              value={[formData.rating]}
-              onValueChange={(v) => setFormData({ ...formData, rating: v[0] })}
-              min={1}
-              max={10}
-              step={1}
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-slate-500">
-              <span>ضعيف</span>
-              <span>متوسط</span>
-              <span>ممتاز</span>
-            </div>
-          </div>
-
           <div className="space-y-2">
             <Label className="text-slate-300">عدد الأخطاء</Label>
             <Input
