@@ -36,6 +36,7 @@ const TrackingSheets = () => {
     prayers_count: 0,
     adhkar_after_prayer: 0,
     quran_sitting_days: 0,
+    duha_prayers: 0,
     family_recitation: 0,
     study_hours: 0,
     witr_prayers_days: 0,
