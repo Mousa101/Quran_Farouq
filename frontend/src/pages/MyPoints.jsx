@@ -134,13 +134,12 @@ const MyPoints = () => {
             <div className="w-20 h-20 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center mb-4 animate-pulse-glow">
               {getLevelIcon(pointsData?.level || 1)}
             </div>
-            <h2 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-900'} mb-1`}>المستوى {pointsData?.level || 1}</h2>
-            <p className="text-emerald-400 text-lg font-medium mb-4">{getLevelName(pointsData?.level || 1)}</p>
+            <h2 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-900'} mb-1`}>المركز {myRankIndex + 1}</h2>
             
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>النقاط الحالية</span>
-                <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{pointsData?.total_points || 0} / {maxPoints}</span>
+                <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>{maxPoints}</span>
+                <span className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{pointsData?.total_points || 0} </span>
               </div>
               <Progress value={progressToMax} className="h-3 bg-slate-700" />
               <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -151,9 +150,9 @@ const MyPoints = () => {
             {myRankIndex >= 0 && (
               <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
                 <p className="text-amber-400 text-sm">ترتيبك في المجموعة</p>
-                <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {myRankIndex + 1} من {leaderboard?.total_in_group || leaderboard?.scores?.length || 0}
-                </p>
+                {/* <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                   من {leaderboard?.total_in_group || leaderboard?.scores?.length || 0}
+                </p> */}
               </div>
             )}
           </CardContent>
@@ -278,7 +277,7 @@ const MyPoints = () => {
       </Card>
 
       {/* Leaderboard */}
-      <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+      {/* <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
         <CardHeader>
           <CardTitle className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'} flex items-center gap-3`}>
             <Trophy className="w-6 h-6 text-amber-400" />
@@ -323,7 +322,7 @@ const MyPoints = () => {
             })}
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
     </div>
   );
 };

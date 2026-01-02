@@ -7,7 +7,7 @@ import requests
 import json
 from datetime import datetime, timedelta
 
-BASE_URL = "https://quranprogress-2.preview.emergentagent.com/api"
+BASE_URL = "https://memorize-track-1.preview.emergentagent.com/api"
 
 def make_request(method, endpoint, data=None, token=None, expected_status=200):
     """Make HTTP request with proper headers"""
