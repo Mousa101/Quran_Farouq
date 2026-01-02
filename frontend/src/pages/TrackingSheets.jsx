@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   FileText, Upload, Plus, Loader2, BookOpen, Moon, Star, Hand, Clock, Eye, 
-  Sunrise, Users, GraduationCap, Calendar, Sparkles, MessageCircle
+  Sunrise, Users, GraduationCap, Calendar, Sparkles, MessageCircle, Edit
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -24,6 +24,7 @@ const TrackingSheets = () => {
   const [submitting, setSubmitting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedSheet, setSelectedSheet] = useState(null);
   const [activeTab, setActiveTab] = useState('manual');
   const [imagePreview, setImagePreview] = useState(null);
@@ -33,6 +34,20 @@ const TrackingSheets = () => {
   const [formData, setFormData] = useState({
     student_id: '',
     week_start: '',
+    prayers_count: 0,
+    adhkar_after_prayer: 0,
+    quran_sitting_days: 0,
+    duha_prayers: 0,
+    family_recitation: 0,
+    study_hours: 0,
+    witr_prayers_days: 0,
+    sunnah_prayers: 0,
+    night_prayer: 0,
+    fasting: 0,
+    notes: ''
+  });
+
+  const [editFormData, setEditFormData] = useState({
     prayers_count: 0,
     adhkar_after_prayer: 0,
     quran_sitting_days: 0,
