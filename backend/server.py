@@ -2678,7 +2678,7 @@ async def delete_student(student_id: str, current_user: dict = Depends(get_curre
 
 @api_router.post("/students/{student_id}/change-group")
 async def change_student_group(student_id: str, group_id: str, current_user: dict = Depends(get_current_user)):
-    """Change student's group (Admin only)"""
+    """Change student's group (Admin only) - البيانات تنتقل تلقائياً مع الطالب"""
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="فقط المدير يمكنه نقل الطالب")
     
@@ -2687,17 +2687,42 @@ async def change_student_group(student_id: str, group_id: str, current_user: dic
     if not student:
         raise HTTPException(status_code=404, detail="الطالب غير موجود")
     
+    old_group_id = student.get("group_id")
+    
     # Check if group exists (if not empty)
+    new_sheikh_id = None
     if group_id:
         group = await db.groups.find_one({"id": group_id})
         if not group:
             raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
+        new_sheikh_id = group.get("sheikh_id")
     
     # Update student's group
     new_group_id = group_id if group_id else None
     await db.users.update_one({"id": student_id}, {"$set": {"group_id": new_group_id}})
     
-    return {"message": "تم نقل الطالب بنجاح"}
+    # Update sheikh_id in tracking sheets for new group's sheikh
+    if new_sheikh_id:
+        await db.tracking_sheets.update_many(
+            {"student_id": student_id},
+            {"$set": {"sheikh_id": new_sheikh_id}}
+        )
+        
+        # Update recitations sheikh_id
+        await db.recitations.update_many(
+            {"student_id": student_id},
+            {"$set": {"sheikh_id": new_sheikh_id}}
+        )
+    
+    # Create notification for student
+    await create_notification_internal(
+        student_id,
+        "تم نقلك إلى مجموعة جديدة",
+        "تم نقلك إلى مجموعة أخرى. جميع بياناتك السابقة (التسميعات، ورق المتابعة، الحضور) محفوظة.",
+        "info"
+    )
+    
+    return {"message": "تم نقل الطالب مع جميع بياناته بنجاح"}
 
 @api_router.post("/admin/students")
 async def admin_create_student(data: UserCreateWithCode, current_user: dict = Depends(get_current_user)):
