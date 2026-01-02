@@ -255,9 +255,9 @@ class Recitation(BaseModel):
     juz_number: Optional[int] = None
     page_from: Optional[int] = None
     page_to: Optional[int] = None
-    rating: Optional[int] = None
     error_count: Optional[int] = None
     passed_minimum: bool = False
+    did_not_recite: bool = False  # لم يسمع
     # Review fields
     review_juz: Optional[List[int]] = None
     partial_review_juz: Optional[int] = None
@@ -267,7 +267,7 @@ class Recitation(BaseModel):
     has_new_memorization: bool = False
     has_review: bool = False
     notes: Optional[str] = None
-    points_earned: int = 0  # 20 نقطة لكل تسميع
+    points_earned: int = 0  # 20 نقطة لكل تسميع (فقط إذا اجتاز)
     # Legacy fields
     pages_count: Optional[int] = None
     review_type: Optional[str] = None
