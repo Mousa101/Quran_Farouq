@@ -175,7 +175,7 @@ const MyPoints = () => {
                 <Target className="w-6 h-6 mx-auto text-blue-400 mb-1" />
                 <p className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{pointsData?.recitation_points || 0}</p>
                 <p className="text-blue-400 text-xs">تسميع</p>
-                <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>10/تسميع</p>
+                <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>20/تسميع</p>
               </div>
               <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 text-center">
                 <Zap className="w-6 h-6 mx-auto text-purple-400 mb-1" />

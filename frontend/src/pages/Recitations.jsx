@@ -53,17 +53,13 @@ const getInitialFormData = (juzNumber = 1) => {
   const juzRange = JUZ_PAGE_RANGES[juzNumber];
   return {
     student_id: '',
-    recitation_type: 'combined',  // combined = حفظ ومراجعة معاً
-    // حفظ جديد
-    has_new_memorization: false,
+    recitation_type: 'new_memorization',
     juz_number: juzNumber,
     page_from: juzRange.start,
     page_to: juzRange.start,
     rating: 7,
     error_count: 0,
     passed_minimum: false,
-    // مراجعة
-    has_review: false,
     review_juz: [],
     partial_review_juz: null,
     partial_review_pages: 0,
@@ -135,20 +131,7 @@ const Recitations = () => {
     setSubmitting(true);
     
     try {
-      // تحديد نوع التسميع بناءً على الاختيارات
-      let recitation_type = 'combined';
-      if (formData.has_new_memorization && !formData.has_review) {
-        recitation_type = 'new_memorization';
-      } else if (!formData.has_new_memorization && formData.has_review) {
-        recitation_type = 'review';
-      }
-      
-      const submitData = {
-        ...formData,
-        recitation_type
-      };
-      
-      const response = await axios.post(`${API}/recitations`, submitData);
+      const response = await axios.post(`${API}/recitations`, formData);
       toast.success(`تم تسجيل التسميع بنجاح - ${response.data.points_earned} نقطة`);
       setDialogOpen(false);
       setFormData(getInitialFormData());
@@ -275,60 +258,36 @@ const Recitations = () => {
       </div>
 
       <div className="space-y-3">
-        <Label className="text-slate-300 text-lg font-bold">نوع التسميع</Label>
-        <p className="text-slate-400 text-sm">يمكنك تسجيل حفظ جديد ومراجعة معاً في نفس الخانة</p>
-        
-        {/* خيار الحفظ الجديد */}
-        <div 
-          className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
-            formData.has_new_memorization 
-              ? 'border-emerald-500 bg-emerald-500/10' 
-              : 'border-slate-700 hover:border-slate-600'
-          }`}
-          onClick={(e) => {
-            e.stopPropagation();
-            setFormData(prev => ({ ...prev, has_new_memorization: !prev.has_new_memorization }));
-          }}
+        <Label className="text-slate-300">نوع التسميع</Label>
+        <RadioGroup 
+          value={formData.recitation_type} 
+          onValueChange={(v) => setFormData({ ...formData, recitation_type: v })}
+          className="grid grid-cols-2 gap-3"
         >
-          <div className="flex items-center gap-3">
-            <Checkbox 
-              checked={formData.has_new_memorization}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, has_new_memorization: checked }))}
-              className="border-emerald-500 data-[state=checked]:bg-emerald-500"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <FileText className="w-5 h-5 text-emerald-400" />
-            <span className="text-white font-medium">حفظ جديد</span>
+          <div>
+            <RadioGroupItem value="new_memorization" id={isEdit ? "new-edit" : "new"} className="peer sr-only" />
+            <Label
+              htmlFor={isEdit ? "new-edit" : "new"}
+              className="flex items-center gap-2 p-3 rounded-xl border-2 border-slate-700 cursor-pointer transition-all peer-data-[state=checked]:border-emerald-500 peer-data-[state=checked]:bg-emerald-500/10"
+            >
+              <FileText className="w-5 h-5 text-emerald-400" />
+              <span className="text-white">حفظ جديد</span>
+            </Label>
           </div>
-        </div>
-        
-        {/* خيار المراجعة */}
-        <div 
-          className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
-            formData.has_review 
-              ? 'border-blue-500 bg-blue-500/10' 
-              : 'border-slate-700 hover:border-slate-600'
-          }`}
-          onClick={(e) => {
-            e.stopPropagation();
-            setFormData(prev => ({ ...prev, has_review: !prev.has_review }));
-          }}
-        >
-          <div className="flex items-center gap-3">
-            <Checkbox 
-              checked={formData.has_review}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, has_review: checked }))}
-              className="border-blue-500 data-[state=checked]:bg-blue-500"
-              onClick={(e) => e.stopPropagation()}
-            />
-            <RotateCcw className="w-5 h-5 text-blue-400" />
-            <span className="text-white font-medium">مراجعة</span>
+          <div>
+            <RadioGroupItem value="review" id={isEdit ? "review-edit" : "review"} className="peer sr-only" />
+            <Label
+              htmlFor={isEdit ? "review-edit" : "review"}
+              className="flex items-center gap-2 p-3 rounded-xl border-2 border-slate-700 cursor-pointer transition-all peer-data-[state=checked]:border-blue-500 peer-data-[state=checked]:bg-blue-500/10"
+            >
+              <RotateCcw className="w-5 h-5 text-blue-400" />
+              <span className="text-white">مراجعة</span>
+            </Label>
           </div>
-        </div>
+        </RadioGroup>
       </div>
 
-      {/* قسم الحفظ الجديد */}
-      {formData.has_new_memorization && (
+      {formData.recitation_type === 'new_memorization' && (
         <div className="space-y-4 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
           <div className="space-y-2">
             <Label className="text-slate-300">الجزء</Label>
@@ -447,8 +406,7 @@ const Recitations = () => {
         </div>
       )}
 
-      {/* قسم المراجعة */}
-      {formData.has_review && (
+      {formData.recitation_type === 'review' && (
         <div className="space-y-4 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20">
           <div className="space-y-2">
             <Label className="text-slate-300">الأجزاء المراجعة كاملة</Label>
