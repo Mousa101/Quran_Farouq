@@ -59,17 +59,18 @@ const ExamsManagement = () => {
     student_id: '',
     exam_type: 'quran',
     mufassal_level: 5,
-    juz_number: 26,
+    juz_numbers: [],  // أجزاء متعددة
+    selected_juz: [],  // الأجزاء المختارة
     surah_name: '',
     page_from: '',
     page_to: '',
-    error_count: 0,
-    warning_count: 0,
-    tajweed_errors: 0,
+    warning_count: 0,  // التنبيهات (-0.5 لكل تنبيه)
+    error_count: 0,    // الأخطاء (-2 لكل خطأ)
+    tajweed_errors: 0, // أخطاء التجويد (-0.5 لكل خطأ)
     pronunciation_errors: 0,
     memorization_errors: 0,
-    result: 'pending',
-    grade: '',
+    result: 'pending', // 'pass', 'fail', 'pending'
+    grade: 100,        // الدرجة من 100
     notes: ''
   });
 
