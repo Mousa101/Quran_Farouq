@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Link } from 'react-router-dom';
-import { Trophy, Medal, Users, Eye, TrendingUp, Target, BookOpen, UserCheck } from 'lucide-react';
+import { Trophy, Medal, Users, Eye, TrendingUp, Target, BookOpen, UserCheck, FileText } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
