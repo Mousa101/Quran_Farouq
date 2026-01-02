@@ -148,7 +148,19 @@ const Register = () => {
       setRegisteredEmail(formData.email);
       setStep(2);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'فشل التسجيل');
+      // Handle error - detail might be string or object
+      const detail = error.response?.data?.detail;
+      let errorMessage = 'فشل التسجيل';
+      
+      if (typeof detail === 'string') {
+        errorMessage = detail;
+      } else if (Array.isArray(detail)) {
+        errorMessage = detail.map(d => d.msg || d).join(', ');
+      } else if (detail && typeof detail === 'object') {
+        errorMessage = detail.msg || detail.message || JSON.stringify(detail);
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
