@@ -189,7 +189,19 @@ const Register = () => {
       toast.success('تم تفعيل حسابك بنجاح!');
       window.location.href = '/dashboard';
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'كود التفعيل غير صحيح');
+      // Handle error - detail might be string or object
+      const detail = error.response?.data?.detail;
+      let errorMessage = 'كود التفعيل غير صحيح';
+      
+      if (typeof detail === 'string') {
+        errorMessage = detail;
+      } else if (Array.isArray(detail)) {
+        errorMessage = detail.map(d => d.msg || d).join(', ');
+      } else if (detail && typeof detail === 'object') {
+        errorMessage = detail.msg || detail.message || JSON.stringify(detail);
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
