@@ -1106,6 +1106,7 @@ async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_
     # Calculate points
     points_breakdown = calculate_tracking_points({
         "prayers_count": data.prayers_count,
+        "adhkar_after_prayer": data.adhkar_after_prayer,
         "quran_sitting_days": data.quran_sitting_days,
         "duha_prayers": data.duha_prayers,
         "family_recitation": data.family_recitation,
@@ -1118,6 +1119,7 @@ async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_
     
     sheet_data = TrackingSheetData(
         prayers_count=min(data.prayers_count, 35),
+        adhkar_after_prayer=min(data.adhkar_after_prayer, 7),
         quran_sitting_days=min(data.quran_sitting_days, 7),
         duha_prayers=min(data.duha_prayers, 7),
         family_recitation=min(data.family_recitation, 7),
