@@ -686,6 +686,9 @@ const TrackingSheets = () => {
                         نقطة أسبوعية
                       </p>
                     </div>
+                    <Button variant="ghost" size="sm" onClick={() => openEditDialog(sheet)} className="text-blue-400 hover:text-blue-300">
+                      <Edit className="w-4 h-4" />
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => viewSheet(sheet)}>
                       <Eye className="w-4 h-4" />
                     </Button>
