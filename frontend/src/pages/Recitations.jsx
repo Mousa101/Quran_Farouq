@@ -57,9 +57,9 @@ const getInitialFormData = (juzNumber = 1) => {
     juz_number: juzNumber,
     page_from: juzRange.start,
     page_to: juzRange.start,
-    rating: 7,
     error_count: 0,
     passed_minimum: false,
+    did_not_recite: false,  // لم يسمع
     review_juz: [],
     partial_review_juz: null,
     partial_review_pages: 0,
