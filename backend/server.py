@@ -968,8 +968,8 @@ def calculate_tracking_points(data: dict) -> dict:
     study = min(data.get("study_hours", 0), 7)  # Max 7
     witr = min(data.get("witr_prayers_days", 0), 7)  # Max 7
     sunnah = min(data.get("sunnah_prayers", 0), 7)  # Max 7
-    # قيام الليل: إذا أتم يوم واحد = 4 نقاط كاملة
-    night = 4 if data.get("night_prayer", 0) >= 1 else 0
+    # قيام الليل: إذا قام ليلة واحدة = 8 نقاط كاملة
+    night = 8 if data.get("night_prayer", 0) >= 1 else 0
     # الصيام: إذا أتم يوم واحد = 5 نقاط كاملة
     fasting = 5 if data.get("fasting", 0) >= 1 else 0
     
