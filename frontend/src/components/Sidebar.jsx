@@ -155,7 +155,7 @@ const Sidebar = () => {
           <p className={`font-medium text-sm md:text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>{user?.name}</p>
           <p className="text-xs text-emerald-500">
             {user?.role === 'admin' && 'مدير'}
-            {user?.role === 'sheikh' && 'شيخ'}
+            {user?.role === 'sheikh' && 'معلم'}
             {user?.role === 'student' && 'طالب'}
           </p>
         </div>

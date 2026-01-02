@@ -52,9 +52,10 @@ const SheikhDashboard = () => {
 
   const quickActions = [
     { to: '/groups', icon: Users, label: 'إدارة المجموعات', color: 'emerald' },
-    { to: '/tracking', icon: FileText, label: 'رفع ورقة متابعة', color: 'blue' },
-    { to: '/recitations', icon: BookOpen, label: 'تسجيل تسميع', color: 'purple' },
     { to: '/attendance', icon: UserCheck, label: 'تسجيل الحضور', color: 'amber' },
+    { to: '/tracking', icon: FileText, label: 'رفع ورقة متابعة', color: 'blue' },
+    { to: '/recitations', icon: BookOpen, label: 'تسجيل تسميع', color: 'purple' }
+    
   ];
 
   const formatDate = (dateStr) => {
@@ -108,7 +109,7 @@ const SheikhDashboard = () => {
           </div>
 
           {/* Stats Summary */}
-          <div className="flex-1 grid grid-cols-3 gap-2 md:gap-4">
+          <div className="flex-1 grid grid-cols-2 gap-2 md:gap-4">
             <div className="text-center p-2 md:p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
               <p className="text-xl md:text-2xl font-bold text-emerald-400">{groups.length}</p>
               <p className="text-slate-400 text-[10px] md:text-xs">مجموعة</p>
@@ -117,10 +118,7 @@ const SheikhDashboard = () => {
               <p className="text-xl md:text-2xl font-bold text-blue-400">{students.length}</p>
               <p className="text-slate-400 text-[10px] md:text-xs">طالب</p>
             </div>
-            <div className="text-center p-2 md:p-3 rounded-xl bg-purple-500/10 border border-purple-500/20">
-              <p className="text-xl md:text-2xl font-bold text-purple-400">{recentRecitations.length}</p>
-              <p className="text-slate-400 text-[10px] md:text-xs">تسميع</p>
-            </div>
+            
           </div>
         </div>
       </div>
@@ -187,7 +185,7 @@ const SheikhDashboard = () => {
                   <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4 text-cyan-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-slate-400 text-[10px] md:text-xs">تاريخ الإلتحاق</p>
+                  <p className="text-slate-400 text-[10px] md:text-xs">تاريخ الالتحاق</p>
                   <p className="text-white font-medium text-xs md:text-sm">{formatDate(profile?.join_date || profile?.registration_date)}</p>
                 </div>
               </div>
@@ -219,115 +217,7 @@ const SheikhDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* My Groups */}
-      <Card className="glass-card border-white/10">
-        <CardHeader className="pb-2 md:pb-3">
-          <CardTitle className="text-base md:text-lg font-bold text-white">مجموعاتي</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {groups.length === 0 ? (
-            <div className="text-center py-6 md:py-8 text-slate-400 text-sm">
-              لم تقم بإنشاء أي مجموعة بعد
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4">
-              {groups.map((group) => (
-                <div
-                  key={group.id}
-                  className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5 hover:border-emerald-500/30 transition-all"
-                >
-                  <h3 className="text-sm md:text-lg font-bold text-white">{group.name}</h3>
-                  <p className="text-slate-400 text-xs md:text-sm mt-1">{group.description || 'لا يوجد وصف'}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* My Students */}
-      <Card className="glass-card border-white/10">
-        <CardHeader className="pb-2 md:pb-3">
-          <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
-            <Users className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
-            طلابي ({students.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {students.length === 0 ? (
-            <div className="text-center py-6 md:py-8 text-slate-400 text-sm">
-              لا يوجد طلاب في مجموعاتك
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3">
-              {students.slice(0, 6).map((student) => (
-                <Link 
-                  key={student.id} 
-                  to={`/student/${student.id}`}
-                  className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5 hover:border-emerald-500/30 transition-all flex items-center justify-between group"
-                >
-                  <div className="flex items-center gap-2 md:gap-3">
-                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-slate-700 flex items-center justify-center">
-                      <span className="text-xs md:text-sm font-bold text-emerald-400">
-                        {student.name?.charAt(0)}
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-white font-medium text-sm md:text-base truncate">{student.name}</p>
-                      <p className="text-slate-400 text-[10px] md:text-xs truncate">{student.email}</p>
-                    </div>
-                  </div>
-                  <Eye className="w-4 h-4 text-slate-400 group-hover:text-emerald-400 transition-colors flex-shrink-0" />
-                </Link>
-              ))}
-            </div>
-          )}
-          {students.length > 6 && (
-            <div className="mt-3 text-center">
-              <Link to="/groups">
-                <Button variant="outline" size="sm" className="text-emerald-400 border-emerald-500/30">
-                  عرض جميع الطلاب ({students.length})
-                </Button>
-              </Link>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Recent Recitations */}
-      <Card className="glass-card border-white/10">
-        <CardHeader className="pb-2 md:pb-3">
-          <CardTitle className="text-base md:text-lg font-bold text-white">آخر التسميعات</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {recentRecitations.length === 0 ? (
-            <div className="text-center py-6 md:py-8 text-slate-400 text-sm">
-              لا توجد تسميعات مسجلة
-            </div>
-          ) : (
-            <div className="space-y-2 md:space-y-3">
-              {recentRecitations.map((rec) => (
-                <div
-                  key={rec.id}
-                  className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5 flex items-center justify-between"
-                >
-                  <div>
-                    <p className="text-white font-medium text-sm md:text-base">سورة {rec.surah_name}</p>
-                    <p className="text-slate-400 text-xs md:text-sm">آية {rec.verses_from} - {rec.verses_to}</p>
-                  </div>
-                  <span className={`px-2 md:px-3 py-1 rounded-full text-xs md:text-sm font-bold ${
-                    rec.quality_score >= 8 ? 'bg-emerald-500/20 text-emerald-400' :
-                    rec.quality_score >= 5 ? 'bg-amber-500/20 text-amber-400' :
-                    'bg-red-500/20 text-red-400'
-                  }`}>
-                    {rec.quality_score}/10
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+     
     </div>
   );
 };

@@ -69,7 +69,7 @@ const GroupManagement = () => {
   const handleCreateGroup = async (e) => {
     e.preventDefault();
     if (!formData.sheikh_id) {
-      toast.error('يرجى اختيار شيخ للمجموعة');
+      toast.error('يرجى اختيار معلم للمجموعة');
       return;
     }
     setSubmitting(true);
@@ -232,13 +232,13 @@ const GroupManagement = () => {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-slate-300">شيخ المجموعة</Label>
+                <Label className="text-slate-300">معلم المجموعة</Label>
                 <Select 
                   value={formData.sheikh_id} 
                   onValueChange={(v) => setFormData({ ...formData, sheikh_id: v })}
                 >
                   <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                    <SelectValue placeholder="اختر الشيخ" />
+                    <SelectValue placeholder="اختر المعلم" />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-800 border-slate-700">
                     {sheikhs.map((sheikh) => (
@@ -306,7 +306,7 @@ const GroupManagement = () => {
                 
                 <div className="flex items-center gap-2 text-sm">
                   <User className="w-4 h-4 text-slate-400" />
-                  <span className="text-slate-400">الشيخ:</span>
+                  <span className="text-slate-400">المعلم:</span>
                   <span className="text-emerald-400">{group.sheikh_name || getSheikhName(group.sheikh_id)}</span>
                 </div>
 
@@ -357,13 +357,13 @@ const GroupManagement = () => {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-slate-300">شيخ المجموعة</Label>
+              <Label className="text-slate-300">معلم المجموعة</Label>
               <Select 
                 value={formData.sheikh_id} 
                 onValueChange={(v) => setFormData({ ...formData, sheikh_id: v })}
               >
                 <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                  <SelectValue placeholder="اختر الشيخ" />
+                  <SelectValue placeholder="اختر المعلم" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-800 border-slate-700">
                   {sheikhs.map((sheikh) => (
