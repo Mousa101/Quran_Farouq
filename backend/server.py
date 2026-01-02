@@ -4177,20 +4177,32 @@ async def create_admin_exam(data: AdminExamCreate, current_user: dict = Depends(
     if not student:
         raise HTTPException(status_code=404, detail="الطالب غير موجود")
     
+    # حساب الدرجة تلقائياً من 100
+    # كل تنبيه = -0.5، كل خطأ = -2، كل خطأ تجويد = -0.5
+    calculated_grade = 100.0
+    calculated_grade -= data.warning_count * 0.5  # التنبيهات
+    calculated_grade -= data.error_count * 2.0     # الأخطاء
+    calculated_grade -= data.tajweed_errors * 0.5  # أخطاء التجويد
+    calculated_grade = max(0, calculated_grade)    # لا تنزل تحت الصفر
+    
+    # استخدم الدرجة المحسوبة إذا لم يتم إدخال درجة يدوياً
+    final_grade = data.grade if data.grade is not None else calculated_grade
+    
     exam = AdminExam(
         student_id=data.student_id,
         exam_type=data.exam_type,
-        juz_number=data.juz_number,
+        juz_numbers=data.juz_numbers,  # أجزاء متعددة
+        juz_number=data.juz_number,    # للتوافق
         surah_name=data.surah_name,
         page_from=data.page_from,
         page_to=data.page_to,
-        error_count=data.error_count,
         warning_count=data.warning_count,
+        error_count=data.error_count,
         tajweed_errors=data.tajweed_errors,
         pronunciation_errors=data.pronunciation_errors,
         memorization_errors=data.memorization_errors,
         result=data.result,
-        grade=data.grade,
+        grade=final_grade,
         notes=data.notes,
         examiner_id=current_user["user_id"],
         exam_date=datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -4204,14 +4216,20 @@ async def create_admin_exam(data: AdminExamCreate, current_user: dict = Depends(
     # Notify student
     result_text = "ناجح ✅" if data.result == "pass" else "راسب ❌" if data.result == "fail" else "قيد المراجعة"
     exam_type_text = "مفصل قرآن" if data.exam_type == "quran" else "امتحان تجويد"
+    juz_text = ""
+    if data.juz_numbers:
+        juz_text = f" - الأجزاء: {', '.join(map(str, data.juz_numbers))}"
+    elif data.juz_number:
+        juz_text = f" - الجزء {data.juz_number}"
+    
     await create_notification_internal(
         data.student_id,
         f"نتيجة {exam_type_text}",
-        f"النتيجة: {result_text} - الدرجة: {data.grade or 0}%",
+        f"النتيجة: {result_text} - الدرجة: {final_grade:.1f}%{juz_text}",
         "success" if data.result == "pass" else "warning"
     )
     
-    return {"message": "تم إضافة الامتحان بنجاح", "exam_id": exam.id}
+    return {"message": "تم إضافة الامتحان بنجاح", "exam_id": exam.id, "grade": final_grade}
 
 @api_router.get("/admin-exams")
 async def get_admin_exams(student_id: Optional[str] = None, exam_type: Optional[str] = None, current_user: dict = Depends(get_current_user)):
