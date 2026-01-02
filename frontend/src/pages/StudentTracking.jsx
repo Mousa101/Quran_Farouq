@@ -206,7 +206,23 @@ const StudentTracking = () => {
                       />
                       <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>5 صلوات × 7 أيام</p>
                     </div>
-                    
+                    {/* أذكار بعد الصلاة */}
+                     <div>
+                          <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                            <Hand className="w-4 h-4 text-amber-400" />
+                            أذكار بعد الصلاة (من 7)
+                          </Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="7"
+                            value={formData.adhkar_count}
+                            onChange={(e) => setFormData({ ...formData, adhkar_count: parseInt(e.target.value) || 0 })}
+                            className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                          />
+                          <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>كل يوم = 1 نقطة</p>
+                        </div>
+
                     {/* الجلوس مع القرآن */}
                     <div>
                       <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -396,6 +412,7 @@ const StudentTracking = () => {
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>التسميع</p>
               <p className="text-sm font-bold text-pink-400">7</p>
             </div>
+            
             <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
               <GraduationCap className="w-4 h-4 mx-auto mb-1 text-purple-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الدراسة</p>
@@ -410,6 +427,11 @@ const StudentTracking = () => {
               <Sparkles className="w-4 h-4 mx-auto mb-1 text-teal-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>السنن</p>
               <p className="text-sm font-bold text-teal-400">7</p>
+            </div>
+            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+              <Star className="w-6 h-6 mx-auto mb-2 text-amber-400" />
+              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الأذكار</p>
+              <p className="text-lg font-bold text-amber-400">7 نقاط</p>
             </div>
             <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-yellow-500/10' : 'bg-yellow-50'}`}>
               <Star className="w-4 h-4 mx-auto mb-1 text-yellow-400" />

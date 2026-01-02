@@ -1516,7 +1516,7 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
         raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تسجيل التسميع")
     
     # كل تسميع = 10 نقاط (النظام الجديد المبسط)
-    points = 10
+    points = 20
     description = ""
     
     if recitation_data.recitation_type == "new_memorization":

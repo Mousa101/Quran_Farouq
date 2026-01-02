@@ -210,8 +210,8 @@ const SheikhRankings = () => {
                     <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>النقاط</th>
                     <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الحضور</th>
                     <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>التسميعات</th>
-                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الصفحات</th>
-                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>ورقة المتابعة</th>
+                    {/* <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الصفحات</th> */}
+                    {/* <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>ورقة المتابعة</th> */}
                     <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}></th>
                   </tr>
                 </thead>
@@ -230,12 +230,12 @@ const SheikhRankings = () => {
                         <td className="px-4 py-3 text-emerald-400 font-bold">{student.total_points}</td>
                         <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{student.attendance_rate}%</td>
                         <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{student.total_recitations}</td>
-                        <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{student.total_pages}</td>
-                        <td className="px-4 py-3">
+                        {/* <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{student.total_pages}</td> */}
+                        {/* <td className="px-4 py-3">
                           <span className="px-2 py-1 text-xs rounded-full bg-purple-500/20 text-purple-400">
                             المستوى {student.level}
                           </span>
-                        </td>
+                        </td> */}
                         <td className="px-4 py-3">
                           <Link to={`/student/${student.student_id}`}>
                             <button className="text-emerald-400 hover:text-emerald-300">

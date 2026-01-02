@@ -676,6 +676,11 @@ const StudentDashboard = () => {
                 <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.sunnah_prayers || 0}<span className="text-xs text-slate-500">/7</span></p>
                 <p className="text-teal-400 text-[10px] md:text-xs">السنن</p>
               </div>
+              <div className="p-2 rounded-xl bg-purple-500/10 text-center">
+              <Hand className="w-8 h-8 mx-auto text-purple-400 mb-2" />
+              <p className="text-2xl font-bold text-white">{stats?.tracking?.total_adhkar || 0}<span className="text-xs text-slate-500">/7</span></p>
+              <p className="text-purple-400 text-xs">أذكار بعد الصلاة</p>
+            </div>
               <div className="p-2 md:p-3 rounded-xl bg-yellow-500/10 text-center">
                 <Star className="w-5 h-5 md:w-6 md:h-6 mx-auto text-yellow-400 mb-1" />
                 <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.night_prayer >= 1 ? '8' : '0'}<span className="text-xs text-slate-500">/8</span></p>
