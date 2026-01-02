@@ -424,7 +424,8 @@ const Recitations = () => {
         </div>
       )}
 
-      {formData.recitation_type === 'review' && (
+      {/* قسم المراجعة */}
+      {formData.has_review && (
         <div className="space-y-4 p-4 rounded-xl bg-blue-500/5 border border-blue-500/20">
           <div className="space-y-2">
             <Label className="text-slate-300">الأجزاء المراجعة كاملة</Label>
