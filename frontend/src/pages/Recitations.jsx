@@ -53,13 +53,17 @@ const getInitialFormData = (juzNumber = 1) => {
   const juzRange = JUZ_PAGE_RANGES[juzNumber];
   return {
     student_id: '',
-    recitation_type: 'new_memorization',
+    recitation_type: 'combined',  // combined = حفظ ومراجعة معاً
+    // حفظ جديد
+    has_new_memorization: false,
     juz_number: juzNumber,
     page_from: juzRange.start,
     page_to: juzRange.start,
     rating: 7,
     error_count: 0,
     passed_minimum: false,
+    // مراجعة
+    has_review: false,
     review_juz: [],
     partial_review_juz: null,
     partial_review_pages: 0,
