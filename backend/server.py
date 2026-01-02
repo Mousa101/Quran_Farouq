@@ -2297,6 +2297,7 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
     recitations = await db.recitations.find({"student_id": student_id}, {"_id": 0}).to_list(100)
     attendance = await db.attendance.find({"student_id": student_id}, {"_id": 0}).to_list(1000)
     warnings = await db.warnings.find({"student_id": student_id}, {"_id": 0}).to_list(100)
+    points_data = await db.student_points.find_one({"student_id": student_id}, {"_id": 0})
     
     # Tracking stats
     total_prayers = sum(t["data"].get("prayers_count", 0) for t in tracking)
