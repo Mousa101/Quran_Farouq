@@ -180,6 +180,7 @@ const StudentDashboard = () => {
 
   const calculateTrackingPoints = () => {
     const prayers = Math.min(trackingForm.prayers_count, 35);
+    const adhkar = Math.min(trackingForm.adhkar_after_prayer || 0, 7);  // أذكار بعد الصلاة
     const quran = Math.min(trackingForm.quran_sitting_days, 7);
     const duha = Math.min(trackingForm.duha_prayers, 7);
     const family = Math.min(trackingForm.family_recitation, 7);
@@ -190,7 +191,7 @@ const StudentDashboard = () => {
     const night = trackingForm.night_prayer >= 1 ? 8 : 0;
     // الصيام: إذا أتم يوم = 8 نقاط كاملة
     const fasting = trackingForm.fasting >= 1 ? 8 : 0;
-    return Math.min(prayers + quran + duha + family + study + witr + sunnah + night + fasting, 100);
+    return Math.min(prayers + adhkar + quran + duha + family + study + witr + sunnah + night + fasting, 100);
   };
 
   if (loading) {
