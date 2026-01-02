@@ -228,9 +228,9 @@ class RecitationCreate(BaseModel):
     juz_number: Optional[int] = None  # رقم الجزء (1-30)
     page_from: Optional[int] = None  # من صفحة
     page_to: Optional[int] = None  # إلى صفحة
-    rating: Optional[int] = None  # تقييم من 10
     error_count: Optional[int] = None  # عدد الأخطاء
     passed_minimum: bool = False  # اجتاز الحد الأدنى
+    did_not_recite: bool = False  # لم يسمع - لا يُحسب التسميع
     # For review - combined juz and pages
     review_juz: Optional[List[int]] = None  # أرقام الأجزاء المراجعة كاملة
     partial_review_juz: Optional[int] = None  # جزء المراجعة الجزئية
