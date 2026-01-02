@@ -325,7 +325,7 @@ const ExamsManagement = () => {
                                 setQuranForm({ 
                                   ...quranForm, 
                                   mufassal_level: level,
-                                  juz_number: mufassal?.juz[0] || 26
+                                  selected_juz: []
                                 });
                               }}
                               className={`w-full p-2 rounded-md border ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}
@@ -337,21 +337,42 @@ const ExamsManagement = () => {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4">
-                          <div>
-                            <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>الجزء</Label>
-                            <select
-                              value={quranForm.juz_number}
-                              onChange={(e) => setQuranForm({ ...quranForm, juz_number: parseInt(e.target.value) })}
-                              className={`w-full p-2 rounded-md border ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}
-                            >
-                              {(MUFASSAL_LEVELS.find(m => m.value === quranForm.mufassal_level)?.juz || []).map((j) => (
-                                <option key={j} value={j}>الجزء {j}</option>
-                              ))}
-                            </select>
+                        {/* اختيار الأجزاء المتعددة */}
+                        <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
+                          <Label className={`font-bold mb-2 block ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                            اختر الأجزاء (يمكن اختيار أكثر من جزء)
+                          </Label>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {(MUFASSAL_LEVELS.find(m => m.value === quranForm.mufassal_level)?.juz || []).map((j) => (
+                              <button
+                                key={j}
+                                type="button"
+                                onClick={() => {
+                                  const newSelected = quranForm.selected_juz.includes(j)
+                                    ? quranForm.selected_juz.filter(x => x !== j)
+                                    : [...quranForm.selected_juz, j].sort((a,b) => a-b);
+                                  setQuranForm({ ...quranForm, selected_juz: newSelected });
+                                }}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                                  quranForm.selected_juz.includes(j)
+                                    ? 'bg-amber-500 text-white'
+                                    : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                                }`}
+                              >
+                                الجزء {j}
+                              </button>
+                            ))}
                           </div>
+                          {quranForm.selected_juz.length > 0 && (
+                            <p className={`mt-2 text-sm ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                              الأجزاء المختارة: {quranForm.selected_juz.join(', ')}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>من صفحة</Label>
+                            <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>من صفحة (اختياري)</Label>
                             <Input
                               type="number"
                               min="1"
@@ -362,7 +383,7 @@ const ExamsManagement = () => {
                             />
                           </div>
                           <div>
-                            <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>إلى صفحة</Label>
+                            <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>إلى صفحة (اختياري)</Label>
                             <Input
                               type="number"
                               min="1"
@@ -374,11 +395,46 @@ const ExamsManagement = () => {
                           </div>
                         </div>
 
+                        {/* التقييم من 100 */}
                         <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                          <h4 className={`font-bold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>الأخطاء</h4>
+                          <h4 className={`font-bold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                            التقييم من 100
+                          </h4>
+                          <p className={`text-xs mb-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            كل تنبيه = -0.5 | كل خطأ = -2 | كل خطأ تجويد = -0.5
+                          </p>
                           <div className="grid grid-cols-3 gap-4">
                             <div>
-                              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>تجويد</Label>
+                              <Label className={`flex items-center gap-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                                <AlertTriangle className="w-3 h-3 text-yellow-400" />
+                                تنبيهات (-0.5)
+                              </Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={quranForm.warning_count}
+                                onChange={(e) => setQuranForm({ ...quranForm, warning_count: parseInt(e.target.value) || 0 })}
+                                className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                              />
+                            </div>
+                            <div>
+                              <Label className={`flex items-center gap-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                                <XCircle className="w-3 h-3 text-red-400" />
+                                أخطاء (-2)
+                              </Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                value={quranForm.error_count}
+                                onChange={(e) => setQuranForm({ ...quranForm, error_count: parseInt(e.target.value) || 0 })}
+                                className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                              />
+                            </div>
+                            <div>
+                              <Label className={`flex items-center gap-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                                <BookOpen className="w-3 h-3 text-blue-400" />
+                                تجويد (-0.5)
+                              </Label>
                               <Input
                                 type="number"
                                 min="0"
@@ -387,26 +443,48 @@ const ExamsManagement = () => {
                                 className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                               />
                             </div>
-                            <div>
-                              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>نطق</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                value={quranForm.pronunciation_errors}
-                                onChange={(e) => setQuranForm({ ...quranForm, pronunciation_errors: parseInt(e.target.value) || 0 })}
-                                className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
-                              />
-                            </div>
-                            <div>
-                              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>حفظ</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                value={quranForm.memorization_errors}
-                                onChange={(e) => setQuranForm({ ...quranForm, memorization_errors: parseInt(e.target.value) || 0 })}
-                                className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
-                              />
-                            </div>
+                          </div>
+                          {/* عرض الدرجة المحسوبة */}
+                          <div className={`mt-4 p-3 rounded-lg text-center ${isDark ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
+                            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الدرجة المتوقعة</p>
+                            <p className={`text-2xl font-bold ${
+                              (100 - quranForm.warning_count * 0.5 - quranForm.error_count * 2 - quranForm.tajweed_errors * 0.5) >= 50 
+                                ? 'text-emerald-400' 
+                                : 'text-red-400'
+                            }`}>
+                              {Math.max(0, 100 - quranForm.warning_count * 0.5 - quranForm.error_count * 2 - quranForm.tajweed_errors * 0.5).toFixed(1)}%
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* النتيجة: ناجح أو راسب */}
+                        <div>
+                          <Label className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>النتيجة</Label>
+                          <div className="flex gap-4 mt-2">
+                            <button
+                              type="button"
+                              onClick={() => setQuranForm({ ...quranForm, result: 'pass' })}
+                              className={`flex-1 p-3 rounded-xl flex items-center justify-center gap-2 transition-all ${
+                                quranForm.result === 'pass'
+                                  ? 'bg-emerald-500 text-white'
+                                  : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              <CheckCircle className="w-5 h-5" />
+                              ناجح
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setQuranForm({ ...quranForm, result: 'fail' })}
+                              className={`flex-1 p-3 rounded-xl flex items-center justify-center gap-2 transition-all ${
+                                quranForm.result === 'fail'
+                                  ? 'bg-red-500 text-white'
+                                  : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              <XCircle className="w-5 h-5" />
+                              راسب
+                            </button>
                           </div>
                         </div>
 
