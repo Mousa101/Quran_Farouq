@@ -983,6 +983,25 @@ class QuranAppAPITester:
         self.test_student_self_update()
         self.test_attendance_with_excuse()
 
+    def run_review_request_tests(self):
+        """Run tests specifically for the review request"""
+        print("🚀 Starting Review Request Backend API Tests...")
+        print(f"🌐 Testing against: {self.base_url}")
+        
+        try:
+            # Core authentication tests (required for other tests)
+            self.test_user_login()
+            self.test_auth_me()
+            
+            # Review request specific tests
+            self.test_review_request_apis()
+            
+        except Exception as e:
+            print(f"💥 Critical error during testing: {str(e)}")
+            return False
+
+        return True
+
     def run_new_features_tests(self):
         """Run tests for new features mentioned in review request"""
         print("🚀 Starting New Features Backend API Tests...")
