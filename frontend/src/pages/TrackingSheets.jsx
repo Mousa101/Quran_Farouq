@@ -510,62 +510,57 @@ const TrackingSheets = () => {
           <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>دليل النقاط (الأسبوعية)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-              <Hand className="w-5 h-5 mx-auto mb-1 text-emerald-400" />
+          <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-9 gap-2">
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
+              <Hand className="w-4 h-4 mx-auto mb-1 text-emerald-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصلوات</p>
               <p className="text-sm font-bold text-emerald-400">35</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
-              <MessageCircle className="w-5 h-5 mx-auto mb-1 text-teal-400" />
-              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>أذكار الصلاة</p>
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
+              <MessageCircle className="w-4 h-4 mx-auto mb-1 text-teal-400" />
+              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الأذكار</p>
               <p className="text-sm font-bold text-teal-400">7</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
-              <BookOpen className="w-5 h-5 mx-auto mb-1 text-blue-400" />
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
+              <BookOpen className="w-4 h-4 mx-auto mb-1 text-blue-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>القرآن</p>
               <p className="text-sm font-bold text-blue-400">7</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
-              <Sunrise className="w-5 h-5 mx-auto mb-1 text-amber-400" />
-              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الضحى</p>
-              <p className="text-sm font-bold text-amber-400">7</p>
-            </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-pink-500/10' : 'bg-pink-50'}`}>
-              <Users className="w-5 h-5 mx-auto mb-1 text-pink-400" />
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-pink-500/10' : 'bg-pink-50'}`}>
+              <Users className="w-4 h-4 mx-auto mb-1 text-pink-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>التسميع</p>
               <p className="text-sm font-bold text-pink-400">7</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
-              <GraduationCap className="w-5 h-5 mx-auto mb-1 text-purple-400" />
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
+              <GraduationCap className="w-4 h-4 mx-auto mb-1 text-purple-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الدراسة</p>
               <p className="text-sm font-bold text-purple-400">7</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
-              <Moon className="w-5 h-5 mx-auto mb-1 text-indigo-400" />
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
+              <Moon className="w-4 h-4 mx-auto mb-1 text-indigo-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الوتر</p>
               <p className="text-sm font-bold text-indigo-400">7</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
-              <Sparkles className="w-5 h-5 mx-auto mb-1 text-orange-400" />
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
+              <Sparkles className="w-4 h-4 mx-auto mb-1 text-orange-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>السنن</p>
               <p className="text-sm font-bold text-orange-400">7</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-yellow-500/10' : 'bg-yellow-50'}`}>
-              <Star className="w-5 h-5 mx-auto mb-1 text-yellow-400" />
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-yellow-500/10' : 'bg-yellow-50'}`}>
+              <Star className="w-4 h-4 mx-auto mb-1 text-yellow-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>قيام الليل</p>
-              <p className="text-sm font-bold text-yellow-400">4</p>
+              <p className="text-sm font-bold text-yellow-400">8</p>
             </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-cyan-500/10' : 'bg-cyan-50'}`}>
-              <Calendar className="w-5 h-5 mx-auto mb-1 text-cyan-400" />
+            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-cyan-500/10' : 'bg-cyan-50'}`}>
+              <Calendar className="w-4 h-4 mx-auto mb-1 text-cyan-400" />
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصيام</p>
-              <p className="text-sm font-bold text-cyan-400">5</p>
+              <p className="text-sm font-bold text-cyan-400">8</p>
             </div>
           </div>
-          <div className={`mt-4 p-3 rounded-lg text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
-            <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>الحد الأقصى الأسبوعي</p>
-            <p className="text-2xl font-bold text-emerald-400">100 نقطة</p>
-            <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>35+7+7+7+7+7+7+7+4+5=93 (مع حد أقصى 100)</p>
+          <div className={`mt-3 p-2 rounded-lg text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
+            <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>الحد الأقصى الأسبوعي</p>
+            <p className="text-xl font-bold text-emerald-400">100 نقطة</p>
+            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>35+7+7+7+7+7+7+8+8=93</p>
           </div>
         </CardContent>
       </Card>
