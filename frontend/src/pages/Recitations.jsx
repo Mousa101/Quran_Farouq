@@ -10,7 +10,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
 import { Slider } from '../components/ui/slider';
-import { BookOpen, Plus, Loader2, CheckCircle, FileText, RotateCcw, Edit, Trash2, Star, Info } from 'lucide-react';
+import { BookOpen, Plus, Loader2, CheckCircle, XCircle, FileText, RotateCcw, Edit, Trash2, Star, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
