@@ -1108,7 +1108,6 @@ async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_
         "prayers_count": data.prayers_count,
         "adhkar_after_prayer": data.adhkar_after_prayer,
         "quran_sitting_days": data.quran_sitting_days,
-        "duha_prayers": data.duha_prayers,
         "family_recitation": data.family_recitation,
         "study_hours": data.study_hours,
         "witr_prayers_days": data.witr_prayers_days,
