@@ -147,8 +147,10 @@ const MyPoints = () => {
 
             {myRankIndex >= 0 && (
               <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                <p className="text-amber-400 text-sm">ترتيبك في المركز</p>
-                <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>#{myRankIndex + 1}</p>
+                <p className="text-amber-400 text-sm">ترتيبك في المجموعة</p>
+                <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  {myRankIndex + 1} من {leaderboard?.total_in_group || leaderboard?.scores?.length || 0}
+                </p>
               </div>
             )}
           </CardContent>
