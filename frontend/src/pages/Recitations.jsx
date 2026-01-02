@@ -285,12 +285,17 @@ const Recitations = () => {
               ? 'border-emerald-500 bg-emerald-500/10' 
               : 'border-slate-700 hover:border-slate-600'
           }`}
-          onClick={() => setFormData({ ...formData, has_new_memorization: !formData.has_new_memorization })}
+          onClick={(e) => {
+            e.stopPropagation();
+            setFormData(prev => ({ ...prev, has_new_memorization: !prev.has_new_memorization }));
+          }}
         >
           <div className="flex items-center gap-3">
             <Checkbox 
               checked={formData.has_new_memorization}
+              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, has_new_memorization: checked }))}
               className="border-emerald-500 data-[state=checked]:bg-emerald-500"
+              onClick={(e) => e.stopPropagation()}
             />
             <FileText className="w-5 h-5 text-emerald-400" />
             <span className="text-white font-medium">حفظ جديد</span>
@@ -304,12 +309,17 @@ const Recitations = () => {
               ? 'border-blue-500 bg-blue-500/10' 
               : 'border-slate-700 hover:border-slate-600'
           }`}
-          onClick={() => setFormData({ ...formData, has_review: !formData.has_review })}
+          onClick={(e) => {
+            e.stopPropagation();
+            setFormData(prev => ({ ...prev, has_review: !prev.has_review }));
+          }}
         >
           <div className="flex items-center gap-3">
             <Checkbox 
               checked={formData.has_review}
+              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, has_review: checked }))}
               className="border-blue-500 data-[state=checked]:bg-blue-500"
+              onClick={(e) => e.stopPropagation()}
             />
             <RotateCcw className="w-5 h-5 text-blue-400" />
             <span className="text-white font-medium">مراجعة</span>
