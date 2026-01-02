@@ -964,7 +964,6 @@ def calculate_tracking_points(data: dict) -> dict:
     prayers = min(data.get("prayers_count", 0), 35)  # Max 35
     adhkar = min(data.get("adhkar_after_prayer", 0), 7)  # Max 7 (جديد)
     quran = min(data.get("quran_sitting_days", 0), 7)  # Max 7
-    duha = min(data.get("duha_prayers", 0), 7)  # Max 7
     family = min(data.get("family_recitation", 0), 7)  # Max 7
     study = min(data.get("study_hours", 0), 7)  # Max 7
     witr = min(data.get("witr_prayers_days", 0), 7)  # Max 7
