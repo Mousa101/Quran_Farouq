@@ -228,6 +228,14 @@ const SheikhRankings = () => {
                         <td className={`px-4 py-3 font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{student.student_name}</td>
                         <td className={`px-4 py-3 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{student.group_name}</td>
                         <td className="px-4 py-3 text-emerald-400 font-bold">{student.total_points}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col">
+                            <span className="text-blue-400 font-bold">{student.tracking_points || 0}</span>
+                            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                              ({student.tracking_sheets_count || 0} ورقة)
+                            </span>
+                          </div>
+                        </td>
                         <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{student.attendance_rate}%</td>
                         <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{student.total_recitations}</td>
                         {/* <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{student.total_pages}</td> */}
