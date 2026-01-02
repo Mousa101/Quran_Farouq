@@ -3407,16 +3407,24 @@ async def get_sheikh_students_ranking(current_user: dict = Depends(get_current_u
         # Get group name
         group = next((g for g in groups if g["id"] == student.get("group_id")), None)
         
+        # حساب النسب المئوية
+        # الحد الأقصى للنقاط 1000
+        points_percentage = round((total_points / 1000) * 100, 1) if total_points > 0 else 0
+        # نسبة ورق المتابعة: افتراض 100 نقطة أسبوعياً كحد أقصى لكل ورقة
+        tracking_percentage = round((tracking_points_total / (tracking_sheets_count * 100)) * 100, 1) if tracking_sheets_count > 0 else 0
+        
         rankings.append({
             "student_id": student["id"],
             "student_name": student["name"],
             "group_id": student.get("group_id"),
             "group_name": group["name"] if group else "بدون مجموعة",
             "total_points": total_points,
+            "points_percentage": points_percentage,  # نسبة النقاط من 1000
             "attendance_rate": attendance_rate,
             "total_recitations": total_recitations,
             "total_pages": total_pages,
             "tracking_points": tracking_points_total,  # مجموع نقاط ورق المتابعة
+            "tracking_percentage": tracking_percentage,  # نسبة ورق المتابعة
             "tracking_sheets_count": tracking_sheets_count,  # عدد ورق المتابعة
             "level": points_data.get("level", 1) if points_data else 1
         })
