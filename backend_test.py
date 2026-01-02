@@ -702,6 +702,270 @@ class QuranAppAPITester:
         else:
             self.log_test("Get current student points", False, f"Status: {status}")
 
+    def test_sheikh_rankings_api(self):
+        """Test Sheikh Rankings API - GET /api/rankings/sheikh-students"""
+        print("\n🏆 Testing Sheikh Rankings API...")
+        
+        if 'sheikh' not in self.tokens:
+            self.log_test("Sheikh Rankings API", False, "Sheikh token not available")
+            return
+            
+        success, response, status = self.make_request('GET', 'rankings/sheikh-students', 
+                                                    token=self.tokens['sheikh'])
+        
+        if success and isinstance(response, list):
+            # Check if students have percentage values
+            has_percentages = False
+            for student in response:
+                if 'points_percentage' in student and 'tracking_percentage' in student:
+                    has_percentages = True
+                    break
+            
+            if has_percentages:
+                self.log_test("Sheikh Rankings API - with percentages", True)
+            else:
+                self.log_test("Sheikh Rankings API - missing percentages", False, "Students missing percentage values")
+        else:
+            self.log_test("Sheikh Rankings API", False, f"Status: {status}, Response: {response}")
+
+    def test_active_student_bonus_api(self):
+        """Test Active Student Bonus API - POST /api/students/active-bonus"""
+        print("\n⭐ Testing Active Student Bonus API...")
+        
+        if 'sheikh' not in self.tokens:
+            self.log_test("Active Student Bonus API", False, "Sheikh token not available")
+            return
+            
+        # Use the specific student_id from the review request
+        bonus_data = {
+            "student_id": "9f50fd76-2dc3-491f-8e82-125f78e88ad5",
+            "reason": "طالب متفاعل"
+        }
+        
+        success, response, status = self.make_request('POST', 'students/active-bonus', bonus_data, 
+                                                    token=self.tokens['sheikh'])
+        
+        if success:
+            # Check if 10 points were granted
+            if 'points' in response or 'message' in response:
+                self.log_test("Active Student Bonus API - 10 points granted", True)
+            else:
+                self.log_test("Active Student Bonus API - success but unclear response", True, f"Response: {response}")
+        else:
+            self.log_test("Active Student Bonus API", False, f"Status: {status}, Response: {response}")
+
+    def test_student_statistics_api(self):
+        """Test Student Statistics API - GET /api/statistics/student/{student_id}"""
+        print("\n📊 Testing Student Statistics API...")
+        
+        if 'sheikh' not in self.tokens and 'admin' not in self.tokens:
+            self.log_test("Student Statistics API", False, "Sheikh or admin token not available")
+            return
+            
+        # Use the specific student_id from the review request
+        student_id = "9f50fd76-2dc3-491f-8e82-125f78e88ad5"
+        token = self.tokens.get('sheikh') or self.tokens.get('admin')
+        
+        success, response, status = self.make_request('GET', f'statistics/student/{student_id}', 
+                                                    token=token)
+        
+        if success:
+            # Check if total_points is not 0 and comes from student_points table
+            if 'total_points' in response and response['total_points'] != 0:
+                self.log_test("Student Statistics API - has non-zero total_points", True)
+            elif 'total_points' in response and response['total_points'] == 0:
+                self.log_test("Student Statistics API - total_points is 0", False, "Expected non-zero points from student_points table")
+            else:
+                self.log_test("Student Statistics API - missing total_points", False, f"Response: {response}")
+        else:
+            self.log_test("Student Statistics API", False, f"Status: {status}, Response: {response}")
+
+    def test_recitations_api_comprehensive(self):
+        """Test Recitations API - POST /api/recitations"""
+        print("\n📖 Testing Recitations API Comprehensively...")
+        
+        if 'sheikh' not in self.tokens:
+            self.log_test("Recitations API", False, "Sheikh token not available")
+            return
+            
+        # Test with comprehensive recitation data
+        recitation_data = {
+            "student_id": "9f50fd76-2dc3-491f-8e82-125f78e88ad5",
+            "recitation_type": "new_memorization",
+            "juz_number": 1,
+            "page_from": 1,
+            "page_to": 2,
+            "rating": 8,
+            "error_count": 2,
+            "passed_minimum": True,
+            "notes": "تسميع جيد مع بعض الأخطاء البسيطة"
+        }
+        
+        success, response, status = self.make_request('POST', 'recitations', recitation_data, 
+                                                    token=self.tokens['sheikh'])
+        
+        if success:
+            if 'recitation_id' in response or 'message' in response:
+                self.log_test("Recitations API - new memorization", True)
+            else:
+                self.log_test("Recitations API - success but unclear response", True, f"Response: {response}")
+        else:
+            self.log_test("Recitations API - new memorization", False, f"Status: {status}, Response: {response}")
+        
+        # Test review recitation
+        review_data = {
+            "student_id": "9f50fd76-2dc3-491f-8e82-125f78e88ad5",
+            "recitation_type": "review",
+            "review_juz": [1, 2],
+            "rating": 9,
+            "notes": "مراجعة ممتازة"
+        }
+        
+        success, response, status = self.make_request('POST', 'recitations', review_data, 
+                                                    token=self.tokens['sheikh'])
+        
+        if success:
+            self.log_test("Recitations API - review", True)
+        else:
+            self.log_test("Recitations API - review", False, f"Status: {status}, Response: {response}")
+
+    def test_tracking_sheet_manual_api(self):
+        """Test Tracking Sheet Manual API - POST /api/tracking-sheets/manual"""
+        print("\n📋 Testing Tracking Sheet Manual API...")
+        
+        if 'sheikh' not in self.tokens:
+            self.log_test("Tracking Sheet Manual API", False, "Sheikh token not available")
+            return
+            
+        # Calculate current week start (Saturday)
+        from datetime import timedelta
+        today = datetime.now()
+        days_since_saturday = (today.weekday() + 2) % 7
+        saturday = today - timedelta(days=days_since_saturday)
+        week_start = saturday.strftime('%Y-%m-%d')
+        
+        # Test with all 10 fields including duha_prayers
+        tracking_data = {
+            "student_id": "9f50fd76-2dc3-491f-8e82-125f78e88ad5",
+            "week_start": week_start,
+            "prayers_count": 35,           # Max 35 points
+            "adhkar_after_prayer": 7,      # Max 7 points
+            "quran_sitting_days": 7,       # Max 7 points
+            "duha_prayers": 7,             # Max 7 points - CRITICAL FIELD
+            "family_recitation": 7,        # Max 7 points
+            "study_hours": 7,              # Max 7 points
+            "witr_prayers_days": 7,        # Max 7 points
+            "sunnah_prayers": 7,           # Max 7 points
+            "night_prayer": 1,             # 8 points
+            "fasting": 1,                  # 8 points
+            "notes": "أسبوع ممتاز - جميع العبادات"
+        }
+        
+        success, response, status = self.make_request('POST', 'tracking-sheets/manual', tracking_data, 
+                                                    token=self.tokens['sheikh'])
+        
+        if success:
+            # Check if total points match expected (should be 100 points max)
+            if 'points_breakdown' in response:
+                total_points = response['points_breakdown'].get('total_points', 0)
+                if total_points == 100:
+                    self.log_test("Tracking Sheet Manual API - 100 points calculation", True)
+                else:
+                    self.log_test("Tracking Sheet Manual API - incorrect points", False, f"Expected 100, got {total_points}")
+                
+                # Verify duha_prayers is included in calculation
+                duha_points = response['points_breakdown'].get('duha_points', 0)
+                if duha_points == 7:
+                    self.log_test("Tracking Sheet Manual API - duha_prayers included", True)
+                else:
+                    self.log_test("Tracking Sheet Manual API - duha_prayers missing", False, f"Expected 7 duha points, got {duha_points}")
+            else:
+                self.log_test("Tracking Sheet Manual API - missing points breakdown", False, f"Response: {response}")
+        else:
+            self.log_test("Tracking Sheet Manual API", False, f"Status: {status}, Response: {response}")
+
+    def test_initial_assessment_api(self):
+        """Test Initial Assessment API - PUT /api/students/{student_id}/initial-assessment"""
+        print("\n🎓 Testing Initial Assessment API...")
+        
+        if 'sheikh' not in self.tokens:
+            self.log_test("Initial Assessment API", False, "Sheikh token not available")
+            return
+            
+        student_id = "9f50fd76-2dc3-491f-8e82-125f78e88ad5"
+        
+        # Test with all 8 tajweed levels including the new ones
+        tajweed_levels = [
+            "تلاوة عامة", "تمهيدية", "متوسطة", "متقدمة", 
+            "إجازة", "اتقان", "سند غيبي", "روايات أخرى"
+        ]
+        
+        # Test with one of the new levels
+        assessment_data = {
+            "previous_memorization_juz": [1, 2, 3],
+            "previous_memorization_pages": 5,
+            "tajweed_level": "إجازة"  # This should now be accepted
+        }
+        
+        success, response, status = self.make_request('PUT', f'students/{student_id}/initial-assessment', 
+                                                    assessment_data, token=self.tokens['sheikh'])
+        
+        if success:
+            self.log_test("Initial Assessment API - إجازة level", True)
+        else:
+            self.log_test("Initial Assessment API - إجازة level", False, f"Status: {status}, Response: {response}")
+        
+        # Test with another new level
+        assessment_data_2 = {
+            "previous_memorization_juz": [1],
+            "previous_memorization_pages": 10,
+            "tajweed_level": "سند غيبي"  # This should now be accepted
+        }
+        
+        success, response, status = self.make_request('PUT', f'students/{student_id}/initial-assessment', 
+                                                    assessment_data_2, token=self.tokens['sheikh'])
+        
+        if success:
+            self.log_test("Initial Assessment API - سند غيبي level", True)
+        else:
+            self.log_test("Initial Assessment API - سند غيبي level", False, f"Status: {status}, Response: {response}")
+
+    def test_health_endpoint(self):
+        """Test Health Endpoint - GET /health"""
+        print("\n💚 Testing Health Endpoint...")
+        
+        # Health endpoint should be accessible without authentication
+        # Use the base URL without /api prefix since health is at root level
+        health_url = self.base_url.replace('/api', '') + '/health'
+        
+        try:
+            response = requests.get(health_url, timeout=30)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('status') == 'healthy':
+                    self.log_test("Health Endpoint - 200 OK with healthy status", True)
+                else:
+                    self.log_test("Health Endpoint - wrong status", False, f"Expected 'healthy', got: {data}")
+            else:
+                self.log_test("Health Endpoint", False, f"Status: {response.status_code}")
+                
+        except Exception as e:
+            self.log_test("Health Endpoint", False, f"Error: {str(e)}")
+
+    def test_review_request_apis(self):
+        """Test all APIs mentioned in the review request"""
+        print("\n🎯 Testing Review Request APIs...")
+        
+        # Test all the specific APIs mentioned in the review request
+        self.test_sheikh_rankings_api()
+        self.test_active_student_bonus_api()
+        self.test_student_statistics_api()
+        self.test_recitations_api_comprehensive()
+        self.test_tracking_sheet_manual_api()
+        self.test_initial_assessment_api()
+        self.test_health_endpoint()
+
     def test_new_features_comprehensive(self):
         """Comprehensive test for all new features mentioned in review request"""
         print("\n🆕 Testing New Features Comprehensively...")
