@@ -282,12 +282,12 @@ const MyPoints = () => {
         <CardHeader>
           <CardTitle className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'} flex items-center gap-3`}>
             <Trophy className="w-6 h-6 text-amber-400" />
-            لوحة المتصدرين
+            ترتيب المجموعة
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {leaderboard.slice(0, 10).map((entry, index) => {
+            {(leaderboard.scores || []).slice(0, 10).map((entry, index) => {
               const isMe = entry.student_id === user?.id;
               return (
                 <div
