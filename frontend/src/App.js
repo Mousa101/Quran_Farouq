@@ -39,6 +39,7 @@ import SheikhManagement from './pages/SheikhManagement';
 import StudentTracking from './pages/StudentTracking';
 import MyProgress from './pages/MyProgress';
 import StudentHomework from './pages/StudentHomework';
+import StudentRecord from './pages/StudentRecord';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
