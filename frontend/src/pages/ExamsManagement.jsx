@@ -337,13 +337,16 @@ const ExamsManagement = () => {
                           </div>
                         </div>
 
-                        {/* اختيار الأجزاء المتعددة */}
+                        {/* اختيار الأجزاء المتعددة - كل أجزاء القرآن */}
                         <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
                           <Label className={`font-bold mb-2 block ${isDark ? 'text-white' : 'text-slate-900'}`}>
                             اختر الأجزاء (يمكن اختيار أكثر من جزء)
                           </Label>
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {(MUFASSAL_LEVELS.find(m => m.value === quranForm.mufassal_level)?.juz || []).map((j) => (
+                          <p className={`text-xs mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            كل أجزاء القرآن الكريم (1-30)
+                          </p>
+                          <div className="grid grid-cols-6 sm:grid-cols-10 gap-2 mt-2">
+                            {Array.from({ length: 30 }, (_, i) => i + 1).map((j) => (
                               <button
                                 key={j}
                                 type="button"
