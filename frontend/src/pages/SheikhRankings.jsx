@@ -3,8 +3,10 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
 import { Link } from 'react-router-dom';
-import { Trophy, Medal, Users, Eye, TrendingUp, Target, BookOpen, UserCheck, FileText } from 'lucide-react';
+import { Trophy, Medal, Users, Eye, TrendingUp, Target, BookOpen, UserCheck, FileText, Sparkles, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -13,6 +15,7 @@ const SheikhRankings = () => {
   const { isDark } = useTheme();
   const [data, setData] = useState({ students: [], groups: [] });
   const [loading, setLoading] = useState(true);
+  const [grantingBonus, setGrantingBonus] = useState(null);
 
   useEffect(() => {
     fetchRankings();
@@ -26,6 +29,22 @@ const SheikhRankings = () => {
       console.error('Error fetching rankings:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const grantActiveBonus = async (studentId, studentName) => {
+    setGrantingBonus(studentId);
+    try {
+      await axios.post(`${API}/students/active-bonus`, {
+        student_id: studentId,
+        reason: "طالب متفاعل"
+      });
+      toast.success(`تم منح ${studentName} 10 نقاط كطالب متفاعل 🌟`);
+      fetchRankings(); // Refresh data
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في منح النقاط');
+    } finally {
+      setGrantingBonus(null);
     }
   };
 
