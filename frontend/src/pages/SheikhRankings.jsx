@@ -248,11 +248,18 @@ const SheikhRankings = () => {
                         </td>
                         <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{student.total_recitations}</td>
                         <td className="px-4 py-3">
-                          <Link to={`/student/${student.student_id}`}>
-                            <button className="text-emerald-400 hover:text-emerald-300">
-                              <Eye className="w-4 h-4" />
-                            </button>
-                          </Link>
+                          <div className="flex items-center gap-2">
+                            <Link to={`/student/${student.student_id}`}>
+                              <button className="text-emerald-400 hover:text-emerald-300" title="عرض الملف">
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            </Link>
+                            <Link to={`/student-record/${student.student_id}`}>
+                              <button className="text-blue-400 hover:text-blue-300" title="السجل العام">
+                                <FileText className="w-4 h-4" />
+                              </button>
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     );
