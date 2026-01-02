@@ -948,21 +948,23 @@ async def get_students_pending_assessment(current_user: dict = Depends(get_curre
 
 def calculate_tracking_points(data: dict) -> dict:
     """
-    حساب نقاط ورقة المتابعة - المجموع 100 نقطة كحد أقصى:
+    حساب نقاط ورقة المتابعة - المجموع 100 نقطة:
     - الصلوات: 35 نقطة (5 صلوات × 7 أيام)
     - أذكار بعد الصلاة: 7 نقاط
     - الجلوس مع القرآن: 7 نقاط
+    - صلاة الضحى: 7 نقاط
     - التسميع للأهل: 7 نقاط
     - ساعات الدراسة: 7 نقاط
     - الوتر: 7 نقاط
     - السنن: 7 نقاط
     - قيام الليل: 8 نقاط (إذا قام ليلة واحدة = 8 نقاط كاملة)
     - الصيام: 8 نقاط (إذا صام يوم واحد = 8 نقاط كاملة)
-    المجموع: 35+7+7+7+7+7+7+8+8 = 93 (الحد الأقصى 100)
+    المجموع: 35+7+7+7+7+7+7+7+8+8 = 100 نقطة
     """
     prayers = min(data.get("prayers_count", 0), 35)  # Max 35
     adhkar = min(data.get("adhkar_after_prayer", 0), 7)  # Max 7
     quran = min(data.get("quran_sitting_days", 0), 7)  # Max 7
+    duha = min(data.get("duha_prayers", 0), 7)  # Max 7
     family = min(data.get("family_recitation", 0), 7)  # Max 7
     study = min(data.get("study_hours", 0), 7)  # Max 7
     witr = min(data.get("witr_prayers_days", 0), 7)  # Max 7
@@ -972,12 +974,13 @@ def calculate_tracking_points(data: dict) -> dict:
     # الصيام: إذا صام يوم واحد = 8 نقاط كاملة
     fasting = 8 if data.get("fasting", 0) >= 1 else 0
     
-    total = min(prayers + adhkar + quran + family + study + witr + sunnah + night + fasting, 100)
+    total = min(prayers + adhkar + quran + duha + family + study + witr + sunnah + night + fasting, 100)
     
     return {
         "prayers_points": prayers,
         "adhkar_points": adhkar,
         "quran_points": quran,
+        "duha_points": duha,
         "family_points": family,
         "study_points": study,
         "witr_points": witr,
