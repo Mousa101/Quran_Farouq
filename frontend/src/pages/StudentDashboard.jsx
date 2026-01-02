@@ -258,9 +258,9 @@ const StudentDashboard = () => {
                 <Trophy className={`w-6 h-6 md:w-8 md:h-8 ${getRankStyle(myRank.rank).text}`} />
                 <div>
                   <p className={`text-sm md:text-lg font-bold ${getRankStyle(myRank.rank).text}`}>
-                    المركز {myPosition}
+                    {myPosition} من {totalInGroup}
                   </p>
-                  <p className="text-slate-400 text-[10px] md:text-sm">{getRankStyle(myRank.rank).label}</p>
+                  <p className="text-slate-400 text-[10px] md:text-sm">ترتيبك في المجموعة</p>
                 </div>
               </div>
             )}
