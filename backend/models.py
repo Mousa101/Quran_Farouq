@@ -223,7 +223,7 @@ class TrackingSheet(BaseModel):
 # NEW Recitation Models - Updated with ranges and ratings
 class RecitationCreate(BaseModel):
     student_id: str
-    recitation_type: str  # "new_memorization" or "review"
+    recitation_type: str = "combined"  # "new_memorization", "review", or "combined" (حفظ ومراجعة معاً)
     # For new memorization - with range
     juz_number: Optional[int] = None  # رقم الجزء (1-30)
     page_from: Optional[int] = None  # من صفحة
@@ -236,6 +236,9 @@ class RecitationCreate(BaseModel):
     partial_review_juz: Optional[int] = None  # جزء المراجعة الجزئية
     partial_review_pages: Optional[int] = None  # عدد صفحات المراجعة الجزئية
     passed_review_minimum: bool = False  # اجتاز الحد الأدنى للمراجعة
+    # Combined fields - حفظ جديد ومراجعة معاً
+    has_new_memorization: bool = False  # هل يوجد حفظ جديد
+    has_review: bool = False  # هل يوجد مراجعة
     notes: Optional[str] = None
     # Legacy fields (for backward compatibility)
     pages_count: Optional[int] = None
@@ -260,8 +263,11 @@ class Recitation(BaseModel):
     partial_review_juz: Optional[int] = None
     partial_review_pages: Optional[int] = None
     passed_review_minimum: bool = False
+    # Combined fields
+    has_new_memorization: bool = False
+    has_review: bool = False
     notes: Optional[str] = None
-    points_earned: int = 0
+    points_earned: int = 0  # 20 نقطة لكل تسميع
     # Legacy fields
     pages_count: Optional[int] = None
     review_type: Optional[str] = None
