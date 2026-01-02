@@ -153,6 +153,7 @@ const TrackingSheets = () => {
       student_id: '',
       week_start: saturday.toISOString().split('T')[0],
       prayers_count: 0,
+      adhkar_after_prayer: 0,
       quran_sitting_days: 0,
       duha_prayers: 0,
       family_recitation: 0,
@@ -169,6 +170,7 @@ const TrackingSheets = () => {
 
   const calculatePoints = () => {
     const prayers = Math.min(formData.prayers_count, 35);
+    const adhkar = Math.min(formData.adhkar_after_prayer, 7);
     const quran = Math.min(formData.quran_sitting_days, 7);
     const duha = Math.min(formData.duha_prayers, 7);
     const family = Math.min(formData.family_recitation, 7);
@@ -179,7 +181,7 @@ const TrackingSheets = () => {
     const night = formData.night_prayer >= 1 ? 8 : 0;
     // الصيام: إذا أتم يوم = 8 نقاط كاملة
     const fasting = formData.fasting >= 1 ? 8 : 0;
-    return Math.min(prayers + quran + duha + family + study + witr + sunnah + night + fasting, 100);
+    return Math.min(prayers + adhkar + quran + duha + family + study + witr + sunnah + night + fasting, 100);
   };
 
   const viewSheet = (sheet) => {
