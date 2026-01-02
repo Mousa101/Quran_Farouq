@@ -4151,6 +4151,56 @@ async def get_homework_submissions(homework_id: str, current_user: dict = Depend
     
     return submissions
 
+# نموذج تسليم الواجب مع الملف
+class HomeworkSubmitRequest(BaseModel):
+    notes: Optional[str] = None
+    file_base64: Optional[str] = None  # الملف بصيغة base64
+    file_name: Optional[str] = None
+    file_type: Optional[str] = None  # image, pdf, doc
+
+@api_router.post("/homework/{homework_id}/submit")
+async def submit_homework(homework_id: str, data: HomeworkSubmitRequest, current_user: dict = Depends(get_current_user)):
+    """Submit homework with optional file attachment (Student)"""
+    if current_user["role"] != "student":
+        raise HTTPException(status_code=403, detail="فقط الطلاب يمكنهم تسليم الواجبات")
+    
+    # Check if homework exists
+    homework = await db.homework.find_one({"id": homework_id}, {"_id": 0})
+    if not homework:
+        raise HTTPException(status_code=404, detail="الواجب غير موجود")
+    
+    # Find student's submission
+    submission = await db.homework_submissions.find_one({
+        "homework_id": homework_id,
+        "student_id": current_user["user_id"]
+    })
+    
+    if not submission:
+        raise HTTPException(status_code=404, detail="لم يتم تخصيص هذا الواجب لك")
+    
+    if submission.get("status") == "graded":
+        raise HTTPException(status_code=400, detail="تم تقييم هذا الواجب مسبقاً")
+    
+    # Update submission
+    update_data = {
+        "status": "submitted",
+        "submission_notes": data.notes,
+        "submitted_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    # Handle file upload
+    if data.file_base64:
+        update_data["file_base64"] = data.file_base64
+        update_data["file_name"] = data.file_name
+        update_data["file_type"] = data.file_type
+    
+    await db.homework_submissions.update_one(
+        {"id": submission["id"]},
+        {"$set": update_data}
+    )
+    
+    return {"message": "تم تسليم الواجب بنجاح"}
+
 @api_router.put("/homework/submissions/{submission_id}/grade")
 async def grade_homework(submission_id: str, grade: int, feedback: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Grade a homework submission"""
