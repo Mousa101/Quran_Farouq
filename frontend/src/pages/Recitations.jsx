@@ -395,14 +395,32 @@ const Recitations = () => {
             <Checkbox
               id={isEdit ? "passed_min_edit" : "passed_min"}
               checked={formData.passed_minimum}
-              onCheckedChange={(checked) => setFormData({ ...formData, passed_minimum: checked })}
+              onCheckedChange={(checked) => setFormData({ ...formData, passed_minimum: checked, did_not_recite: false })}
               className="border-emerald-500 data-[state=checked]:bg-emerald-500"
+              disabled={formData.did_not_recite}
             />
             <Label htmlFor={isEdit ? "passed_min_edit" : "passed_min"} className="text-white cursor-pointer flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-emerald-400" />
               اجتاز الحد الأدنى
             </Label>
           </div>
+          
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+            <Checkbox
+              id={isEdit ? "did_not_recite_edit" : "did_not_recite"}
+              checked={formData.did_not_recite}
+              onCheckedChange={(checked) => setFormData({ ...formData, did_not_recite: checked, passed_minimum: false })}
+              className="border-red-500 data-[state=checked]:bg-red-500"
+            />
+            <Label htmlFor={isEdit ? "did_not_recite_edit" : "did_not_recite"} className="text-white cursor-pointer flex items-center gap-2">
+              <XCircle className="w-4 h-4 text-red-400" />
+              لم يسمع (لا يُحسب التسميع)
+            </Label>
+          </div>
+          
+          {!formData.passed_minimum && !formData.did_not_recite && (
+            <p className="text-amber-400 text-sm">⚠️ إذا لم يجتاز الحد الأدنى لن يحصل على نقاط</p>
+          )}
         </div>
       )}
 
