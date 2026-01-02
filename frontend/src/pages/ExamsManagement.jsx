@@ -356,13 +356,13 @@ const ExamsManagement = () => {
                                     : [...quranForm.selected_juz, j].sort((a,b) => a-b);
                                   setQuranForm({ ...quranForm, selected_juz: newSelected });
                                 }}
-                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                                className={`px-2 py-1 rounded-lg text-xs font-medium transition-all ${
                                   quranForm.selected_juz.includes(j)
                                     ? 'bg-amber-500 text-white'
                                     : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
                                 }`}
                               >
-                                الجزء {j}
+                                {j}
                               </button>
                             ))}
                           </div>
