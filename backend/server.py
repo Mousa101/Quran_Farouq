@@ -2443,7 +2443,7 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
             "count": len(warnings),
             "list": warnings[-5:]  # Last 5 warnings
         },
-        "total_points": student.get("points", 0)
+        "total_points": points_data.get("total_points", 0) if points_data else 0
     }
 
 @api_router.get("/statistics/overview")
