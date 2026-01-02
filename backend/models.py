@@ -603,37 +603,41 @@ class HomeworkSubmission(BaseModel):
 class AdminExamCreate(BaseModel):
     student_id: str
     exam_type: str  # "quran" (مفصل قرآن), "tajweed" (تجويد)
-    juz_number: Optional[int] = None  # For Quran exams
+    juz_numbers: Optional[List[int]] = None  # أرقام الأجزاء (متعددة)
     surah_name: Optional[str] = None
     page_from: Optional[int] = None
     page_to: Optional[int] = None
-    # Results
-    error_count: int = 0
-    warning_count: int = 0
-    tajweed_errors: int = 0
-    pronunciation_errors: int = 0
-    memorization_errors: int = 0
+    # Results - التقييم من 100
+    # كل تنبيه = -0.5، كل خطأ = -2، كل خطأ تجويد = -0.5
+    warning_count: int = 0  # عدد التنبيهات (-0.5 لكل تنبيه)
+    error_count: int = 0  # عدد الأخطاء (-2 لكل خطأ)
+    tajweed_errors: int = 0  # أخطاء التجويد (-0.5 لكل خطأ)
+    pronunciation_errors: int = 0  # أخطاء النطق (للتوافق)
+    memorization_errors: int = 0  # أخطاء الحفظ (للتوافق)
     result: str = "pending"  # "pass" (ناجح), "fail" (راسب), "pending"
-    grade: Optional[int] = None  # 0-100
+    grade: Optional[float] = None  # 0-100 (يحسب تلقائياً)
     notes: Optional[str] = None
+    # Legacy field
+    juz_number: Optional[int] = None
 
 class AdminExam(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     student_id: str
     exam_type: str
-    juz_number: Optional[int] = None
+    juz_numbers: Optional[List[int]] = None  # أرقام الأجزاء (متعددة)
+    juz_number: Optional[int] = None  # Legacy
     surah_name: Optional[str] = None
     page_from: Optional[int] = None
     page_to: Optional[int] = None
     # Results
-    error_count: int = 0
     warning_count: int = 0
+    error_count: int = 0
     tajweed_errors: int = 0
     pronunciation_errors: int = 0
     memorization_errors: int = 0
     result: str = "pending"
-    grade: Optional[int] = None
+    grade: Optional[float] = None
     notes: Optional[str] = None
     examiner_id: str  # Sheikh or Admin who conducted exam
     exam_date: str
