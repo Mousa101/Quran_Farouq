@@ -106,7 +106,10 @@ const MyPoints = () => {
   // الحد الأقصى للفصل 1000 نقطة
   const maxPoints = 1000;
   const progressToMax = pointsData ? Math.min((pointsData.total_points / maxPoints) * 100, 100) : 0;
-  const myRankIndex = leaderboard.findIndex(l => l.student_id === user?.id);
+  // استخدم my_rank من API الجديد أو ابحث في القائمة
+  const myRankIndex = leaderboard.my_rank?.position 
+    ? leaderboard.my_rank.position - 1 
+    : (leaderboard.scores || leaderboard)?.findIndex?.(l => l.student_id === user?.id) ?? -1;
 
   // الشارات الأسبوعية المتاحة
   const availableBadges = [
