@@ -10,7 +10,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { 
   FileText, Plus, Loader2, BookOpen, Moon, Star, Hand, Eye, 
-  Users, GraduationCap, Calendar, CheckCircle, Sparkles, MessageCircle
+  Sunrise, Users, GraduationCap, Calendar, CheckCircle, Sparkles, MessageCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
