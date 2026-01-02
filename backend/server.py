@@ -1574,11 +1574,6 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
             description_parts.append(f"مراجعة: {' و '.join(review_parts)}")
     
     description = " | ".join(description_parts) if description_parts else "تسميع"
-        
-        if recitation_data.passed_review_minimum:
-            desc_parts.append("✓ اجتاز")
-        
-        description = " ".join(desc_parts) if desc_parts else "مراجعة"
     
     recitation = Recitation(
         student_id=recitation_data.student_id,
@@ -1596,6 +1591,8 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
         passed_minimum=recitation_data.passed_minimum,
         review_juz=recitation_data.review_juz,
         passed_review_minimum=recitation_data.passed_review_minimum,
+        has_new_memorization=recitation_data.has_new_memorization,
+        has_review=recitation_data.has_review,
         notes=recitation_data.notes,
         points_earned=points,
         # Legacy
