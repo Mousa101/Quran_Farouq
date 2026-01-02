@@ -1262,6 +1262,7 @@ class StudentTrackingCreate(BaseModel):
     """ورقة المتابعة للطالب - الأسبوع يبدأ وينتهي السبت"""
     week_start: str  # تاريخ بداية الأسبوع (السبت)
     prayers_count: int = 0  # الصلوات (0-35)
+    adhkar_after_prayer: int = 0  # أذكار بعد الصلاة (0-7)
     quran_sitting_days: int = 0  # الجلوس مع القرآن (0-7)
     duha_prayers: int = 0  # صلاة الضحى (0-7)
     family_recitation: int = 0  # التسميع للأهل (0-7)
