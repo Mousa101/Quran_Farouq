@@ -515,9 +515,9 @@ const Register = () => {
                  <div className="space-y-1">
               <Label className="text-slate-400 text-xs">المعدل الدراسي</Label>
               <Input
-                name="school_average"
+                type="text"
                 value={formData.school_average}
-                onChange={handleChange}
+                onChange={(e) => handleChange('school_average', e.target.value)}
                 placeholder="مثال: 95%"
                 className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
                     
