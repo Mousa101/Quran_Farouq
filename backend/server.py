@@ -824,7 +824,7 @@ async def submit_initial_assessment(student_id: str, data: InitialAssessment, cu
         raise HTTPException(status_code=403, detail="الطالب ليس في مجموعتك")
     
     # Validate tajweed level
-    valid_levels = ["تمهيدية", "متوسطة", "متقدمة"]
+    valid_levels = ["تلاوة عامة", "تمهيدية", "متوسطة", "متقدمة", "إجازة", "اتقان", "سند غيبي", "روايات أخرى"]
     if data.tajweed_level not in valid_levels:
         raise HTTPException(status_code=400, detail="مستوى التجويد غير صحيح")
     
