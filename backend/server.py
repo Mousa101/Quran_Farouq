@@ -948,7 +948,7 @@ async def get_students_pending_assessment(current_user: dict = Depends(get_curre
 
 def calculate_tracking_points(data: dict) -> dict:
     """
-    حساب نقاط ورقة المتابعة - المجموع 100 نقطة:
+    حساب نقاط ورقة المتابعة - المجموع 100 نقطة كحد أقصى:
     - الصلوات: 35 نقطة (5 صلوات × 7 أيام)
     - أذكار بعد الصلاة: 7 نقاط (جديد)
     - الجلوس مع القرآن: 7 نقاط
