@@ -961,7 +961,7 @@ def calculate_tracking_points(data: dict) -> dict:
     المجموع: 35+7+7+7+7+7+7+8+8 = 93 (الحد الأقصى 100)
     """
     prayers = min(data.get("prayers_count", 0), 35)  # Max 35
-    adhkar = min(data.get("adhkar_after_prayer", 0), 7)  # Max 7 (جديد)
+    adhkar = min(data.get("adhkar_after_prayer", 0), 7)  # Max 7
     quran = min(data.get("quran_sitting_days", 0), 7)  # Max 7
     family = min(data.get("family_recitation", 0), 7)  # Max 7
     study = min(data.get("study_hours", 0), 7)  # Max 7
