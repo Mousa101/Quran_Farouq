@@ -959,7 +959,7 @@ def calculate_tracking_points(data: dict) -> dict:
     - السنن: 7 نقاط
     - قيام الليل: 4 نقاط (إذا أتم يوم = 4 نقاط كاملة)
     - الصيام: 5 نقاط (إذا أتم يوم = 5 نقاط كاملة)
-    المجموع: 35+7+7+7+7+7+7+7+8+8 = 100 نقطة كحد أقصى
+    المجموع: 35+7+7+7+7+7+7+7+4+5 = 93 (مع حد أقصى 100)
     """
     prayers = min(data.get("prayers_count", 0), 35)  # Max 35
     adhkar = min(data.get("adhkar_after_prayer", 0), 7)  # Max 7 (جديد)
