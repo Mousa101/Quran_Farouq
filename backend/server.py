@@ -979,7 +979,6 @@ def calculate_tracking_points(data: dict) -> dict:
         "prayers_points": prayers,
         "adhkar_points": adhkar,
         "quran_points": quran,
-        "duha_points": duha,
         "family_points": family,
         "study_points": study,
         "witr_points": witr,
