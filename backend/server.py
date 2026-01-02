@@ -1419,6 +1419,100 @@ async def get_tracking_sheets(
     sheets = await db.tracking_sheets.find(query, {"_id": 0}).to_list(100)
     return sheets
 
+class TrackingSheetUpdate(BaseModel):
+    """تعديل ورقة المتابعة من المعلم"""
+    prayers_count: Optional[int] = None
+    adhkar_after_prayer: Optional[int] = None
+    quran_sitting_days: Optional[int] = None
+    duha_prayers: Optional[int] = None
+    family_recitation: Optional[int] = None
+    study_hours: Optional[int] = None
+    witr_prayers_days: Optional[int] = None
+    sunnah_prayers: Optional[int] = None
+    night_prayer: Optional[int] = None
+    fasting: Optional[int] = None
+    notes: Optional[str] = None
+
+@api_router.put("/tracking-sheets/{sheet_id}")
+async def update_tracking_sheet(sheet_id: str, data: TrackingSheetUpdate, current_user: dict = Depends(get_current_user)):
+    """تعديل ورقة متابعة (للشيخ فقط)"""
+    if current_user["role"] != "sheikh":
+        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تعديل ورقة المتابعة")
+    
+    # Get existing sheet
+    sheet = await db.tracking_sheets.find_one({"id": sheet_id})
+    if not sheet:
+        raise HTTPException(status_code=404, detail="ورقة المتابعة غير موجودة")
+    
+    # Verify sheikh owns this sheet
+    if sheet.get("sheikh_id") and sheet.get("sheikh_id") != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="لا يمكنك تعديل ورقة متابعة لشيخ آخر")
+    
+    # Get old points
+    old_points = sheet.get("points_earned", 0)
+    
+    # Build update data
+    sheet_data = sheet.get("data", {})
+    
+    if data.prayers_count is not None:
+        sheet_data["prayers_count"] = min(data.prayers_count, 35)
+    if data.adhkar_after_prayer is not None:
+        sheet_data["adhkar_after_prayer"] = min(data.adhkar_after_prayer, 7)
+    if data.quran_sitting_days is not None:
+        sheet_data["quran_sitting_days"] = min(data.quran_sitting_days, 7)
+    if data.duha_prayers is not None:
+        sheet_data["duha_prayers"] = min(data.duha_prayers, 7)
+    if data.family_recitation is not None:
+        sheet_data["family_recitation"] = min(data.family_recitation, 7)
+    if data.study_hours is not None:
+        sheet_data["study_hours"] = min(data.study_hours, 7)
+    if data.witr_prayers_days is not None:
+        sheet_data["witr_prayers_days"] = min(data.witr_prayers_days, 7)
+    if data.sunnah_prayers is not None:
+        sheet_data["sunnah_prayers"] = min(data.sunnah_prayers, 7)
+    if data.night_prayer is not None:
+        sheet_data["night_prayer"] = min(data.night_prayer, 1)
+    if data.fasting is not None:
+        sheet_data["fasting"] = min(data.fasting, 1)
+    if data.notes is not None:
+        sheet_data["notes"] = data.notes
+    
+    # Calculate new points
+    points_breakdown = calculate_tracking_points(sheet_data)
+    new_points = points_breakdown["total_points"]
+    
+    # Update sheet
+    await db.tracking_sheets.update_one(
+        {"id": sheet_id},
+        {"$set": {
+            "data": sheet_data,
+            "points_earned": new_points,
+            "sheikh_id": current_user["user_id"]  # Update sheikh_id if empty
+        }}
+    )
+    
+    # Adjust student points
+    points_diff = new_points - old_points
+    if points_diff != 0:
+        student_id = sheet.get("student_id")
+        if student_id:
+            student_points = await db.student_points.find_one({"student_id": student_id})
+            current_total = student_points.get("total_points", 0) if student_points else 0
+            new_total = max(0, min(1000, current_total + points_diff))  # Ensure between 0 and 1000
+            
+            await db.student_points.update_one(
+                {"student_id": student_id},
+                {"$set": {"total_points": new_total}},
+                upsert=True
+            )
+    
+    return {
+        "message": "تم تحديث ورقة المتابعة بنجاح",
+        "old_points": old_points,
+        "new_points": new_points,
+        "points_diff": points_diff
+    }
+
 @api_router.get("/tracking-sheets/stats/{student_id}")
 async def get_tracking_stats(student_id: str, current_user: dict = Depends(get_current_user)):
     """الحصول على إحصائيات ورقة المتابعة - الأسبوع الحالي والمجموع الفصلي"""
