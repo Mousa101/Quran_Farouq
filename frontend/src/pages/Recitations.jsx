@@ -262,36 +262,50 @@ const Recitations = () => {
       </div>
 
       <div className="space-y-3">
-        <Label className="text-slate-300">نوع التسميع</Label>
-        <RadioGroup 
-          value={formData.recitation_type} 
-          onValueChange={(v) => setFormData({ ...formData, recitation_type: v })}
-          className="grid grid-cols-2 gap-3"
+        <Label className="text-slate-300 text-lg font-bold">نوع التسميع</Label>
+        <p className="text-slate-400 text-sm">يمكنك تسجيل حفظ جديد ومراجعة معاً في نفس الخانة</p>
+        
+        {/* خيار الحفظ الجديد */}
+        <div 
+          className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
+            formData.has_new_memorization 
+              ? 'border-emerald-500 bg-emerald-500/10' 
+              : 'border-slate-700 hover:border-slate-600'
+          }`}
+          onClick={() => setFormData({ ...formData, has_new_memorization: !formData.has_new_memorization })}
         >
-          <div>
-            <RadioGroupItem value="new_memorization" id={isEdit ? "new-edit" : "new"} className="peer sr-only" />
-            <Label
-              htmlFor={isEdit ? "new-edit" : "new"}
-              className="flex items-center gap-2 p-3 rounded-xl border-2 border-slate-700 cursor-pointer transition-all peer-data-[state=checked]:border-emerald-500 peer-data-[state=checked]:bg-emerald-500/10"
-            >
-              <FileText className="w-5 h-5 text-emerald-400" />
-              <span className="text-white">حفظ جديد</span>
-            </Label>
+          <div className="flex items-center gap-3">
+            <Checkbox 
+              checked={formData.has_new_memorization}
+              className="border-emerald-500 data-[state=checked]:bg-emerald-500"
+            />
+            <FileText className="w-5 h-5 text-emerald-400" />
+            <span className="text-white font-medium">حفظ جديد</span>
           </div>
-          <div>
-            <RadioGroupItem value="review" id={isEdit ? "review-edit" : "review"} className="peer sr-only" />
-            <Label
-              htmlFor={isEdit ? "review-edit" : "review"}
-              className="flex items-center gap-2 p-3 rounded-xl border-2 border-slate-700 cursor-pointer transition-all peer-data-[state=checked]:border-blue-500 peer-data-[state=checked]:bg-blue-500/10"
-            >
-              <RotateCcw className="w-5 h-5 text-blue-400" />
-              <span className="text-white">مراجعة</span>
-            </Label>
+        </div>
+        
+        {/* خيار المراجعة */}
+        <div 
+          className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
+            formData.has_review 
+              ? 'border-blue-500 bg-blue-500/10' 
+              : 'border-slate-700 hover:border-slate-600'
+          }`}
+          onClick={() => setFormData({ ...formData, has_review: !formData.has_review })}
+        >
+          <div className="flex items-center gap-3">
+            <Checkbox 
+              checked={formData.has_review}
+              className="border-blue-500 data-[state=checked]:bg-blue-500"
+            />
+            <RotateCcw className="w-5 h-5 text-blue-400" />
+            <span className="text-white font-medium">مراجعة</span>
           </div>
-        </RadioGroup>
+        </div>
       </div>
 
-      {formData.recitation_type === 'new_memorization' && (
+      {/* قسم الحفظ الجديد */}
+      {formData.has_new_memorization && (
         <div className="space-y-4 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
           <div className="space-y-2">
             <Label className="text-slate-300">الجزء</Label>
