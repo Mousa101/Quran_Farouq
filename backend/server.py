@@ -3399,6 +3399,66 @@ async def delete_schedule(schedule_id: str, current_user: dict = Depends(get_cur
     
     return {"message": "تم حذف الجدول بنجاح"}
 
+# ===== ACTIVE STUDENT BONUS =====
+class ActiveStudentBonus(BaseModel):
+    student_id: str
+    reason: Optional[str] = "طالب متفاعل"
+
+@api_router.post("/students/active-bonus")
+async def grant_active_student_bonus(data: ActiveStudentBonus, current_user: dict = Depends(get_current_user)):
+    """منح نقاط الطالب المتفاعل (للشيخ فقط) - 10 نقاط"""
+    if current_user["role"] != "sheikh":
+        raise HTTPException(status_code=403, detail="فقط المعلم يمكنه منح هذه النقاط")
+    
+    # Verify student exists
+    student = await db.users.find_one({"id": data.student_id, "role": "student"})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    # Check if student is in sheikh's groups
+    groups = await db.groups.find({"sheikh_id": current_user["user_id"]}).to_list(100)
+    group_ids = [g["id"] for g in groups]
+    if student.get("group_id") not in group_ids:
+        raise HTTPException(status_code=403, detail="الطالب ليس في مجموعاتك")
+    
+    # Check if bonus already given today
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    existing = await db.active_bonuses.find_one({
+        "student_id": data.student_id,
+        "date": today
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="تم منح النقاط لهذا الطالب اليوم")
+    
+    # Save the bonus record
+    bonus_record = {
+        "id": str(uuid.uuid4()),
+        "student_id": data.student_id,
+        "sheikh_id": current_user["user_id"],
+        "reason": data.reason,
+        "points": 10,
+        "date": today,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.active_bonuses.insert_one(bonus_record)
+    
+    # Add points
+    await add_points(data.student_id, 10, "active_bonus", data.reason)
+    
+    # Notify student
+    await create_notification_internal(
+        data.student_id,
+        "🌟 مبارك!",
+        f"حصلت على 10 نقاط كطالب متفاعل من الشيخ {current_user.get('name', 'المعلم')}",
+        "success"
+    )
+    
+    return {
+        "message": "تم منح نقاط الطالب المتفاعل بنجاح",
+        "student_name": student.get("name"),
+        "points": 10
+    }
+
 # Schedule Slots
 @api_router.post("/schedule/{schedule_id}/slots")
 async def add_schedule_slot(schedule_id: str, data: ScheduleSlotCreate, current_user: dict = Depends(get_current_user)):
