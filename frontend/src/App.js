@@ -398,7 +398,7 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
-              <HomeworkManagement />
+              <HomeworkRoute />
             </Layout>
           </ProtectedRoute>
         }
