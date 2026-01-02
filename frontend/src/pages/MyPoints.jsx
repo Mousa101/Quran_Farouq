@@ -31,7 +31,7 @@ const MyPoints = () => {
       const [pointsRes, transactionsRes, leaderboardRes, badgesRes, statsRes] = await Promise.all([
         axios.get(`${API}/points/my-points`),
         axios.get(`${API}/points/transactions`),
-        axios.get(`${API}/points/leaderboard`),
+        axios.get(`${API}/rankings/group`),  // ترتيب حسب المجموعة
         axios.get(`${API}/badges/student/${user?.id}`).catch(() => ({ data: { current_week_badges: [], total_badges_count: 0 } })),
         axios.get(`${API}/statistics/student/${user?.id}`)
       ]);
