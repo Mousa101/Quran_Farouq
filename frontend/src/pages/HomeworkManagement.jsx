@@ -245,34 +245,82 @@ const HomeworkManagement = () => {
           <DialogHeader>
             <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>تسليمات: {selectedHomework?.title}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
+          <div className="space-y-3 max-h-[70vh] overflow-y-auto">
             {submissions.map((sub) => (
-              <div key={sub.id} className={`p-3 rounded-lg ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{sub.student_name}</p>
-                    <p className={`text-sm ${sub.status === 'graded' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                      {sub.status === 'graded' ? `تم التقييم: ${sub.grade}%` : 'قيد الانتظار'}
-                    </p>
+              <div key={sub.id} className={`p-4 rounded-lg ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{sub.student_name}</p>
+                      <p className={`text-sm ${sub.status === 'graded' ? 'text-emerald-400' : sub.status === 'submitted' ? 'text-blue-400' : 'text-amber-400'}`}>
+                        {sub.status === 'graded' ? `تم التقييم: ${sub.grade}%` : 
+                         sub.status === 'submitted' ? 'تم التسليم - في انتظار التقييم' : 'لم يسلم بعد'}
+                      </p>
+                      {sub.submitted_at && (
+                        <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                          تاريخ التسليم: {new Date(sub.submitted_at).toLocaleString('ar-SA')}
+                        </p>
+                      )}
+                    </div>
+                    {sub.status === 'submitted' && (
+                      <div className="flex gap-2">
+                        {[100, 80, 60, 40].map((grade) => (
+                          <Button
+                            key={grade}
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleGrade(sub.id, grade)}
+                            className="text-xs"
+                          >
+                            {grade}%
+                          </Button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {sub.status !== 'graded' && (
-                    <div className="flex gap-2">
-                      {[100, 80, 60, 40].map((grade) => (
-                        <Button
-                          key={grade}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleGrade(sub.id, grade)}
-                          className="text-xs"
+                  
+                  {/* عرض الملف المرفق */}
+                  {sub.file_base64 && (
+                    <div className={`p-3 rounded-lg ${isDark ? 'bg-slate-700/50' : 'bg-white'}`}>
+                      <p className={`text-sm font-medium mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        الملف المرفق: {sub.file_name}
+                      </p>
+                      {sub.file_type === 'image' ? (
+                        <img 
+                          src={sub.file_base64} 
+                          alt="Submission" 
+                          className="max-h-48 rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => window.open(sub.file_base64, '_blank')}
+                        />
+                      ) : (
+                        <a 
+                          href={sub.file_base64} 
+                          download={sub.file_name}
+                          className="flex items-center gap-2 text-blue-400 hover:text-blue-300"
                         >
-                          {grade}%
-                        </Button>
-                      ))}
+                          <FileText className="w-5 h-5" />
+                          تحميل الملف
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* عرض الملاحظات */}
+                  {sub.submission_notes && (
+                    <div className={`p-2 rounded ${isDark ? 'bg-slate-700/30' : 'bg-slate-50'}`}>
+                      <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        <span className="font-medium">ملاحظات الطالب:</span> {sub.submission_notes}
+                      </p>
                     </div>
                   )}
                 </div>
               </div>
             ))}
+            {submissions.length === 0 && (
+              <p className={`text-center py-8 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                لا توجد تسليمات حتى الآن
+              </p>
+            )}
           </div>
         </DialogContent>
       </Dialog>
