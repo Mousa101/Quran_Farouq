@@ -135,7 +135,20 @@ const Recitations = () => {
     setSubmitting(true);
     
     try {
-      const response = await axios.post(`${API}/recitations`, formData);
+      // تحديد نوع التسميع بناءً على الاختيارات
+      let recitation_type = 'combined';
+      if (formData.has_new_memorization && !formData.has_review) {
+        recitation_type = 'new_memorization';
+      } else if (!formData.has_new_memorization && formData.has_review) {
+        recitation_type = 'review';
+      }
+      
+      const submitData = {
+        ...formData,
+        recitation_type
+      };
+      
+      const response = await axios.post(`${API}/recitations`, submitData);
       toast.success(`تم تسجيل التسميع بنجاح - ${response.data.points_earned} نقطة`);
       setDialogOpen(false);
       setFormData(getInitialFormData());
