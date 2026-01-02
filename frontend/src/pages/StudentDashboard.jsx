@@ -50,7 +50,7 @@ const StudentDashboard = () => {
       const [statsRes, activitiesRes, rankingsRes] = await Promise.all([
         axios.get(`${API}/statistics/student/${user.id}`),
         axios.get(`${API}/activities`),
-        axios.get(`${API}/rankings/weekly`)
+        axios.get(`${API}/rankings/group`)  // ترتيب حسب المجموعة فقط
       ]);
       
       setStats(statsRes.data);
