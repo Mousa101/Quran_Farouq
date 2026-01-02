@@ -177,10 +177,10 @@ const TrackingSheets = () => {
     const study = Math.min(formData.study_hours, 7);
     const witr = Math.min(formData.witr_prayers_days, 7);
     const sunnah = Math.min(formData.sunnah_prayers, 7);
-    // قيام الليل: إذا أتم يوم = 8 نقاط كاملة
-    const night = formData.night_prayer >= 1 ? 8 : 0;
-    // الصيام: إذا أتم يوم = 8 نقاط كاملة
-    const fasting = formData.fasting >= 1 ? 8 : 0;
+    // قيام الليل: إذا أتم يوم = 4 نقاط كاملة
+    const night = formData.night_prayer >= 1 ? 4 : 0;
+    // الصيام: إذا أتم يوم = 5 نقاط كاملة
+    const fasting = formData.fasting >= 1 ? 5 : 0;
     return Math.min(prayers + adhkar + quran + duha + family + study + witr + sunnah + night + fasting, 100);
   };
 
