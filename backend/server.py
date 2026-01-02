@@ -51,6 +51,11 @@ db = client[os.environ['DB_NAME']]
 # Create the main app
 app = FastAPI(title="Hafiz - Quran Memorization App")
 
+# Health endpoint for Kubernetes health checks (must be at root level)
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
