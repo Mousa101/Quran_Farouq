@@ -214,8 +214,9 @@ const Recitations = () => {
       } else if (rec.pages_count) {
         details.push(`${rec.pages_count} صفحة`);
       }
-      if (rec.rating) details.push(`التقييم: ${rec.rating}/10`);
       if (rec.error_count) details.push(`الأخطاء: ${rec.error_count}`);
+      if (rec.passed_minimum) details.push('✓ اجتاز الحد الأدنى');
+      if (rec.did_not_recite) details.push('✗ لم يسمع');
       return details.join(' | ');
     } else {
       let details = [];
