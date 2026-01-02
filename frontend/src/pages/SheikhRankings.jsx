@@ -227,23 +227,26 @@ const SheikhRankings = () => {
                         </td>
                         <td className={`px-4 py-3 font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{student.student_name}</td>
                         <td className={`px-4 py-3 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{student.group_name}</td>
-                        <td className="px-4 py-3 text-emerald-400 font-bold">{student.total_points}</td>
                         <td className="px-4 py-3">
                           <div className="flex flex-col">
-                            <span className="text-blue-400 font-bold">{student.tracking_points || 0}</span>
+                            <span className="text-emerald-400 font-bold">{student.points_percentage || 0}%</span>
                             <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                              ({student.tracking_sheets_count || 0} ورقة)
+                              ({student.total_points} / 1000)
                             </span>
                           </div>
                         </td>
-                        <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{student.attendance_rate}%</td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col">
+                            <span className="text-blue-400 font-bold">{student.tracking_percentage || 0}%</span>
+                            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                              ({student.tracking_points || 0} نقطة / {student.tracking_sheets_count || 0} ورقة)
+                            </span>
+                          </div>
+                        </td>
+                        <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                          <span className="font-bold">{student.attendance_rate}%</span>
+                        </td>
                         <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{student.total_recitations}</td>
-                        {/* <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{student.total_pages}</td> */}
-                        {/* <td className="px-4 py-3">
-                          <span className="px-2 py-1 text-xs rounded-full bg-purple-500/20 text-purple-400">
-                            المستوى {student.level}
-                          </span>
-                        </td> */}
                         <td className="px-4 py-3">
                           <Link to={`/student/${student.student_id}`}>
                             <button className="text-emerald-400 hover:text-emerald-300">
