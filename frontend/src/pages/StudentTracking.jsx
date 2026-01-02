@@ -242,6 +242,22 @@ const StudentTracking = () => {
                       />
                     </div>
 
+                    {/* صلاة الضحى */}
+                    <div>
+                      <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        <Sunrise className="w-4 h-4 text-amber-400" />
+                        صلاة الضحى (من 7)
+                      </Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="7"
+                        value={formData.duha_prayers}
+                        onChange={(e) => setFormData({ ...formData, duha_prayers: parseInt(e.target.value) || 0 })}
+                        className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                      />
+                    </div>
+
                     {/* التسميع للأهل */}
                     <div>
                       <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
