@@ -86,6 +86,16 @@ const Layout = ({ children }) => {
   );
 };
 
+// مكون التوجيه للواجبات - يعرض صفحة مختلفة للطالب
+const HomeworkRoute = () => {
+  const { user } = useAuth();
+  
+  if (user?.role === 'student') {
+    return <StudentHomework />;
+  }
+  return <HomeworkManagement />;
+};
+
 function AppRoutes() {
   const { user, loading } = useAuth();
 
