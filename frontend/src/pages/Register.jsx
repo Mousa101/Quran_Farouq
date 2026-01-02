@@ -543,7 +543,7 @@ const Register = () => {
               <div className="space-y-1">
                 <Label className="text-slate-400 text-xs flex items-center gap-1">
                   <UserPlus className="w-3 h-3" />
-                  تاريخ الإلتحاق بالمركز
+                  تاريخ الالتحاق بالمركز
                 </Label>
                 <Input
                   type="date"
