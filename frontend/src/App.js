@@ -284,6 +284,17 @@ function AppRoutes() {
       />
 
       <Route
+        path="/student-record/:studentId"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <StudentRecord />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/student-management"
         element={
           <ProtectedRoute>
