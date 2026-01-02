@@ -268,6 +268,18 @@ const SheikhRankings = () => {
                         <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{student.total_recitations}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => grantActiveBonus(student.student_id, student.student_name)}
+                              disabled={grantingBonus === student.student_id}
+                              className="text-amber-400 hover:text-amber-300 disabled:opacity-50"
+                              title="منح نقاط الطالب المتفاعل"
+                            >
+                              {grantingBonus === student.student_id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Sparkles className="w-4 h-4" />
+                              )}
+                            </button>
                             <Link to={`/student/${student.student_id}`}>
                               <button className="text-emerald-400 hover:text-emerald-300" title="عرض الملف">
                                 <Eye className="w-4 h-4" />
