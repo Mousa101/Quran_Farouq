@@ -32,6 +32,7 @@ const StudentDashboard = () => {
   const [submittingTracking, setSubmittingTracking] = useState(false);
   const [trackingForm, setTrackingForm] = useState({
     prayers_count: 0,
+    adhkar_after_prayer: 0,  // أذكار بعد الصلاة
     quran_sitting_days: 0,
     duha_prayers: 0,
     family_recitation: 0,
