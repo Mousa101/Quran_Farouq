@@ -199,9 +199,60 @@ const TrackingSheets = () => {
     return Math.min(prayers + adhkar + quran + duha + family + study + witr + sunnah + night + fasting, 100);
   };
 
+  const calculateEditPoints = () => {
+    const prayers = Math.min(editFormData.prayers_count, 35);
+    const adhkar = Math.min(editFormData.adhkar_after_prayer, 7);
+    const quran = Math.min(editFormData.quran_sitting_days, 7);
+    const duha = Math.min(editFormData.duha_prayers, 7);
+    const family = Math.min(editFormData.family_recitation, 7);
+    const study = Math.min(editFormData.study_hours, 7);
+    const witr = Math.min(editFormData.witr_prayers_days, 7);
+    const sunnah = Math.min(editFormData.sunnah_prayers, 7);
+    const night = editFormData.night_prayer >= 1 ? 8 : 0;
+    const fasting = editFormData.fasting >= 1 ? 8 : 0;
+    return Math.min(prayers + adhkar + quran + duha + family + study + witr + sunnah + night + fasting, 100);
+  };
+
   const viewSheet = (sheet) => {
     setSelectedSheet(sheet);
     setViewDialogOpen(true);
+  };
+
+  const openEditDialog = (sheet) => {
+    setSelectedSheet(sheet);
+    const data = sheet.data || {};
+    setEditFormData({
+      prayers_count: data.prayers_count || 0,
+      adhkar_after_prayer: data.adhkar_after_prayer || 0,
+      quran_sitting_days: data.quran_sitting_days || 0,
+      duha_prayers: data.duha_prayers || 0,
+      family_recitation: data.family_recitation || 0,
+      study_hours: data.study_hours || 0,
+      witr_prayers_days: data.witr_prayers_days || 0,
+      sunnah_prayers: data.sunnah_prayers || 0,
+      night_prayer: data.night_prayer || 0,
+      fasting: data.fasting || 0,
+      notes: data.notes || ''
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedSheet) return;
+    setSubmitting(true);
+    
+    try {
+      const res = await axios.put(`${API}/tracking-sheets/${selectedSheet.id}`, editFormData);
+      toast.success(`تم تحديث ورقة المتابعة - ${res.data.new_points} نقطة`);
+      setEditDialogOpen(false);
+      setSelectedSheet(null);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل تحديث ورقة المتابعة');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const getStudentName = (studentId) => {
