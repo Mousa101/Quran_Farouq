@@ -598,6 +598,11 @@ class HomeworkSubmission(BaseModel):
     student_id: str
     status: str = "pending"  # "pending", "submitted", "graded"
     submission_notes: Optional[str] = None
+    # حقول رفع الملفات
+    file_url: Optional[str] = None  # رابط الملف المرفوع
+    file_name: Optional[str] = None  # اسم الملف
+    file_type: Optional[str] = None  # نوع الملف (image, pdf, etc.)
+    file_base64: Optional[str] = None  # الملف بصيغة base64
     grade: Optional[int] = None
     feedback: Optional[str] = None
     submitted_at: Optional[datetime] = None
