@@ -9,7 +9,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { toast } from 'sonner';
-import { BookOpen, Plus, Trash2, Calendar, Users, CheckCircle, Clock, Eye } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Calendar, Users, CheckCircle, Clock, Eye, FileText } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
