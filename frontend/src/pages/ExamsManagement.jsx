@@ -122,24 +122,55 @@ const ExamsManagement = () => {
   const handleMufassalSubmit = async (e) => {
     e.preventDefault();
     try {
-      const totalErrors = quranForm.tajweed_errors + quranForm.pronunciation_errors + quranForm.memorization_errors;
-      let result = 'pending';
-      let grade = '';
+      // حساب الدرجة من 100
+      // كل تنبيه = -0.5، كل خطأ = -2، كل خطأ تجويد = -0.5
+      let calculatedGrade = 100;
+      calculatedGrade -= quranForm.warning_count * 0.5;     // التنبيهات
+      calculatedGrade -= quranForm.error_count * 2;          // الأخطاء
+      calculatedGrade -= quranForm.tajweed_errors * 0.5;     // أخطاء التجويد
+      calculatedGrade = Math.max(0, calculatedGrade);        // لا تنزل تحت الصفر
       
-      if (totalErrors <= 2) { result = 'excellent'; grade = 'ممتاز'; }
-      else if (totalErrors <= 5) { result = 'good'; grade = 'جيد جداً'; }
-      else if (totalErrors <= 8) { result = 'pass'; grade = 'جيد'; }
-      else { result = 'fail'; grade = 'راسب'; }
+      // تحديد ناجح أو راسب
+      const result = quranForm.result;
       
       await axios.post(`${API}/admin-exams`, {
-        ...quranForm,
-        result,
-        grade,
-        error_count: totalErrors
+        student_id: quranForm.student_id,
+        exam_type: 'quran',
+        juz_numbers: quranForm.selected_juz.length > 0 ? quranForm.selected_juz : null,
+        surah_name: quranForm.surah_name || null,
+        page_from: quranForm.page_from || null,
+        page_to: quranForm.page_to || null,
+        warning_count: quranForm.warning_count,
+        error_count: quranForm.error_count,
+        tajweed_errors: quranForm.tajweed_errors,
+        pronunciation_errors: quranForm.pronunciation_errors,
+        memorization_errors: quranForm.memorization_errors,
+        result: result,
+        grade: calculatedGrade,
+        notes: quranForm.notes
       });
       
       toast.success('تم تسجيل امتحان المفصل بنجاح');
       setDialogOpen(false);
+      // إعادة تعيين النموذج
+      setQuranForm({
+        student_id: '',
+        exam_type: 'quran',
+        mufassal_level: 5,
+        juz_numbers: [],
+        selected_juz: [],
+        surah_name: '',
+        page_from: '',
+        page_to: '',
+        warning_count: 0,
+        error_count: 0,
+        tajweed_errors: 0,
+        pronunciation_errors: 0,
+        memorization_errors: 0,
+        result: 'pending',
+        grade: 100,
+        notes: ''
+      });
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'فشل في تسجيل الامتحان');
