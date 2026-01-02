@@ -284,6 +284,22 @@ const TrackingSheets = () => {
                           />
                           <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>5 صلوات × 7 أيام</p>
                         </div>
+
+                        {/* أذكار بعد الصلاة */}
+                        <div>
+                          <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                            <MessageCircle className="w-4 h-4 text-teal-400" />
+                            أذكار بعد الصلاة (من 7)
+                          </Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="7"
+                            value={formData.adhkar_after_prayer}
+                            onChange={(e) => setFormData({ ...formData, adhkar_after_prayer: parseInt(e.target.value) || 0 })}
+                            className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                          />
+                        </div>
                         
                         {/* الجلوس مع القرآن */}
                         <div>
