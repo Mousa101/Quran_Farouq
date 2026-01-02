@@ -290,7 +290,7 @@ const StudentTracking = () => {
                     {/* السنن */}
                     <div>
                       <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                        <Sparkles className="w-4 h-4 text-teal-400" />
+                        <Sparkles className="w-4 h-4 text-orange-400" />
                         السنن (من 7)
                       </Label>
                       <Input
@@ -307,34 +307,34 @@ const StudentTracking = () => {
                     <div>
                       <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                         <Star className="w-4 h-4 text-yellow-400" />
-                        قيام الليل (0 أو 1) = 8 نقاط
+                        قيام الليل (8 نقاط)
                       </Label>
                       <Input
                         type="number"
                         min="0"
-                        max="1"
+                        max="7"
                         value={formData.night_prayer}
                         onChange={(e) => setFormData({ ...formData, night_prayer: parseInt(e.target.value) || 0 })}
                         className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                       />
-                      <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>إذا أتممت يوم واحد = 8 نقاط كاملة</p>
+                      <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>ليلة واحدة = 8 نقاط كاملة</p>
                     </div>
 
                     {/* الصيام */}
                     <div>
                       <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                         <Calendar className="w-4 h-4 text-cyan-400" />
-                        الصيام (0 أو 1) = 8 نقاط
+                        الصيام (8 نقاط)
                       </Label>
                       <Input
                         type="number"
                         min="0"
-                        max="1"
+                        max="7"
                         value={formData.fasting}
                         onChange={(e) => setFormData({ ...formData, fasting: parseInt(e.target.value) || 0 })}
                         className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                       />
-                      <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>إذا أتممت يوم واحد = 8 نقاط كاملة</p>
+                      <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>يوم واحد = 8 نقاط كاملة</p>
                     </div>
                   </div>
                 </div>
