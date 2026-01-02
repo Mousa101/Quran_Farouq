@@ -2088,6 +2088,77 @@ async def get_weekly_rankings(
         "bronze": scores[2].model_dump() if len(scores) > 2 else None
     }
 
+@api_router.get("/rankings/group")
+async def get_group_rankings(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get rankings for current student within their group only"""
+    if current_user["role"] != "student":
+        raise HTTPException(status_code=403, detail="هذا الترتيب للطلاب فقط")
+    
+    # Get current student's group
+    student = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0})
+    if not student or not student.get("group_id"):
+        return {"scores": [], "my_rank": None, "total_in_group": 0}
+    
+    group_id = student["group_id"]
+    
+    # Get all students in the same group
+    group_students = await db.users.find(
+        {"role": "student", "group_id": group_id},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    scores = []
+    for s in group_students:
+        # Get student points
+        points_record = await db.student_points.find_one({"student_id": s["id"]}, {"_id": 0})
+        total_points = points_record.get("total_points", 0) if points_record else 0
+        
+        # Get attendance
+        attendance = await db.attendance.find({"student_id": s["id"]}, {"_id": 0}).to_list(1000)
+        present_count = sum(1 for a in attendance if a["status"] == "present")
+        attendance_rate = (present_count / max(len(attendance), 1)) * 100
+        
+        # Get recitations count
+        recitations = await db.recitations.find({"student_id": s["id"]}, {"_id": 0}).to_list(100)
+        recitation_count = len(recitations)
+        
+        scores.append({
+            "student_id": s["id"],
+            "student_name": s["name"],
+            "total_points": total_points,
+            "attendance_rate": round(attendance_rate, 1),
+            "recitation_count": recitation_count
+        })
+    
+    # Sort by total points
+    scores.sort(key=lambda x: x["total_points"], reverse=True)
+    
+    # Assign ranks
+    for i, score in enumerate(scores):
+        if i == 0:
+            score["rank"] = "gold"
+        elif i == 1:
+            score["rank"] = "silver"
+        elif i == 2:
+            score["rank"] = "bronze"
+        else:
+            score["rank"] = "participant"
+        score["position"] = i + 1
+    
+    # Find current student's rank
+    my_rank = next((s for s in scores if s["student_id"] == current_user["user_id"]), None)
+    
+    return {
+        "scores": scores,
+        "my_rank": my_rank,
+        "total_in_group": len(scores),
+        "gold": scores[0] if len(scores) > 0 else None,
+        "silver": scores[1] if len(scores) > 1 else None,
+        "bronze": scores[2] if len(scores) > 2 else None
+    }
+
 # ============== STATISTICS ROUTES ==============
 
 @api_router.get("/statistics/student/{student_id}")
