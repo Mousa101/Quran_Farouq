@@ -2453,7 +2453,7 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
             "total_points": total_recitation_points,
             "recitations_count": len([r for r in recitations if not r.get("did_not_recite")]),  # عدد التسميعات الفعلية
             "did_not_recite_count": len([r for r in recitations if r.get("did_not_recite")]),  # عدد مرات عدم التسميع
-            "recitation_rate": round((passed_count / max(present_count, 1)) * 100, 1)  # نسبة التسميع = الاجتيازات / أيام الحضور
+            "recitation_rate": round((passed_count / max(len(recitations), 1)) * 100, 1)  # نسبة التسميع = الاجتيازات / إجمالي التسميعات
         },
         "attendance": {
             "present": present_count,
