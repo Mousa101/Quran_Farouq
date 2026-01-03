@@ -570,7 +570,7 @@ const StudentDashboard = () => {
               {/* عداد التسميع */}
               <div className="block md:hidden">
                 <CircularGauge 
-                  value={(stats?.recitation?. || 0) * 10}
+                  value={stats?.recitation?.recitation_rate || 0}
                   maxValue={100}
                   label="نسبة التسميع"
                   color="dynamic"
@@ -580,7 +580,7 @@ const StudentDashboard = () => {
               </div>
               <div className="hidden md:block">
                 <CircularGauge 
-                  value={(stats?.recitation?.passed_count || 0) * 10}
+                  value={stats?.recitation?.recitation_rate || 0}
                   maxValue={100}
                   label="نسبة التسميع"
                   color="dynamic"
