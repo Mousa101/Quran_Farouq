@@ -139,7 +139,7 @@ const MyPoints = () => {
               </p>
             </div>
 
-            {myRankIndex >= 0 && (
+            {myRank > 0 && (
               <div className="mt-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30">
                 <p className="text-amber-400 text-sm">ترتيبك في المجموعة</p>
                 {/* <p className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
