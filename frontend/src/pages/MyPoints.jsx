@@ -48,27 +48,18 @@ const MyPoints = () => {
     }
   };
 
-  const getLevelIcon = (level) => {
-    if (level >= 10) return <Crown className="w-8 h-8 text-amber-400" />;
-    if (level >= 7) return <Trophy className="w-8 h-8 text-purple-400" />;
-    if (level >= 4) return <Medal className="w-8 h-8 text-blue-400" />;
+  const getRankIcon = (rank) => {
+    if (rank === 1) return <Crown className="w-8 h-8 text-amber-400" />;
+    if (rank === 2) return <Trophy className="w-8 h-8 text-slate-400" />;
+    if (rank === 3) return <Medal className="w-8 h-8 text-orange-400" />;
     return <Star className="w-8 h-8 text-emerald-400" />;
   };
 
-  const getLevelName = (level) => {
-    const levels = {
-      1: 'مبتدئ',
-      2: 'متعلم',
-      3: 'مجتهد',
-      4: 'متقدم',
-      5: 'متميز',
-      6: 'حافظ',
-      7: 'ماهر',
-      8: 'خبير',
-      9: 'أستاذ',
-      10: 'عالم'
-    };
-    return levels[level] || 'مبتدئ';
+  const getRankName = (rank) => {
+    if (rank === 1) return 'الأول 🥇';
+    if (rank === 2) return 'الثاني 🥈';
+    if (rank === 3) return 'الثالث 🥉';
+    return `المركز ${rank}`;
   };
 
   const getCategoryColor = (category) => {
