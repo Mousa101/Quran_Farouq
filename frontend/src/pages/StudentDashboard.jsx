@@ -605,7 +605,7 @@ const StudentDashboard = () => {
               <div className="text-center">
                 
                 <p className="text-slate-500 text-[10px] md:text-xs mt-1">
-                  {stats?.recitation?.recitations_count || 0} تسميع - {stats?.recitation?.passed_count || 0} اجتاز
+                  {stats?.recitation?.recitation_days || 0} يوم - {stats?.recitation?.passed_days || 0} اجتاز
                 </p>
               </div>
             </div>
