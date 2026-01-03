@@ -154,7 +154,7 @@ const StudentProfile = () => {
               <div className="text-center p-4 rounded-xl bg-purple-500/10 border border-purple-500/30">
                 <Trophy className="w-6 h-6 text-purple-400 mx-auto" />
                 <p className="text-2xl font-bold text-purple-400 mt-1">{points?.level || 1}</p>
-                <p className="text-xs text-slate-400">المستوى</p>
+                <p className="text-xs text-slate-400">المركز</p>
               </div>
             </div>
           </div>
