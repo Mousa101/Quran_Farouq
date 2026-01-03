@@ -98,9 +98,10 @@ const MyPoints = () => {
   const maxPoints = 1000;
   const progressToMax = pointsData ? Math.min((pointsData.total_points / maxPoints) * 100, 100) : 0;
   // استخدم my_rank من API الجديد أو ابحث في القائمة
-  const myRankIndex = leaderboard.my_rank?.position 
+  const myRankIndexRaw = leaderboard.my_rank?.position 
     ? leaderboard.my_rank.position - 1 
-    : (leaderboard.scores || leaderboard)?.findIndex?.(l => l.student_id === user?.id) ?? -1;
+    : (leaderboard.scores || leaderboard)?.findIndex?.(l => l.student_id === user?.id) ?? 0;
+  const myRank = myRankIndexRaw >= 0 ? myRankIndexRaw + 1 : 1; // المركز يبدأ من 1
 
   // الشارات الأسبوعية المتاحة
   const availableBadges = [
