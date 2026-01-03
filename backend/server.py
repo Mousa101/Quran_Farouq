@@ -2263,9 +2263,23 @@ async def get_group_rankings(
         present_count = sum(1 for a in attendance if a["status"] == "present")
         attendance_rate = (present_count / max(len(attendance), 1)) * 100
         
-        # Get recitations count
+        # Get recitations count - عدد الأيام التي سمع فيها (يُحسب يوم واحد فقط)
         recitations = await db.recitations.find({"student_id": s["id"]}, {"_id": 0}).to_list(100)
-        recitation_count = len(recitations.passed_count)
+        # حساب عدد الأيام الفريدة التي تم التسميع فيها
+        recitation_days = set()
+        passed_days = set()
+        for r in recitations:
+            if not r.get("did_not_recite"):
+                # استخراج التاريخ من created_at
+                created_at = r.get("created_at", "")
+                if created_at:
+                    day = created_at[:10] if isinstance(created_at, str) else created_at.strftime("%Y-%m-%d")
+                    recitation_days.add(day)
+                    if r.get("passed_minimum") or r.get("passed_review_minimum"):
+                        passed_days.add(day)
+        
+        recitation_count = len(recitation_days)  # عدد أيام التسميع
+        passed_count = len(passed_days)  # عدد أيام الاجتياز
         
         scores.append({
             "student_id": s["id"],
