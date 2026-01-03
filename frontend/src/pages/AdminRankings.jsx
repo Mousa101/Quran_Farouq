@@ -110,7 +110,7 @@ const AdminRankings = () => {
                 <td className="px-4 py-3 text-emerald-400 font-bold">{item.total_points}</td>
                 <td className="px-4 py-3">
                   <span className="px-2 py-1 text-xs rounded-full bg-purple-500/20 text-purple-400">
-                    المستوى {item.level}
+                    المركز {item.level}
                   </span>
                 </td>
                 <td className="px-4 py-3">
