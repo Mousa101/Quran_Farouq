@@ -124,9 +124,9 @@ const MyPoints = () => {
         <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} lg:col-span-1`}>
           <CardContent className="p-6 text-center">
             <div className="w-20 h-20 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center mb-4 animate-pulse-glow">
-              {getRankIcon(myRankIndex + 1)}
+              {getRankIcon(myRank)}
             </div>
-            <h2 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-900'} mb-1`}>{getRankName(myRankIndex + 1)}</h2>
+            <h2 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-900'} mb-1`}>{getRankName(myRank)}</h2>
             
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
