@@ -2345,12 +2345,28 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
     total_witr = sum(t["data"].get("witr_prayer", 0) for t in tracking)
     total_duha = sum(t["data"].get("duha_prayer", 0) for t in tracking)
     
-    # New recitation calculations
+    # New recitation calculations - حساب على أساس الأيام
     total_new_pages = sum(r.get("pages_count", 0) or 0 for r in recitations if r.get("recitation_type") == "new_memorization")
     total_review_pages = sum(r.get("review_pages", 0) or 0 for r in recitations if r.get("review_type") == "pages")
-    passed_count = sum(1 for r in recitations if r.get("passed_minimum") or r.get("passed_review_minimum"))
     total_recitation_points = sum(r.get("points_earned", 0) for r in recitations)
-    avg_rating = sum(r.get("rating", 0) or 0 for r in recitations if r.get("rating")) / max(len([r for r in recitations if r.get("rating")]), 1)
+    
+    # حساب أيام التسميع الفريدة (يُحسب يوم واحد فقط حتى لو سمع أكثر من مرة)
+    recitation_days = set()
+    passed_days = set()
+    for r in recitations:
+        if not r.get("did_not_recite"):
+            created_at = r.get("created_at", "")
+            if created_at:
+                day = created_at[:10] if isinstance(created_at, str) else created_at.strftime("%Y-%m-%d")
+                recitation_days.add(day)
+                if r.get("passed_minimum") or r.get("passed_review_minimum"):
+                    passed_days.add(day)
+    
+    recitation_days_count = len(recitation_days)  # عدد أيام التسميع
+    passed_days_count = len(passed_days)  # عدد أيام الاجتياز
+    
+    # نسبة التسميع = أيام الاجتياز / أيام التسميع الكلية
+    recitation_rate = round((passed_days_count / max(recitation_days_count, 1)) * 100, 1)
     
     present_count = sum(1 for a in attendance if a["status"] == "present")
     absent_count = sum(1 for a in attendance if a["status"] == "absent")
