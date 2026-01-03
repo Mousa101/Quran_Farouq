@@ -310,7 +310,7 @@ const MyPoints = () => {
                       <p className={`font-bold ${isMe ? 'text-emerald-400' : isDark ? 'text-white' : 'text-slate-900'}`}>
                         {entry.student_name} {isMe && '(أنت)'}
                       </p>
-                      <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المستوى {entry.level || 1}</p>
+                      <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المركز {entry.level || 1}</p>
                     </div>
                   </div>
                   <div className="text-left">
