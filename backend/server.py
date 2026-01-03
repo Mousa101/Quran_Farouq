@@ -59,6 +59,11 @@ async def health_check():
 # Create a router with the /api prefix
 api_router = APIRouter(prefix="/api")
 
+# Health endpoint on API router
+@api_router.get("/health")
+async def api_health_check():
+    return {"status": "healthy"}
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
