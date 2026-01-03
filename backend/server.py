@@ -2265,7 +2265,7 @@ async def get_group_rankings(
         
         # Get recitations count
         recitations = await db.recitations.find({"student_id": s["id"]}, {"_id": 0}).to_list(100)
-        recitation_count = len(recitations)
+        recitation_count = len(recitations.passed_count)
         
         scores.append({
             "student_id": s["id"],

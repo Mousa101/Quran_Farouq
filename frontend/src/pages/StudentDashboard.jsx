@@ -570,7 +570,7 @@ const StudentDashboard = () => {
               {/* عداد التسميع */}
               <div className="block md:hidden">
                 <CircularGauge 
-                  value={(stats?.recitation?.average_rating || 0) * 10}
+                  value={(stats?.recitation?. || 0) * 10}
                   maxValue={100}
                   label="نسبة التسميع"
                   color="dynamic"
@@ -580,7 +580,7 @@ const StudentDashboard = () => {
               </div>
               <div className="hidden md:block">
                 <CircularGauge 
-                  value={(stats?.recitation?.average_rating || 0) * 10}
+                  value={(stats?.recitation?.passed_count || 0) * 10}
                   maxValue={100}
                   label="نسبة التسميع"
                   color="dynamic"
@@ -603,12 +603,7 @@ const StudentDashboard = () => {
                 <p className="text-slate-500 text-[10px] md:text-xs mt-1">عذر: {stats?.attendance?.excused || 0}</p>
               </div>
               <div className="text-center">
-                <div className="flex items-center justify-center gap-1 md:gap-2 text-[10px] md:text-xs">
-                  <span className="text-amber-400 flex items-center gap-1">
-                    <Star className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                    التقييم: {stats?.recitation?.average_rating || 0}/10
-                  </span>
-                </div>
+                
                 <p className="text-slate-500 text-[10px] md:text-xs mt-1">
                   {stats?.recitation?.recitations_count || 0} تسميع - {stats?.recitation?.passed_count || 0} اجتاز
                 </p>
