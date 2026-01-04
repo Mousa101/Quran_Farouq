@@ -224,6 +224,7 @@ class TrackingSheet(BaseModel):
 class RecitationCreate(BaseModel):
     student_id: str
     recitation_type: str = "combined"  # "new_memorization", "review", or "combined" (حفظ ومراجعة معاً)
+    date: Optional[str] = None  # التاريخ المحدد (YYYY-MM-DD) - إذا لم يحدد يستخدم التاريخ الحالي
     # For new memorization - with range
     juz_number: Optional[int] = None  # رقم الجزء (1-30)
     page_from: Optional[int] = None  # من صفحة
