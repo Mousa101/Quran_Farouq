@@ -26,6 +26,7 @@ const StudentRecord = () => {
   const [recitations, setRecitations] = useState([]);
   const [trackingSheets, setTrackingSheets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [generatingPDF, setGeneratingPDF] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -59,6 +60,182 @@ const StudentRecord = () => {
       month: 'short',
       day: 'numeric'
     });
+  };
+
+  // تحديد بداية ونهاية الفصل الحالي
+  const getSemesterDates = () => {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+    
+    let semesterStart, semesterEnd, semesterName;
+    
+    if (month >= 9 || month <= 1) {
+      // الفصل الأول: سبتمبر - يناير
+      semesterStart = month >= 9 ? `${year}-09-01` : `${year - 1}-09-01`;
+      semesterEnd = month >= 9 ? `${year + 1}-01-31` : `${year}-01-31`;
+      semesterName = 'الفصل الدراسي الأول';
+    } else {
+      // الفصل الثاني: فبراير - يونيو
+      semesterStart = `${year}-02-01`;
+      semesterEnd = `${year}-06-30`;
+      semesterName = 'الفصل الدراسي الثاني';
+    }
+    
+    return { semesterStart, semesterEnd, semesterName };
+  };
+
+  // تصفية البيانات حسب الفصل
+  const filterBySemester = (data, dateField = 'date') => {
+    const { semesterStart, semesterEnd } = getSemesterDates();
+    return data.filter(item => {
+      const itemDate = item[dateField] || item.created_at;
+      if (!itemDate) return false;
+      const date = itemDate.split('T')[0];
+      return date >= semesterStart && date <= semesterEnd;
+    });
+  };
+
+  // إنشاء PDF لسجل الطالب
+  const generatePDF = async () => {
+    setGeneratingPDF(true);
+    
+    try {
+      const { semesterName } = getSemesterDates();
+      
+      // تصفية البيانات للفصل الحالي
+      const semesterAttendance = filterBySemester(attendance, 'date');
+      const semesterRecitations = filterBySemester(recitations, 'created_at');
+      const semesterTracking = filterBySemester(trackingSheets, 'week_start');
+      
+      // إنشاء PDF
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // إضافة خط عربي
+      doc.setFont('helvetica');
+      
+      // العنوان
+      doc.setFontSize(20);
+      doc.text('سجل الطالب', 105, 20, { align: 'center' });
+      
+      doc.setFontSize(14);
+      doc.text(student?.name || '', 105, 30, { align: 'center' });
+      doc.text(semesterName, 105, 38, { align: 'center' });
+      
+      let yPos = 50;
+      
+      // معلومات الطالب
+      doc.setFontSize(12);
+      doc.text(`البريد الإلكتروني: ${student?.email || '-'}`, 190, yPos, { align: 'right' });
+      yPos += 7;
+      doc.text(`المدرسة: ${student?.school_name || '-'}`, 190, yPos, { align: 'right' });
+      yPos += 7;
+      doc.text(`مجموع النقاط: ${stats?.total_points || 0}`, 190, yPos, { align: 'right' });
+      yPos += 15;
+      
+      // جدول الحضور والغياب
+      doc.setFontSize(14);
+      doc.text('سجل الحضور والغياب', 190, yPos, { align: 'right' });
+      yPos += 10;
+      
+      const presentCount = semesterAttendance.filter(a => a.status === 'present').length;
+      const absentCount = semesterAttendance.filter(a => a.status === 'absent').length;
+      const excusedCount = semesterAttendance.filter(a => a.status === 'excused').length;
+      
+      doc.setFontSize(10);
+      doc.text(`حاضر: ${presentCount} | غائب: ${absentCount} | معذور: ${excusedCount}`, 190, yPos, { align: 'right' });
+      yPos += 10;
+      
+      // جدول الحضور
+      if (semesterAttendance.length > 0) {
+        const attendanceData = semesterAttendance.slice(0, 20).map(a => [
+          a.status === 'present' ? 'حاضر' : a.status === 'absent' ? 'غائب' : 'معذور',
+          formatDate(a.date)
+        ]);
+        
+        doc.autoTable({
+          startY: yPos,
+          head: [['الحالة', 'التاريخ']],
+          body: attendanceData,
+          theme: 'grid',
+          styles: { halign: 'center', font: 'helvetica', fontSize: 9 },
+          headStyles: { fillColor: [16, 185, 129] }
+        });
+        
+        yPos = doc.lastAutoTable.finalY + 15;
+      }
+      
+      // جدول التسميعات
+      doc.setFontSize(14);
+      doc.text('سجل التسميعات', 190, yPos, { align: 'right' });
+      yPos += 10;
+      
+      if (semesterRecitations.length > 0) {
+        const recitationData = semesterRecitations.slice(0, 15).map(r => [
+          `${r.points_earned || 0}`,
+          r.page_from && r.page_to ? `${r.page_from}-${r.page_to}` : '-',
+          r.juz_number || '-',
+          r.recitation_type === 'new_memorization' ? 'حفظ جديد' : 'مراجعة',
+          formatDate(r.created_at)
+        ]);
+        
+        doc.autoTable({
+          startY: yPos,
+          head: [['النقاط', 'الصفحات', 'الجزء', 'النوع', 'التاريخ']],
+          body: recitationData,
+          theme: 'grid',
+          styles: { halign: 'center', font: 'helvetica', fontSize: 9 },
+          headStyles: { fillColor: [139, 92, 246] }
+        });
+        
+        yPos = doc.lastAutoTable.finalY + 15;
+      }
+      
+      // التحقق من الحاجة لصفحة جديدة
+      if (yPos > 250) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      // جدول ورق المتابعة
+      doc.setFontSize(14);
+      doc.text('سجل ورق المتابعة', 190, yPos, { align: 'right' });
+      yPos += 10;
+      
+      if (semesterTracking.length > 0) {
+        const trackingData = semesterTracking.slice(0, 10).map(t => [
+          `${t.points_earned || 0}`,
+          `${t.data?.prayers_count || 0}/35`,
+          `${t.data?.duha_prayers || 0}/7`,
+          `${t.data?.witr_prayers_days || 0}/7`,
+          formatDate(t.week_start)
+        ]);
+        
+        doc.autoTable({
+          startY: yPos,
+          head: [['النقاط', 'الصلوات', 'الضحى', 'الوتر', 'الأسبوع']],
+          body: trackingData,
+          theme: 'grid',
+          styles: { halign: 'center', font: 'helvetica', fontSize: 9 },
+          headStyles: { fillColor: [245, 158, 11] }
+        });
+      }
+      
+      // حفظ PDF
+      const fileName = `سجل_${student?.name || 'الطالب'}_${semesterName}.pdf`;
+      doc.save(fileName);
+      
+      toast.success('تم تحميل سجل الطالب بنجاح');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('فشل في إنشاء ملف PDF');
+    } finally {
+      setGeneratingPDF(false);
+    }
   };
 
   const getStatusBadge = (status) => {
