@@ -1903,6 +1903,7 @@ async def get_recitation(recitation_id: str, current_user: dict = Depends(get_cu
 @api_router.get("/recitations")
 async def get_recitations(
     student_id: Optional[str] = None,
+    date: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     query = {}
@@ -1915,8 +1916,48 @@ async def get_recitations(
     elif student_id:
         query["student_id"] = student_id
     
+    # فلترة حسب التاريخ
+    if date:
+        # البحث عن التسميعات في نفس اليوم
+        query["$expr"] = {
+            "$eq": [
+                {"$substr": ["$created_at", 0, 10]},
+                date
+            ]
+        }
+    
     recitations = await db.recitations.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
     return recitations
+
+# حذف تسميع (للمعلم)
+@api_router.delete("/recitations/{recitation_id}")
+async def delete_recitation(recitation_id: str, current_user: dict = Depends(get_current_user)):
+    """حذف تسميع - للمعلم فقط"""
+    if current_user["role"] not in ["sheikh", "admin"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك بحذف التسميع")
+    
+    # البحث عن التسميع
+    recitation = await db.recitations.find_one({"id": recitation_id})
+    if not recitation:
+        raise HTTPException(status_code=404, detail="التسميع غير موجود")
+    
+    # التحقق من أن المعلم هو من سجل التسميع
+    if current_user["role"] == "sheikh" and recitation.get("sheikh_id") != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="لا يمكنك حذف تسميع سجله معلم آخر")
+    
+    # خصم النقاط من الطالب
+    points_earned = recitation.get("points_earned", 0)
+    if points_earned > 0:
+        student_id = recitation.get("student_id")
+        await db.student_points.update_one(
+            {"student_id": student_id},
+            {"$inc": {"total_points": -points_earned, "recitation_points": -points_earned}}
+        )
+    
+    # حذف التسميع
+    await db.recitations.delete_one({"id": recitation_id})
+    
+    return {"message": "تم حذف التسميع بنجاح", "points_deducted": points_earned}
 
 # Get Quran Juz list
 @api_router.get("/quran/juz")
