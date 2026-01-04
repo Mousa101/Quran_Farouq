@@ -1289,6 +1289,56 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
     if current_user["role"] != "student":
         raise HTTPException(status_code=403, detail="هذا الخيار متاح للطلاب فقط")
     
+    # التحقق من وقت التسليم
+    submission_settings = await db.settings.find_one({"key": "tracking_submission"}, {"_id": 0})
+    is_within_submission_window = True
+    submission_message = ""
+    
+    if submission_settings and submission_settings.get("submission_enabled", False):
+        # الأيام
+        day_numbers = {
+            "saturday": 5, "sunday": 6, "monday": 0,
+            "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4
+        }
+        
+        now = datetime.now(timezone.utc)
+        current_day = now.weekday()
+        current_time = now.hour * 60 + now.minute
+        
+        start_day = day_numbers.get(submission_settings.get("submission_start_day", "friday"), 4)
+        end_day = day_numbers.get(submission_settings.get("submission_end_day", "saturday"), 5)
+        
+        start_time_str = submission_settings.get("submission_start_time", "21:00")
+        end_time_str = submission_settings.get("submission_end_time", "08:50")
+        
+        start_parts = start_time_str.split(":")
+        start_time = int(start_parts[0]) * 60 + int(start_parts[1])
+        
+        end_parts = end_time_str.split(":")
+        end_time = int(end_parts[0]) * 60 + int(end_parts[1])
+        
+        is_within_submission_window = False
+        
+        if start_day == end_day:
+            is_within_submission_window = current_day == start_day and start_time <= current_time <= end_time
+        elif start_day < end_day:
+            if current_day == start_day and current_time >= start_time:
+                is_within_submission_window = True
+            elif current_day == end_day and current_time <= end_time:
+                is_within_submission_window = True
+            elif start_day < current_day < end_day:
+                is_within_submission_window = True
+        else:
+            if current_day == start_day and current_time >= start_time:
+                is_within_submission_window = True
+            elif current_day == end_day and current_time <= end_time:
+                is_within_submission_window = True
+            elif current_day > start_day or current_day < end_day:
+                is_within_submission_window = True
+        
+        if not is_within_submission_window:
+            submission_message = "تم حفظ الورقة بدون نقاط (خارج وقت التسليم)"
+    
     # الحصول على بداية الأسبوع الحالي (السبت)
     current_week_start = get_current_week_start()
     
