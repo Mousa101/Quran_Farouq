@@ -110,6 +110,7 @@ const Sidebar = () => {
         { to: '/homework', icon: BookText, label: 'الواجبات' },
         { to: '/exams', icon: Award, label: 'الامتحانات' },
         { to: '/sheikh-rankings', icon: TrendingUp, label: 'ترتيب طلابي' },
+        { to: '/tracking-settings', icon: Settings, label: 'إعدادات ورق المتابعة' },
         { to: '/curriculum', icon: BookMarked, label: 'عرض المنهج' },
         { to: '/schedule', icon: CalendarDays, label: 'الجدول الدراسي' },
         { to: '/sheikh-edit-profile', icon: UserCog, label: 'تعديل بياناتي' },
