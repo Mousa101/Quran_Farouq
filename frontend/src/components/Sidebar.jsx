@@ -92,6 +92,7 @@ const Sidebar = () => {
         { to: '/exams', icon: Award, label: 'الامتحانات' },
         { to: '/curriculum', icon: BookMarked, label: 'إدارة المنهج' },
         { to: '/schedule', icon: CalendarDays, label: 'إدارة الجداول' },
+        { to: '/tracking-settings', icon: Settings, label: 'إعدادات ورق المتابعة' },
         { to: '/activities', icon: Calendar, label: 'الأنشطة' },
         { to: '/users', icon: Users, label: 'المستخدمين' },
         { to: '/notifications', icon: Bell, label: 'الإشعارات' },
