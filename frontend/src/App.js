@@ -472,6 +472,17 @@ function AppRoutes() {
         }
       />
 
+      <Route
+        path="/tracking-settings"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <TrackingSettings />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* Default Route */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
