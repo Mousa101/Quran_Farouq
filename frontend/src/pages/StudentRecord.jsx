@@ -234,65 +234,6 @@ const StudentRecord = () => {
       setGeneratingPDF(false);
     }
   };
-          r.juz_number || '-',
-          r.recitation_type === 'new_memorization' ? 'حفظ جديد' : 'مراجعة',
-          formatDate(r.created_at)
-        ]);
-        
-        doc.autoTable({
-          startY: yPos,
-          head: [['النقاط', 'الصفحات', 'الجزء', 'النوع', 'التاريخ']],
-          body: recitationData,
-          theme: 'grid',
-          styles: { halign: 'center', font: 'helvetica', fontSize: 9 },
-          headStyles: { fillColor: [139, 92, 246] }
-        });
-        
-        yPos = doc.lastAutoTable.finalY + 15;
-      }
-      
-      // التحقق من الحاجة لصفحة جديدة
-      if (yPos > 250) {
-        doc.addPage();
-        yPos = 20;
-      }
-      
-      // جدول ورق المتابعة
-      doc.setFontSize(14);
-      doc.text('سجل ورق المتابعة', 190, yPos, { align: 'right' });
-      yPos += 10;
-      
-      if (semesterTracking.length > 0) {
-        const trackingData = semesterTracking.slice(0, 10).map(t => [
-          `${t.points_earned || 0}`,
-          `${t.data?.prayers_count || 0}/35`,
-          `${t.data?.duha_prayers || 0}/7`,
-          `${t.data?.witr_prayers_days || 0}/7`,
-          formatDate(t.week_start)
-        ]);
-        
-        doc.autoTable({
-          startY: yPos,
-          head: [['النقاط', 'الصلوات', 'الضحى', 'الوتر', 'الأسبوع']],
-          body: trackingData,
-          theme: 'grid',
-          styles: { halign: 'center', font: 'helvetica', fontSize: 9 },
-          headStyles: { fillColor: [245, 158, 11] }
-        });
-      }
-      
-      // حفظ PDF
-      const fileName = `سجل_${student?.name || 'الطالب'}_${semesterName}.pdf`;
-      doc.save(fileName);
-      
-      toast.success('تم تحميل سجل الطالب بنجاح');
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      toast.error('فشل في إنشاء ملف PDF');
-    } finally {
-      setGeneratingPDF(false);
-    }
-  };
 
   const getStatusBadge = (status) => {
     switch (status) {
