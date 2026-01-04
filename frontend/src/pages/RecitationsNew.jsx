@@ -146,11 +146,13 @@ const RecitationsNew = () => {
   const handleDidNotRecite = async (student) => {
     setSaving(true);
     try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
       await axios.post(`${API}/recitations`, {
         student_id: student.id,
         recitation_type: 'did_not_recite',
         did_not_recite: true,
-        notes: `لم يسمع - ${format(selectedDate, 'yyyy-MM-dd')}`
+        date: dateStr,
+        notes: `لم يسمع - ${dateStr}`
       });
       
       toast.success(`تم تسجيل عدم التسميع للطالب ${student.name}`);
