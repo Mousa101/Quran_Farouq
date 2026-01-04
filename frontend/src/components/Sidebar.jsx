@@ -29,7 +29,8 @@ import {
   Award,
   Menu,
   FileQuestion,
-  X
+  X,
+  Settings
 } from 'lucide-react';
 import { Button } from './ui/button';
 
