@@ -209,9 +209,11 @@ const RecitationsNew = () => {
     setSaving(true);
     
     try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const payload = {
         student_id: selectedStudent.id,
         recitation_type: 'combined',
+        date: dateStr,
         has_new_memorization: formData.has_new_memorization,
         juz_number: formData.juz_number,
         page_from: formData.page_from,
