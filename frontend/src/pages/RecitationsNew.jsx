@@ -415,17 +415,38 @@ const RecitationsNew = () => {
                         <div className="mt-3 space-y-2">
                           {studentRecs.map((rec, idx) => (
                             <div key={idx} className="p-2 rounded-lg bg-slate-900/50 flex items-center justify-between">
-                              <div className="flex items-center gap-2 text-sm text-slate-300">
+                              <div className="flex flex-col gap-1 text-sm text-slate-300">
                                 {rec.did_not_recite ? (
                                   <span className="text-red-400">لم يسمّع</span>
                                 ) : (
                                   <>
-                                    {rec.juz_number && <span>الجزء {rec.juz_number}</span>}
-                                    {rec.page_from && rec.page_to && (
-                                      <span>• ص {rec.page_from}-{rec.page_to}</span>
+                                    {/* حفظ جديد */}
+                                    {(rec.has_new_memorization || rec.juz_number) && (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-emerald-400 text-xs px-1.5 py-0.5 bg-emerald-500/20 rounded">حفظ</span>
+                                        {rec.juz_number && <span>الجزء {rec.juz_number}</span>}
+                                        {rec.page_from && rec.page_to && (
+                                          <span>ص {rec.page_from}-{rec.page_to}</span>
+                                        )}
+                                        {rec.passed_minimum && (
+                                          <span className="text-emerald-400">✓</span>
+                                        )}
+                                      </div>
                                     )}
-                                    {rec.passed_minimum && (
-                                      <span className="text-emerald-400">✓ اجتاز</span>
+                                    {/* مراجعة */}
+                                    {(rec.has_review || (rec.review_juz && rec.review_juz.length > 0)) && (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-blue-400 text-xs px-1.5 py-0.5 bg-blue-500/20 rounded">مراجعة</span>
+                                        {rec.review_juz && rec.review_juz.length > 0 && (
+                                          <span>الأجزاء: {rec.review_juz.sort((a,b) => a-b).join(', ')}</span>
+                                        )}
+                                        {rec.partial_review_pages > 0 && (
+                                          <span>{rec.partial_review_pages} ص من جزء {rec.partial_review_juz}</span>
+                                        )}
+                                        {rec.passed_review_minimum && (
+                                          <span className="text-blue-400">✓</span>
+                                        )}
+                                      </div>
                                     )}
                                     <span className="text-amber-400">+{rec.points_earned || 0} نقطة</span>
                                   </>
