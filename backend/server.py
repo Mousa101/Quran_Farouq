@@ -5009,6 +5009,193 @@ async def upload_curriculum_pdf(curriculum_id: str, file: UploadFile = File(...)
     
     return {"message": "تم رفع الملف بنجاح", "filename": file.filename}
 
+# ============== TRACKING SHEET SETTINGS (SUBMISSION WINDOW) ==============
+
+class TrackingSettingsUpdate(BaseModel):
+    """إعدادات مواعيد تسليم ورق المتابعة"""
+    submission_enabled: Optional[bool] = None
+    submission_start_day: Optional[str] = None  # friday, saturday, sunday, etc.
+    submission_start_time: Optional[str] = None  # HH:MM format (e.g., "21:00")
+    submission_end_day: Optional[str] = None
+    submission_end_time: Optional[str] = None  # HH:MM format (e.g., "08:50")
+
+@api_router.get("/settings/tracking-submission")
+async def get_tracking_submission_settings(current_user: dict = Depends(get_current_user)):
+    """الحصول على إعدادات مواعيد تسليم ورق المتابعة"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    settings = await db.settings.find_one({"key": "tracking_submission"}, {"_id": 0})
+    
+    if not settings:
+        # الإعدادات الافتراضية
+        default_settings = {
+            "key": "tracking_submission",
+            "submission_enabled": True,
+            "submission_start_day": "friday",
+            "submission_start_time": "21:00",
+            "submission_end_day": "saturday",
+            "submission_end_time": "08:50",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.settings.insert_one(default_settings)
+        return default_settings
+    
+    return settings
+
+@api_router.put("/settings/tracking-submission")
+async def update_tracking_submission_settings(data: TrackingSettingsUpdate, current_user: dict = Depends(get_current_user)):
+    """تحديث إعدادات مواعيد تسليم ورق المتابعة (المدير والمعلم)"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    # الأيام المسموحة
+    valid_days = ["saturday", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday"]
+    
+    update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    
+    if data.submission_enabled is not None:
+        update_data["submission_enabled"] = data.submission_enabled
+    
+    if data.submission_start_day is not None:
+        if data.submission_start_day.lower() not in valid_days:
+            raise HTTPException(status_code=400, detail="يوم البداية غير صحيح")
+        update_data["submission_start_day"] = data.submission_start_day.lower()
+    
+    if data.submission_start_time is not None:
+        # التحقق من صيغة الوقت
+        try:
+            parts = data.submission_start_time.split(":")
+            hour = int(parts[0])
+            minute = int(parts[1]) if len(parts) > 1 else 0
+            if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+                raise ValueError()
+            update_data["submission_start_time"] = f"{hour:02d}:{minute:02d}"
+        except:
+            raise HTTPException(status_code=400, detail="صيغة وقت البداية غير صحيحة (استخدم HH:MM)")
+    
+    if data.submission_end_day is not None:
+        if data.submission_end_day.lower() not in valid_days:
+            raise HTTPException(status_code=400, detail="يوم النهاية غير صحيح")
+        update_data["submission_end_day"] = data.submission_end_day.lower()
+    
+    if data.submission_end_time is not None:
+        try:
+            parts = data.submission_end_time.split(":")
+            hour = int(parts[0])
+            minute = int(parts[1]) if len(parts) > 1 else 0
+            if hour < 0 or hour > 23 or minute < 0 or minute > 59:
+                raise ValueError()
+            update_data["submission_end_time"] = f"{hour:02d}:{minute:02d}"
+        except:
+            raise HTTPException(status_code=400, detail="صيغة وقت النهاية غير صحيحة (استخدم HH:MM)")
+    
+    # تحديث أو إنشاء الإعدادات
+    result = await db.settings.update_one(
+        {"key": "tracking_submission"},
+        {"$set": update_data},
+        upsert=True
+    )
+    
+    # إرجاع الإعدادات المحدثة
+    settings = await db.settings.find_one({"key": "tracking_submission"}, {"_id": 0})
+    
+    return {
+        "message": "تم تحديث إعدادات مواعيد التسليم بنجاح",
+        "settings": settings
+    }
+
+@api_router.get("/settings/tracking-submission/check")
+async def check_tracking_submission_window(current_user: dict = Depends(get_current_user)):
+    """فحص هل يمكن تسليم ورق المتابعة الآن"""
+    settings = await db.settings.find_one({"key": "tracking_submission"}, {"_id": 0})
+    
+    if not settings or not settings.get("submission_enabled", True):
+        return {
+            "can_submit": True,
+            "message": "التسليم مفتوح دائماً",
+            "settings": settings
+        }
+    
+    # الأيام بالعربية
+    day_names = {
+        "saturday": "السبت",
+        "sunday": "الأحد",
+        "monday": "الاثنين",
+        "tuesday": "الثلاثاء",
+        "wednesday": "الأربعاء",
+        "thursday": "الخميس",
+        "friday": "الجمعة"
+    }
+    
+    day_numbers = {
+        "saturday": 5,
+        "sunday": 6,
+        "monday": 0,
+        "tuesday": 1,
+        "wednesday": 2,
+        "thursday": 3,
+        "friday": 4
+    }
+    
+    now = datetime.now(timezone.utc)
+    current_day = now.weekday()
+    current_time = now.hour * 60 + now.minute  # بالدقائق
+    
+    start_day = day_numbers.get(settings.get("submission_start_day", "friday"), 4)
+    end_day = day_numbers.get(settings.get("submission_end_day", "saturday"), 5)
+    
+    start_time_str = settings.get("submission_start_time", "21:00")
+    end_time_str = settings.get("submission_end_time", "08:50")
+    
+    start_parts = start_time_str.split(":")
+    start_time = int(start_parts[0]) * 60 + int(start_parts[1])
+    
+    end_parts = end_time_str.split(":")
+    end_time = int(end_parts[0]) * 60 + int(end_parts[1])
+    
+    can_submit = False
+    
+    # فحص الفترة (قد تمتد لأكثر من يوم)
+    if start_day == end_day:
+        # نفس اليوم
+        can_submit = current_day == start_day and start_time <= current_time <= end_time
+    elif start_day < end_day:
+        # فترة عادية
+        if current_day == start_day and current_time >= start_time:
+            can_submit = True
+        elif current_day == end_day and current_time <= end_time:
+            can_submit = True
+        elif start_day < current_day < end_day:
+            can_submit = True
+    else:
+        # فترة تمتد عبر نهاية الأسبوع
+        if current_day == start_day and current_time >= start_time:
+            can_submit = True
+        elif current_day == end_day and current_time <= end_time:
+            can_submit = True
+        elif current_day > start_day or current_day < end_day:
+            can_submit = True
+    
+    start_day_name = day_names.get(settings.get("submission_start_day", "friday"), "الجمعة")
+    end_day_name = day_names.get(settings.get("submission_end_day", "saturday"), "السبت")
+    
+    if can_submit:
+        message = f"التسليم مفتوح حتى {end_day_name} {end_time_str}"
+    else:
+        message = f"التسليم متاح من {start_day_name} {start_time_str} إلى {end_day_name} {end_time_str}"
+    
+    return {
+        "can_submit": can_submit,
+        "message": message,
+        "settings": {
+            "start_day": settings.get("submission_start_day"),
+            "start_time": start_time_str,
+            "end_day": settings.get("submission_end_day"),
+            "end_time": end_time_str
+        }
+    }
+
 # Include the router
 app.include_router(api_router)
 
