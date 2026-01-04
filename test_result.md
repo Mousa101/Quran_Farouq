@@ -13,11 +13,14 @@ backend:
     file: "backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "New API for tracking sheet submission window settings"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: All tracking submission settings APIs working correctly. GET /api/settings/tracking-submission returns proper settings with expected fields (submission_enabled, submission_start_day, submission_start_time, submission_end_day, submission_end_time). PUT /api/settings/tracking-submission successfully updates settings. GET /api/settings/tracking-submission/check returns proper submission window status. Admin credentials test_admin@test.com work correctly."
 
   - task: "Recitations API with combined type - POST /api/recitations"
     implemented: true
@@ -25,11 +28,26 @@ backend:
     file: "backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Updated to support combined recitation (new memorization + review together)"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Combined recitations API working perfectly. Successfully tested POST /api/recitations with recitation_type='combined' supporting both new memorization AND review together. All test scenarios passed: 1) Combined with both new memorization + review, 2) Combined with new memorization only, 3) Combined with review only. Sheikh credentials test_sheikh@test.com work correctly."
+
+  - task: "Tracking Submission Check API - GET /api/settings/tracking-submission/check"
+    implemented: true
+    working: true
+    file: "backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Tracking submission check API working correctly. Returns proper JSON with can_submit boolean and message fields. Accessible to all authenticated users."
 
 frontend:
   - task: "New Recitations Page - Like Attendance"
