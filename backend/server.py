@@ -1628,6 +1628,16 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     if current_user["role"] != "sheikh":
         raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تسجيل التسميع")
     
+    # تحديد التاريخ - إذا لم يُحدد يستخدم التاريخ الحالي
+    if recitation_data.date:
+        try:
+            # تحويل التاريخ المحدد إلى datetime
+            recitation_date = datetime.strptime(recitation_data.date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        except ValueError:
+            recitation_date = datetime.now(timezone.utc)
+    else:
+        recitation_date = datetime.now(timezone.utc)
+    
     # إذا لم يسمع - لا يُسجل التسميع ولا نقاط
     if recitation_data.did_not_recite:
         recitation = Recitation(
@@ -1642,7 +1652,7 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
         )
         
         recitation_dict = recitation.model_dump()
-        recitation_dict["created_at"] = recitation_dict["created_at"].isoformat()
+        recitation_dict["created_at"] = recitation_date.isoformat()
         await db.recitations.insert_one(recitation_dict)
         
         return {"message": "تم تسجيل عدم التسميع", "recitation_id": recitation.id, "points_earned": 0}
