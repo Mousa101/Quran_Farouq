@@ -2399,20 +2399,33 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
     # حساب أيام التسميع الفريدة (يُحسب يوم واحد فقط حتى لو سمع أكثر من مرة)
     recitation_days = set()
     passed_days = set()
+    did_not_recite_days = set()
+    
     for r in recitations:
-        if not r.get("did_not_recite"):
-            created_at = r.get("created_at", "")
-            if created_at:
-                day = created_at[:10] if isinstance(created_at, str) else created_at.strftime("%Y-%m-%d")
+        created_at = r.get("created_at", "")
+        if created_at:
+            day = created_at[:10] if isinstance(created_at, str) else created_at.strftime("%Y-%m-%d")
+            
+            if r.get("did_not_recite"):
+                # يوم "لم يسمّع"
+                did_not_recite_days.add(day)
+            else:
+                # يوم تسميع فعلي
                 recitation_days.add(day)
                 if r.get("passed_minimum") or r.get("passed_review_minimum"):
                     passed_days.add(day)
     
-    recitation_days_count = len(recitation_days)  # عدد أيام التسميع
-    passed_days_count = len(passed_days)  # عدد أيام الاجتياز
+    # عدد أيام التسميع الفعلي (بدون "لم يسمّع")
+    recitation_days_count = len(recitation_days)
+    # عدد أيام "لم يسمّع"
+    did_not_recite_days_count = len(did_not_recite_days)
+    # إجمالي الأيام (للحساب)
+    total_days_count = recitation_days_count + did_not_recite_days_count
+    # عدد أيام الاجتياز
+    passed_days_count = len(passed_days)
     
-    # نسبة التسميع = أيام الاجتياز / أيام التسميع الكلية
-    recitation_rate = round((passed_days_count / max(recitation_days_count, 1)) * 100, 1)
+    # نسبة التسميع = أيام التسميع الفعلي / إجمالي الأيام (تسميع + لم يسمّع)
+    recitation_rate = round((recitation_days_count / max(total_days_count, 1)) * 100, 1)
     
     present_count = sum(1 for a in attendance if a["status"] == "present")
     absent_count = sum(1 for a in attendance if a["status"] == "absent")
