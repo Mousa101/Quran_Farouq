@@ -931,27 +931,17 @@ class QuranAppAPITester:
             self.log_test("Initial Assessment API - سند غيبي level", False, f"Status: {status}, Response: {response}")
 
     def test_health_endpoint(self):
-        """Test Health Endpoint - GET /health"""
+        """Test Health Endpoint - GET /api/health"""
         print("\n💚 Testing Health Endpoint...")
         
         # Health endpoint should be accessible without authentication
-        # Use the base URL without /api prefix since health is at root level
-        health_url = self.base_url.replace('/api', '') + '/health'
+        # Use the API health endpoint
+        success, response, status = self.make_request('GET', 'health')
         
-        try:
-            response = requests.get(health_url, timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('status') == 'healthy':
-                    self.log_test("Health Endpoint - 200 OK with healthy status", True)
-                else:
-                    self.log_test("Health Endpoint - wrong status", False, f"Expected 'healthy', got: {data}")
-            else:
-                self.log_test("Health Endpoint", False, f"Status: {response.status_code}")
-                
-        except Exception as e:
-            self.log_test("Health Endpoint", False, f"Error: {str(e)}")
+        if success and response.get('status') == 'healthy':
+            self.log_test("API Health Endpoint - 200 OK with healthy status", True)
+        else:
+            self.log_test("API Health Endpoint", False, f"Status: {status}, Response: {response}")
 
     def test_tracking_submission_settings_api(self):
         """Test Tracking Submission Settings API - GET/PUT /api/settings/tracking-submission"""
