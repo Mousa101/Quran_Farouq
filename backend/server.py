@@ -1362,7 +1362,7 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
         "week_start": week_start_to_use
     })
     
-    # حساب النقاط
+    # حساب النقاط - صفر إذا كان خارج وقت التسليم
     points_breakdown = calculate_tracking_points({
         "prayers_count": data.prayers_count,
         "adhkar_after_prayer": data.adhkar_after_prayer,
@@ -1375,6 +1375,9 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
         "night_prayer": data.night_prayer,
         "fasting": data.fasting
     })
+    
+    # إذا كان خارج وقت التسليم، لا تُمنح نقاط
+    actual_points = points_breakdown["total_points"] if is_within_submission_window else 0
     
     sheet_data_dict = {
         "prayers_count": min(data.prayers_count, 35),
@@ -1396,18 +1399,21 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
             {"id": existing["id"]},
             {"$set": {
                 "data": sheet_data_dict,
-                "points_earned": points_breakdown["total_points"],
-                "submitted_by_student": True
+                "points_earned": actual_points,
+                "submitted_by_student": True,
+                "submitted_outside_window": not is_within_submission_window
             }}
         )
         
-        # فحص ومنح شارة العابد
-        await check_worshipper_badge(current_user["user_id"], points_breakdown["total_points"])
+        # فحص ومنح شارة العابد (فقط إذا كان في وقت التسليم)
+        if is_within_submission_window:
+            await check_worshipper_badge(current_user["user_id"], actual_points)
         
         return {
-            "message": "تم تحديث ورقة المتابعة بنجاح",
-            "points_earned": points_breakdown["total_points"],
-            "week_start": week_start_to_use
+            "message": submission_message if submission_message else "تم تحديث ورقة المتابعة بنجاح",
+            "points_earned": actual_points,
+            "week_start": week_start_to_use,
+            "submitted_outside_window": not is_within_submission_window
         }
     
     # إنشاء ورقة جديدة
