@@ -276,7 +276,7 @@ const StudentRecord = () => {
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           {student.profile_image ? (
             <img 
@@ -296,12 +296,26 @@ const StudentRecord = () => {
             <p className="text-slate-400">{student.email}</p>
           </div>
         </div>
-        <Link to="/sheikh-rankings">
-          <Button variant="outline" className={isDark ? 'border-white/10' : ''}>
-            <ArrowRight className="w-4 h-4 ml-2" />
-            العودة للترتيب
+        <div className="flex gap-2">
+          <Button 
+            onClick={generatePDF}
+            disabled={generatingPDF}
+            className="bg-emerald-500 hover:bg-emerald-600"
+          >
+            {generatingPDF ? (
+              <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4 ml-2" />
+            )}
+            تحميل PDF للفصل
           </Button>
-        </Link>
+          <Link to="/sheikh-rankings">
+            <Button variant="outline" className={isDark ? 'border-white/10' : ''}>
+              <ArrowRight className="w-4 h-4 ml-2" />
+              العودة للترتيب
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Quick Stats */}
