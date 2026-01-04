@@ -115,54 +115,53 @@ const StudentRecord = () => {
         format: 'a4'
       });
       
-      // إضافة خط عربي
-      doc.setFont('helvetica');
+      let yPos = 20;
       
       // العنوان
-      doc.setFontSize(20);
-      doc.text('سجل الطالب', 105, 20, { align: 'center' });
+      doc.setFontSize(18);
+      doc.text('Student Record', 105, yPos, { align: 'center' });
+      yPos += 10;
       
       doc.setFontSize(14);
-      doc.text(student?.name || '', 105, 30, { align: 'center' });
-      doc.text(semesterName, 105, 38, { align: 'center' });
-      
-      let yPos = 50;
+      doc.text(student?.name || 'Student', 105, yPos, { align: 'center' });
+      yPos += 8;
+      doc.text(semesterName, 105, yPos, { align: 'center' });
+      yPos += 15;
       
       // معلومات الطالب
-      doc.setFontSize(12);
-      doc.text(`البريد الإلكتروني: ${student?.email || '-'}`, 190, yPos, { align: 'right' });
-      yPos += 7;
-      doc.text(`المدرسة: ${student?.school_name || '-'}`, 190, yPos, { align: 'right' });
-      yPos += 7;
-      doc.text(`مجموع النقاط: ${stats?.total_points || 0}`, 190, yPos, { align: 'right' });
+      doc.setFontSize(11);
+      doc.text(`Email: ${student?.email || '-'}`, 20, yPos);
+      yPos += 6;
+      doc.text(`School: ${student?.school_name || '-'}`, 20, yPos);
+      yPos += 6;
+      doc.text(`Total Points: ${stats?.total_points || 0}`, 20, yPos);
       yPos += 15;
       
       // جدول الحضور والغياب
-      doc.setFontSize(14);
-      doc.text('سجل الحضور والغياب', 190, yPos, { align: 'right' });
-      yPos += 10;
-      
       const presentCount = semesterAttendance.filter(a => a.status === 'present').length;
       const absentCount = semesterAttendance.filter(a => a.status === 'absent').length;
       const excusedCount = semesterAttendance.filter(a => a.status === 'excused').length;
       
+      doc.setFontSize(12);
+      doc.text('Attendance Summary', 20, yPos);
+      yPos += 6;
       doc.setFontSize(10);
-      doc.text(`حاضر: ${presentCount} | غائب: ${absentCount} | معذور: ${excusedCount}`, 190, yPos, { align: 'right' });
+      doc.text(`Present: ${presentCount} | Absent: ${absentCount} | Excused: ${excusedCount}`, 20, yPos);
       yPos += 10;
       
       // جدول الحضور
       if (semesterAttendance.length > 0) {
-        const attendanceData = semesterAttendance.slice(0, 20).map(a => [
-          a.status === 'present' ? 'حاضر' : a.status === 'absent' ? 'غائب' : 'معذور',
-          formatDate(a.date)
+        const attendanceData = semesterAttendance.slice(0, 15).map(a => [
+          formatDate(a.date),
+          a.status === 'present' ? 'Present' : a.status === 'absent' ? 'Absent' : 'Excused'
         ]);
         
-        doc.autoTable({
+        autoTable(doc, {
           startY: yPos,
-          head: [['الحالة', 'التاريخ']],
+          head: [['Date', 'Status']],
           body: attendanceData,
           theme: 'grid',
-          styles: { halign: 'center', font: 'helvetica', fontSize: 9 },
+          styles: { halign: 'center', fontSize: 9 },
           headStyles: { fillColor: [16, 185, 129] }
         });
         
@@ -170,14 +169,71 @@ const StudentRecord = () => {
       }
       
       // جدول التسميعات
-      doc.setFontSize(14);
-      doc.text('سجل التسميعات', 190, yPos, { align: 'right' });
+      doc.setFontSize(12);
+      doc.text('Recitations', 20, yPos);
       yPos += 10;
       
       if (semesterRecitations.length > 0) {
-        const recitationData = semesterRecitations.slice(0, 15).map(r => [
-          `${r.points_earned || 0}`,
+        const recitationData = semesterRecitations.slice(0, 10).map(r => [
+          formatDate(r.created_at),
+          r.juz_number || '-',
           r.page_from && r.page_to ? `${r.page_from}-${r.page_to}` : '-',
+          `${r.points_earned || 0}`
+        ]);
+        
+        autoTable(doc, {
+          startY: yPos,
+          head: [['Date', 'Juz', 'Pages', 'Points']],
+          body: recitationData,
+          theme: 'grid',
+          styles: { halign: 'center', fontSize: 9 },
+          headStyles: { fillColor: [139, 92, 246] }
+        });
+        
+        yPos = doc.lastAutoTable.finalY + 15;
+      }
+      
+      // التحقق من الحاجة لصفحة جديدة
+      if (yPos > 250) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      // جدول ورق المتابعة
+      doc.setFontSize(12);
+      doc.text('Tracking Sheets', 20, yPos);
+      yPos += 10;
+      
+      if (semesterTracking.length > 0) {
+        const trackingData = semesterTracking.slice(0, 10).map(t => [
+          formatDate(t.week_start),
+          `${t.data?.prayers_count || 0}/35`,
+          `${t.data?.duha_prayers || 0}/7`,
+          `${t.points_earned || 0}`
+        ]);
+        
+        autoTable(doc, {
+          startY: yPos,
+          head: [['Week', 'Prayers', 'Duha', 'Points']],
+          body: trackingData,
+          theme: 'grid',
+          styles: { halign: 'center', fontSize: 9 },
+          headStyles: { fillColor: [245, 158, 11] }
+        });
+      }
+      
+      // حفظ PDF
+      const fileName = `Student_Record_${student?.name || 'Student'}.pdf`;
+      doc.save(fileName);
+      
+      toast.success('تم تحميل سجل الطالب بنجاح');
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('فشل في إنشاء ملف PDF: ' + (error.message || 'خطأ غير معروف'));
+    } finally {
+      setGeneratingPDF(false);
+    }
+  };
           r.juz_number || '-',
           r.recitation_type === 'new_memorization' ? 'حفظ جديد' : 'مراجعة',
           formatDate(r.created_at)
