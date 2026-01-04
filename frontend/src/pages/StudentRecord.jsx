@@ -12,8 +12,8 @@ import {
   Phone, Mail, School, Home, Clock, Star, Target, Sparkles, Download, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
