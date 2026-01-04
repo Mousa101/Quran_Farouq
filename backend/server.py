@@ -1436,36 +1436,40 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
         sheikh_id="",  # بدون شيخ - مقدم من الطالب
         week_start=week_start_to_use,
         data=sheet_data,
-        points_earned=points_breakdown["total_points"]
+        points_earned=actual_points
     )
     
     sheet_dict = sheet.model_dump()
     sheet_dict["created_at"] = sheet_dict["created_at"].isoformat()
     sheet_dict["submitted_by_student"] = True
+    sheet_dict["submitted_outside_window"] = not is_within_submission_window
     
     await db.tracking_sheets.insert_one(sheet_dict)
     
-    # منح النقاط (مع الحد الأقصى 1000)
-    student_points = await db.student_points.find_one({"student_id": current_user["user_id"]})
-    current_total = student_points.get("total_points", 0) if student_points else 0
-    points_to_add = min(points_breakdown["total_points"], 1000 - current_total)
-    
-    if points_to_add > 0:
-        await add_points(
-            current_user["user_id"],
-            points_to_add,
-            "tracking",
-            f"ورقة متابعة أسبوع {week_start_to_use}"
-        )
-    
-    # فحص ومنح شارة العابد
-    await check_worshipper_badge(current_user["user_id"], points_breakdown["total_points"])
+    # منح النقاط فقط إذا كان في وقت التسليم (مع الحد الأقصى 1000)
+    points_to_add = 0
+    if is_within_submission_window and actual_points > 0:
+        student_points = await db.student_points.find_one({"student_id": current_user["user_id"]})
+        current_total = student_points.get("total_points", 0) if student_points else 0
+        points_to_add = min(actual_points, 1000 - current_total)
+        
+        if points_to_add > 0:
+            await add_points(
+                current_user["user_id"],
+                points_to_add,
+                "tracking",
+                f"ورقة متابعة أسبوع {week_start_to_use}"
+            )
+        
+        # فحص ومنح شارة العابد
+        await check_worshipper_badge(current_user["user_id"], actual_points)
     
     return {
-        "message": "تم حفظ ورقة المتابعة بنجاح",
+        "message": submission_message if submission_message else "تم حفظ ورقة المتابعة بنجاح",
         "sheet_id": sheet.id,
         "points_earned": points_to_add,
-        "week_start": week_start_to_use
+        "week_start": week_start_to_use,
+        "submitted_outside_window": not is_within_submission_window
     }
 
 @api_router.get("/tracking-sheets")
