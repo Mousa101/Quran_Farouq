@@ -3696,8 +3696,24 @@ async def get_sheikh_students_ranking(current_user: dict = Depends(get_current_u
         
         # Get recitation stats
         recitations = await db.recitations.find({"student_id": student["id"]}, {"_id": 0}).to_list(1000)
-        total_recitations = len(recitations)
-        total_pages = sum(r.get("page_to", 0) - r.get("page_from", 0) + 1 for r in recitations if r.get("page_from") and r.get("page_to"))
+        total_recitations = len([r for r in recitations if not r.get("did_not_recite")])
+        total_pages = sum(r.get("page_to", 0) - r.get("page_from", 0) + 1 for r in recitations if r.get("page_from") and r.get("page_to") and not r.get("did_not_recite"))
+        
+        # حساب نسبة التسميع
+        recitation_days = set()
+        did_not_recite_days = set()
+        for r in recitations:
+            created_at = r.get("created_at", "")
+            if created_at:
+                day = created_at[:10] if isinstance(created_at, str) else created_at.strftime("%Y-%m-%d")
+                if r.get("did_not_recite"):
+                    did_not_recite_days.add(day)
+                else:
+                    recitation_days.add(day)
+        
+        total_recitation_days = len(recitation_days) + len(did_not_recite_days)
+        recitation_rate = round((len(recitation_days) / max(total_recitation_days, 1)) * 100, 1)
+        did_not_recite_count = len([r for r in recitations if r.get("did_not_recite")])
         
         # Get tracking sheets total points - مجموع نقاط ورق المتابعة
         tracking_sheets = await db.tracking_sheets.find({"student_id": student["id"]}, {"_id": 0}).to_list(100)
@@ -3721,7 +3737,9 @@ async def get_sheikh_students_ranking(current_user: dict = Depends(get_current_u
             "total_points": total_points,
             "points_percentage": points_percentage,  # نسبة النقاط من 1000
             "attendance_rate": attendance_rate,
+            "recitation_rate": recitation_rate,  # نسبة التسميع
             "total_recitations": total_recitations,
+            "did_not_recite_count": did_not_recite_count,  # عدد مرات "لم يسمّع"
             "total_pages": total_pages,
             "tracking_points": tracking_points_total,  # مجموع نقاط ورق المتابعة
             "tracking_percentage": tracking_percentage,  # نسبة ورق المتابعة
