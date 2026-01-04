@@ -953,11 +953,207 @@ class QuranAppAPITester:
         except Exception as e:
             self.log_test("Health Endpoint", False, f"Error: {str(e)}")
 
+    def test_tracking_submission_settings_api(self):
+        """Test Tracking Submission Settings API - GET/PUT /api/settings/tracking-submission"""
+        print("\n⚙️ Testing Tracking Submission Settings API...")
+        
+        if 'admin' not in self.tokens:
+            self.log_test("Tracking Submission Settings API", False, "Admin token not available")
+            return
+            
+        # Test GET /api/settings/tracking-submission
+        success, response, status = self.make_request('GET', 'settings/tracking-submission', 
+                                                    token=self.tokens['admin'])
+        
+        if success:
+            # Check if response has expected fields
+            expected_fields = ['submission_enabled', 'submission_start_day', 'submission_start_time', 
+                             'submission_end_day', 'submission_end_time']
+            has_all_fields = all(field in response for field in expected_fields)
+            
+            if has_all_fields:
+                self.log_test("GET tracking submission settings", True)
+                
+                # Verify default values match expected
+                if (response.get('submission_start_day') == 'friday' and 
+                    response.get('submission_start_time') == '21:00' and
+                    response.get('submission_end_day') == 'saturday' and
+                    response.get('submission_end_time') == '08:50'):
+                    self.log_test("Default tracking submission settings", True)
+                else:
+                    self.log_test("Default tracking submission settings", False, f"Unexpected defaults: {response}")
+            else:
+                self.log_test("GET tracking submission settings", False, f"Missing fields. Got: {list(response.keys())}")
+        else:
+            self.log_test("GET tracking submission settings", False, f"Status: {status}, Response: {response}")
+        
+        # Test PUT /api/settings/tracking-submission
+        update_data = {
+            "submission_enabled": True,
+            "submission_start_day": "thursday",
+            "submission_start_time": "20:00",
+            "submission_end_day": "friday",
+            "submission_end_time": "10:00"
+        }
+        
+        success, response, status = self.make_request('PUT', 'settings/tracking-submission', update_data,
+                                                    token=self.tokens['admin'])
+        
+        if success and 'settings' in response:
+            updated_settings = response['settings']
+            if (updated_settings.get('submission_start_day') == 'thursday' and
+                updated_settings.get('submission_start_time') == '20:00'):
+                self.log_test("PUT tracking submission settings", True)
+            else:
+                self.log_test("PUT tracking submission settings", False, f"Settings not updated correctly: {updated_settings}")
+        else:
+            self.log_test("PUT tracking submission settings", False, f"Status: {status}, Response: {response}")
+        
+        # Test unauthorized access (non-admin/sheikh)
+        if 'student' in self.tokens:
+            success, response, status = self.make_request('GET', 'settings/tracking-submission',
+                                                        token=self.tokens['student'], expected_status=403)
+            self.log_test("Unauthorized tracking settings access (student)", success, f"Status: {status}")
+
+    def test_tracking_submission_check_api(self):
+        """Test Tracking Submission Check API - GET /api/settings/tracking-submission/check"""
+        print("\n🕐 Testing Tracking Submission Check API...")
+        
+        if 'student' not in self.tokens:
+            self.log_test("Tracking Submission Check API", False, "Student token not available")
+            return
+            
+        # Test GET /api/settings/tracking-submission/check
+        success, response, status = self.make_request('GET', 'settings/tracking-submission/check',
+                                                    token=self.tokens['student'])
+        
+        if success:
+            # Check if response has expected fields
+            expected_fields = ['can_submit', 'message']
+            has_expected_fields = all(field in response for field in expected_fields)
+            
+            if has_expected_fields:
+                self.log_test("GET tracking submission check", True)
+                
+                # Verify can_submit is boolean
+                if isinstance(response.get('can_submit'), bool):
+                    self.log_test("Tracking submission check format", True)
+                else:
+                    self.log_test("Tracking submission check format", False, f"can_submit is not boolean: {type(response.get('can_submit'))}")
+            else:
+                self.log_test("GET tracking submission check", False, f"Missing fields. Got: {list(response.keys())}")
+        else:
+            self.log_test("GET tracking submission check", False, f"Status: {status}, Response: {response}")
+
+    def test_combined_recitations_api(self):
+        """Test Combined Recitations API - POST /api/recitations with combined type"""
+        print("\n📚 Testing Combined Recitations API...")
+        
+        if 'sheikh' not in self.tokens:
+            self.log_test("Combined Recitations API", False, "Sheikh token not available")
+            return
+            
+        # Get a student from groups first
+        success, groups_response, status = self.make_request('GET', 'groups', token=self.tokens['sheikh'])
+        
+        if not success or not isinstance(groups_response, list) or len(groups_response) == 0:
+            self.log_test("Get groups for combined recitation", False, "No groups found")
+            return
+            
+        # Get students from the first group
+        group_id = groups_response[0].get('id')
+        if not group_id:
+            self.log_test("Get group ID for combined recitation", False, "No group ID found")
+            return
+            
+        success, students_response, status = self.make_request('GET', f'groups/{group_id}/students',
+                                                             token=self.tokens['sheikh'])
+        
+        if not success or not isinstance(students_response, list) or len(students_response) == 0:
+            self.log_test("Get students for combined recitation", False, "No students found in group")
+            return
+            
+        student_id = students_response[0].get('id')
+        if not student_id:
+            self.log_test("Get student ID for combined recitation", False, "No student ID found")
+            return
+        
+        # Test combined recitation with both new memorization AND review
+        combined_data = {
+            "student_id": student_id,
+            "recitation_type": "combined",
+            "has_new_memorization": True,
+            "juz_number": 1,
+            "page_from": 1,
+            "page_to": 3,
+            "passed_minimum": True,
+            "has_review": True,
+            "review_juz": [1],
+            "passed_review_minimum": True,
+            "notes": "Test combined recitation"
+        }
+        
+        success, response, status = self.make_request('POST', 'recitations', combined_data,
+                                                    token=self.tokens['sheikh'])
+        
+        if success:
+            if 'recitation_id' in response or 'message' in response:
+                self.log_test("Combined recitations API - new memorization + review", True)
+            else:
+                self.log_test("Combined recitations API - success but unclear response", True, f"Response: {response}")
+        else:
+            self.log_test("Combined recitations API - new memorization + review", False, f"Status: {status}, Response: {response}")
+        
+        # Test combined recitation with only new memorization
+        combined_new_only = {
+            "student_id": student_id,
+            "recitation_type": "combined",
+            "has_new_memorization": True,
+            "juz_number": 2,
+            "page_from": 21,
+            "page_to": 25,
+            "passed_minimum": True,
+            "has_review": False,
+            "notes": "Test combined - new memorization only"
+        }
+        
+        success, response, status = self.make_request('POST', 'recitations', combined_new_only,
+                                                    token=self.tokens['sheikh'])
+        
+        if success:
+            self.log_test("Combined recitations API - new memorization only", True)
+        else:
+            self.log_test("Combined recitations API - new memorization only", False, f"Status: {status}, Response: {response}")
+        
+        # Test combined recitation with only review
+        combined_review_only = {
+            "student_id": student_id,
+            "recitation_type": "combined",
+            "has_new_memorization": False,
+            "has_review": True,
+            "review_juz": [1, 2],
+            "passed_review_minimum": True,
+            "notes": "Test combined - review only"
+        }
+        
+        success, response, status = self.make_request('POST', 'recitations', combined_review_only,
+                                                    token=self.tokens['sheikh'])
+        
+        if success:
+            self.log_test("Combined recitations API - review only", True)
+        else:
+            self.log_test("Combined recitations API - review only", False, f"Status: {status}, Response: {response}")
+
     def test_review_request_apis(self):
         """Test all APIs mentioned in the review request"""
         print("\n🎯 Testing Review Request APIs...")
         
-        # Test all the specific APIs mentioned in the review request
+        # Test the new features from the review request
+        self.test_tracking_submission_settings_api()
+        self.test_tracking_submission_check_api()
+        self.test_combined_recitations_api()
+        
+        # Test existing APIs mentioned in the review request
         self.test_sheikh_rankings_api()
         self.test_active_student_bonus_api()
         self.test_student_statistics_api()
