@@ -3215,7 +3215,13 @@ async def get_my_points(current_user: dict = Depends(get_current_user)):
             "badges": [],
             "level": 1
         }
-    
+    else:
+          # Ensure all point fields exist
+          student_points.setdefault("attendance_points", 0)
+          student_points.setdefault("recitation_points", 0)
+          student_points.setdefault("tracking_points", 0)
+          student_points.setdefault("interaction_points", 0)
+          student_points.setdefault("admin_bonus_points", 0)
     # Get badge details
     badge_details = [b for b in BADGES if b["id"] in student_points.get("badges", [])]
     
