@@ -713,18 +713,24 @@ class QuranAppAPITester:
         success, response, status = self.make_request('GET', 'rankings/sheikh-students', 
                                                     token=self.tokens['sheikh'])
         
-        if success and isinstance(response, list):
-            # Check if students have percentage values
-            has_percentages = False
-            for student in response:
-                if 'points_percentage' in student and 'tracking_percentage' in student:
-                    has_percentages = True
-                    break
+        if success:
+            # Check if response has students list
+            students = response.get('students', []) if isinstance(response, dict) else response
             
-            if has_percentages:
-                self.log_test("Sheikh Rankings API - with percentages", True)
+            if isinstance(students, list) and len(students) > 0:
+                # Check if students have percentage values
+                has_percentages = False
+                for student in students:
+                    if 'points_percentage' in student and 'tracking_percentage' in student:
+                        has_percentages = True
+                        break
+                
+                if has_percentages:
+                    self.log_test("Sheikh Rankings API - with percentages", True)
+                else:
+                    self.log_test("Sheikh Rankings API - missing percentages", False, "Students missing percentage values")
             else:
-                self.log_test("Sheikh Rankings API - missing percentages", False, "Students missing percentage values")
+                self.log_test("Sheikh Rankings API - students list", False, f"Expected students list, got: {type(students)}")
         else:
             self.log_test("Sheikh Rankings API", False, f"Status: {status}, Response: {response}")
 
