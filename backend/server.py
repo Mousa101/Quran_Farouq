@@ -2539,11 +2539,13 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
             "total_new_pages": total_new_pages,
             "total_review_pages": total_review_pages,
             "passed_days": passed_days_count,  # عدد أيام الاجتياز
-            "recitation_days": recitation_days_count,  # عدد أيام التسميع
+            "recitation_days": recitation_days_count,  # عدد أيام التسميع الفعلي
+            "did_not_recite_days": did_not_recite_days_count,  # عدد أيام "لم يسمّع"
+            "total_days": total_days_count,  # إجمالي الأيام
             "total_points": total_recitation_points,
             "recitations_count": len([r for r in recitations if not r.get("did_not_recite")]),  # إجمالي التسميعات
             "did_not_recite_count": len([r for r in recitations if r.get("did_not_recite")]),  # عدد مرات عدم التسميع
-            "recitation_rate": recitation_rate  # نسبة التسميع = أيام الاجتياز / أيام التسميع
+            "recitation_rate": recitation_rate  # نسبة التسميع = أيام التسميع / إجمالي الأيام
         },
         "attendance": {
             "present": present_count,
