@@ -265,7 +265,16 @@ const SheikhRankings = () => {
                         <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                           <span className="font-bold">{student.attendance_rate}%</span>
                         </td>
-                        <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{student.total_recitations}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col">
+                            <span className={`font-bold ${student.recitation_rate >= 80 ? 'text-emerald-400' : student.recitation_rate >= 50 ? 'text-amber-400' : 'text-red-400'}`}>
+                              {student.recitation_rate || 0}%
+                            </span>
+                            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                              ({student.total_recitations} سمّع / {student.did_not_recite_count || 0} لم يسمّع)
+                            </span>
+                          </div>
+                        </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <button 
