@@ -41,6 +41,7 @@ import StudentTracking from './pages/StudentTracking';
 import MyProgress from './pages/MyProgress';
 import StudentHomework from './pages/StudentHomework';
 import StudentRecord from './pages/StudentRecord';
+import TrackingSettings from './pages/TrackingSettings';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
