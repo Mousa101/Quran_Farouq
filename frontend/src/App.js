@@ -168,6 +168,17 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Layout>
+              <RecitationsNew />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/recitations-old"
+        element={
+          <ProtectedRoute>
+            <Layout>
               <Recitations />
             </Layout>
           </ProtectedRoute>
