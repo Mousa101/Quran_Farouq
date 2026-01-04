@@ -927,6 +927,7 @@ class QuranAppAPITester:
         
         # Test with another new level
         assessment_data_2 = {
+            "student_id": student_id,
             "previous_memorization_juz": [1],
             "previous_memorization_pages": 10,
             "tajweed_level": "سند غيبي"  # This should now be accepted
