@@ -6,127 +6,83 @@ backend:
     stuck_count: 0
     priority: "high"
     needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "testing"
-        comment: "Initial test setup - needs testing"
-      - working: true
-        agent: "testing"
-        comment: "✅ API working correctly - returns students with points_percentage and tracking_percentage values"
 
-  - task: "Active Student Bonus API - POST /api/students/active-bonus"
+  - task: "Tracking Submission Settings - GET/PUT /api/settings/tracking-submission"
     implemented: true
     working: true
     file: "backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
-        agent: "testing"
-        comment: "Initial test setup - needs testing"
-      - working: true
-        agent: "testing"
-        comment: "✅ API working correctly - properly handles 10 points bonus and prevents duplicate grants per day"
+        agent: "main"
+        comment: "New API for tracking sheet submission window settings"
 
-  - task: "Student Statistics API - GET /api/statistics/student/{student_id}"
+  - task: "Recitations API with combined type - POST /api/recitations"
     implemented: true
     working: true
     file: "backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
-        agent: "testing"
-        comment: "Initial test setup - needs testing"
-      - working: true
-        agent: "testing"
-        comment: "✅ API working correctly - returns non-zero total_points from student_points table"
+        agent: "main"
+        comment: "Updated to support combined recitation (new memorization + review together)"
 
-  - task: "Recitations API - POST /api/recitations"
+frontend:
+  - task: "New Recitations Page - Like Attendance"
     implemented: true
     working: true
-    file: "backend/server.py"
+    file: "frontend/src/pages/RecitationsNew.jsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
-        agent: "testing"
-        comment: "Initial test setup - needs testing"
-      - working: true
-        agent: "testing"
-        comment: "✅ API working correctly - successfully creates both new memorization and review recitations"
+        agent: "main"
+        comment: "New recitation page similar to attendance page with student list and recite/did-not-recite buttons"
 
-  - task: "Tracking Sheet Manual - POST /api/tracking-sheets/manual"
+  - task: "Student Record PDF Download"
     implemented: true
     working: true
-    file: "backend/server.py"
+    file: "frontend/src/pages/StudentRecord.jsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
-        agent: "testing"
-        comment: "Initial test setup - needs testing"
-      - working: true
-        agent: "testing"
-        comment: "✅ API working correctly - includes duha_prayers in calculation and correctly calculates 100 points max with all 10 fields"
+        agent: "main"
+        comment: "Added PDF download button for semester student record"
 
-  - task: "Initial Assessment - POST /api/students/{student_id}/initial-assessment"
+  - task: "Tracking Settings Page"
     implemented: true
-    working: false
-    file: "backend/server.py"
-    stuck_count: 1
+    working: true
+    file: "frontend/src/pages/TrackingSettings.jsx"
+    stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: "NA"
-        agent: "testing"
-        comment: "Initial test setup - needs testing"
-      - working: false
-        agent: "testing"
-        comment: "❌ API endpoint exists but test failed - student may not be in sheikh's group or already assessed. The endpoint accepts new tajweed levels including 'إجازة', 'اتقان', 'سند غيبي'"
-
-  - task: "Health Endpoint - GET /health"
-    implemented: true
-    working: false
-    file: "backend/server.py"
-    stuck_count: 1
-    priority: "medium"
-    needs_retesting: false
-    status_history:
-      - working: "NA"
-        agent: "testing"
-        comment: "Initial test setup - needs testing"
-      - working: false
-        agent: "testing"
-        comment: "❌ Health endpoint defined in backend but Kubernetes ingress routing returns frontend HTML instead of backend health check. Backend API is accessible at /api/* routes"
-
-frontend: []
+        agent: "main"
+        comment: "New page for configuring tracking sheet submission window times"
 
 metadata:
-  created_by: "testing_agent"
-  version: "1.0"
-  test_sequence: 1
-  run_ui: false
+  created_by: "main_agent"
+  version: "1.1"
+  test_sequence: 2
+  run_ui: true
 
 test_plan:
   current_focus:
-    - "Sheikh Rankings API - GET /api/rankings/sheikh-students"
-    - "Active Student Bonus API - POST /api/students/active-bonus"
-    - "Student Statistics API - GET /api/statistics/student/{student_id}"
-    - "Recitations API - POST /api/recitations"
-    - "Tracking Sheet Manual - POST /api/tracking-sheets/manual"
-    - "Initial Assessment - PUT /api/students/{student_id}/initial-assessment"
-    - "Health Endpoint - GET /health"
+    - "New Recitations Page functionality"
+    - "Tracking Settings API and Page"
+    - "Student Record PDF Download"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
-  - agent: "testing"
-    message: "Starting backend API testing for Quran Memorization Center app with specific focus on 7 critical APIs"
-  - agent: "testing"
-    message: "Backend testing completed. 5/7 APIs working correctly. Issues found: 1) Initial Assessment API may have group membership restrictions 2) Health endpoint routing issue in Kubernetes ingress - returns frontend HTML instead of backend health check. All core functionality APIs are working properly."
+  - agent: "main"
+    message: "Implemented 3 new features: 1) New recitations page like attendance with combined new memorization + review 2) PDF download for student record 3) Tracking sheet submission window settings"
