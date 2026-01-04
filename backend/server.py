@@ -1737,7 +1737,7 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     )
     
     recitation_dict = recitation.model_dump()
-    recitation_dict["created_at"] = recitation_dict["created_at"].isoformat()
+    recitation_dict["created_at"] = recitation_date.isoformat()
     
     await db.recitations.insert_one(recitation_dict)
     
