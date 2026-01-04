@@ -907,7 +907,7 @@ class QuranAppAPITester:
             "tajweed_level": "إجازة"  # This should now be accepted
         }
         
-        success, response, status = self.make_request('PUT', f'students/{student_id}/initial-assessment', 
+        success, response, status = self.make_request('POST', f'students/{student_id}/initial-assessment', 
                                                     assessment_data, token=self.tokens['sheikh'])
         
         if success:
