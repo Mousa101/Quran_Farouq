@@ -9,8 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { 
   User, Calendar, CheckCircle, XCircle, AlertTriangle, 
   BookOpen, FileText, TrendingUp, Award, ArrowRight,
-  Phone, Mail, School, Home, Clock, Star, Target, Sparkles
+  Phone, Mail, School, Home, Clock, Star, Target, Sparkles, Download, Loader2
 } from 'lucide-react';
+import { toast } from 'sonner';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
