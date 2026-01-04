@@ -757,6 +757,9 @@ class QuranAppAPITester:
                 self.log_test("Active Student Bonus API - 10 points granted", True)
             else:
                 self.log_test("Active Student Bonus API - success but unclear response", True, f"Response: {response}")
+        elif status == 400 and "منح النقاط" in response.get('detail', ''):
+            # Already granted today - this is expected behavior
+            self.log_test("Active Student Bonus API - already granted today", True)
         else:
             self.log_test("Active Student Bonus API", False, f"Status: {status}, Response: {response}")
 
