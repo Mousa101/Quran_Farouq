@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -9,10 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Checkbox } from '../components/ui/checkbox';
 import { Calendar } from '../components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   BookOpen, CheckCircle, XCircle, Loader2, Info, Users, 
-  Calendar as CalendarIcon, FileText, RotateCcw, Clock, Trash2
+  FileText, RotateCcw, Clock, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -55,8 +54,6 @@ const JUZ_PAGE_RANGES = {
 };
 
 const RecitationsNew = () => {
-  const [groups, setGroups] = useState([]);
-  const [selectedGroup, setSelectedGroup] = useState('');
   const [students, setStudents] = useState([]);
   const [recitations, setRecitations] = useState({});
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -66,57 +63,64 @@ const RecitationsNew = () => {
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [recitationToDelete, setRecitationToDelete] = useState(null);
   
   // Form state for recitation
   const [formData, setFormData] = useState({
-    // حفظ جديد
     has_new_memorization: true,
     juz_number: 1,
     page_from: 1,
     page_to: 1,
     error_count: 0,
     passed_minimum: false,
-    // مراجعة
     has_review: false,
     review_juz: [],
     partial_review_juz: null,
     partial_review_pages: 0,
     passed_review_minimum: false,
-    // ملاحظات
     notes: ''
   });
 
   useEffect(() => {
-    fetchGroups();
+    fetchMyStudents();
   }, []);
 
   useEffect(() => {
-    if (selectedGroup) {
-      fetchStudents();
+    if (students.length > 0) {
       fetchRecitations();
     }
-  }, [selectedGroup, selectedDate]);
+  }, [selectedDate, students]);
 
-  const fetchGroups = async () => {
+  // جلب طلاب المعلم (من مجموعاته)
+  const fetchMyStudents = async () => {
     try {
-      const response = await axios.get(`${API}/groups`);
-      setGroups(response.data);
-      if (response.data.length > 0) {
-        setSelectedGroup(response.data[0].id);
+      // جلب مجموعات المعلم
+      const groupsRes = await axios.get(`${API}/groups`);
+      const myGroups = groupsRes.data;
+      
+      // جلب طلاب كل مجموعة
+      let allStudents = [];
+      for (const group of myGroups) {
+        try {
+          const studentsRes = await axios.get(`${API}/groups/${group.id}/students`);
+          const studentsWithGroup = studentsRes.data.map(s => ({
+            ...s,
+            group_name: group.name,
+            group_id: group.id
+          }));
+          allStudents = [...allStudents, ...studentsWithGroup];
+        } catch (err) {
+          console.error(`Error fetching students for group ${group.id}:`, err);
+        }
       }
+      
+      setStudents(allStudents);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error fetching students:', error);
+      toast.error('فشل في جلب قائمة الطلاب');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchStudents = async () => {
-    try {
-      const response = await axios.get(`${API}/groups/${selectedGroup}/students`);
-      setStudents(response.data);
-    } catch (error) {
-      console.error('Error:', error);
     }
   };
 
@@ -135,19 +139,18 @@ const RecitationsNew = () => {
       });
       setRecitations(recitationMap);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error fetching recitations:', error);
     }
   };
 
   const handleDidNotRecite = async (student) => {
     setSaving(true);
     try {
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
       await axios.post(`${API}/recitations`, {
         student_id: student.id,
         recitation_type: 'did_not_recite',
         did_not_recite: true,
-        notes: `لم يسمع - ${dateStr}`
+        notes: `لم يسمع - ${format(selectedDate, 'yyyy-MM-dd')}`
       });
       
       toast.success(`تم تسجيل عدم التسميع للطالب ${student.name}`);
@@ -161,7 +164,6 @@ const RecitationsNew = () => {
 
   const openRecitationDialog = (student) => {
     setSelectedStudent(student);
-    // Reset form
     setFormData({
       has_new_memorization: true,
       juz_number: 1,
@@ -208,14 +210,12 @@ const RecitationsNew = () => {
       const payload = {
         student_id: selectedStudent.id,
         recitation_type: 'combined',
-        // حفظ جديد
         has_new_memorization: formData.has_new_memorization,
         juz_number: formData.juz_number,
         page_from: formData.page_from,
         page_to: formData.page_to,
         error_count: formData.error_count,
         passed_minimum: formData.passed_minimum,
-        // مراجعة
         has_review: formData.has_review,
         review_juz: formData.review_juz,
         partial_review_juz: formData.partial_review_juz,
@@ -235,9 +235,31 @@ const RecitationsNew = () => {
     }
   };
 
+  const handleDeleteRecitation = async () => {
+    if (!recitationToDelete) return;
+    setSaving(true);
+    
+    try {
+      await axios.delete(`${API}/recitations/${recitationToDelete.id}`);
+      toast.success('تم حذف التسميع بنجاح');
+      setDeleteConfirmOpen(false);
+      setRecitationToDelete(null);
+      fetchRecitations();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل حذف التسميع');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openDeleteConfirm = (recitation, student) => {
+    setRecitationToDelete({ ...recitation, student_name: student.name });
+    setDeleteConfirmOpen(true);
+  };
+
   const getStudentStatus = (studentId) => {
     const studentRecitations = recitations[studentId];
-    if (!studentRecitations || studentRecitations.length === 0) return null;
+    if (!studentRecitations || studentRecitations.length === 0) return 'not_recorded';
     
     const didNotRecite = studentRecitations.some(r => r.did_not_recite);
     if (didNotRecite) return 'did_not_recite';
@@ -256,21 +278,25 @@ const RecitationsNew = () => {
     }
   };
 
-  const getStatusStyle = (currentStatus, buttonStatus) => {
-    if (currentStatus === buttonStatus) {
-      switch (buttonStatus) {
-        case 'recited':
-          return 'bg-emerald-500 text-white';
-        case 'did_not_recite':
-          return 'bg-red-500 text-white';
-        default:
-          return '';
-      }
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'recited':
+        return <span className="px-2 py-1 text-xs rounded-full bg-emerald-500/20 text-emerald-400">سمّع</span>;
+      case 'did_not_recite':
+        return <span className="px-2 py-1 text-xs rounded-full bg-red-500/20 text-red-400">لم يسمّع</span>;
+      default:
+        return <span className="px-2 py-1 text-xs rounded-full bg-slate-500/20 text-slate-400">لم يُسجل</span>;
     }
-    return 'bg-slate-700 text-slate-300 hover:bg-slate-600';
   };
 
   const juzRange = JUZ_PAGE_RANGES[formData.juz_number] || JUZ_PAGE_RANGES[1];
+
+  // إحصائيات
+  const stats = {
+    recited: students.filter(s => getStudentStatus(s.id) === 'recited').length,
+    didNotRecite: students.filter(s => getStudentStatus(s.id) === 'did_not_recite').length,
+    notRecorded: students.filter(s => getStudentStatus(s.id) === 'not_recorded').length
+  };
 
   if (loading) {
     return (
@@ -288,25 +314,12 @@ const RecitationsNew = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Calendar & Group Selection */}
+        {/* Calendar Selection */}
         <Card className="glass-card border-white/10">
           <CardHeader>
-            <CardTitle className="text-lg font-bold text-white">اختر التاريخ والمجموعة</CardTitle>
+            <CardTitle className="text-lg font-bold text-white">اختر التاريخ</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-              <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                <SelectValue placeholder="اختر المجموعة" />
-              </SelectTrigger>
-              <SelectContent className="bg-slate-800 border-slate-700">
-                {groups.map((group) => (
-                  <SelectItem key={group.id} value={group.id} className="text-white">
-                    {group.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
             <Calendar
               mode="single"
               selected={selectedDate}
@@ -314,6 +327,22 @@ const RecitationsNew = () => {
               locale={ar}
               className="rounded-xl border border-slate-700 bg-slate-800/50 p-3"
             />
+            
+            {/* Summary Stats */}
+            <div className="grid grid-cols-3 gap-2 pt-4 border-t border-slate-700">
+              <div className="text-center p-2 rounded-lg bg-emerald-500/10">
+                <p className="text-lg font-bold text-emerald-400">{stats.recited}</p>
+                <p className="text-xs text-slate-400">سمّع</p>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-red-500/10">
+                <p className="text-lg font-bold text-red-400">{stats.didNotRecite}</p>
+                <p className="text-xs text-slate-400">لم يسمّع</p>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-slate-500/10">
+                <p className="text-lg font-bold text-slate-400">{stats.notRecorded}</p>
+                <p className="text-xs text-slate-400">لم يُسجل</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -322,35 +351,43 @@ const RecitationsNew = () => {
           <CardHeader>
             <CardTitle className="text-lg font-bold text-white flex items-center gap-3">
               <Users className="w-6 h-6 text-emerald-400" />
-              الطلاب - {format(selectedDate, 'EEEE d MMMM yyyy', { locale: ar })}
+              طلابي - {format(selectedDate, 'EEEE d MMMM yyyy', { locale: ar })}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {students.length === 0 ? (
               <div className="text-center py-12 text-slate-400">
                 <Users className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                <p>لا يوجد طلاب في هذه المجموعة</p>
+                <p>لا يوجد طلاب في مجموعاتك</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-[500px] overflow-y-auto">
                 {students.map((student) => {
                   const status = getStudentStatus(student.id);
+                  const studentRecs = recitations[student.id] || [];
+                  
                   return (
                     <div
                       key={student.id}
                       className="p-4 rounded-xl bg-slate-800/50 border border-white/5"
                     >
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-3">
                           {getStatusIcon(status)}
-                          <span className="text-white font-medium">{student.name}</span>
+                          <div>
+                            <span className="text-white font-medium">{student.name}</span>
+                            {student.group_name && (
+                              <span className="text-slate-500 text-sm mr-2">({student.group_name})</span>
+                            )}
+                          </div>
+                          {getStatusBadge(status)}
                         </div>
                         
                         <div className="flex gap-2">
                           <Button
                             size="sm"
                             onClick={() => openRecitationDialog(student)}
-                            className={`${getStatusStyle(status, 'recited')} transition-all`}
+                            className="bg-emerald-500 hover:bg-emerald-600"
                             disabled={saving}
                           >
                             <BookOpen className="w-4 h-4 ml-1" />
@@ -358,8 +395,9 @@ const RecitationsNew = () => {
                           </Button>
                           <Button
                             size="sm"
+                            variant="outline"
                             onClick={() => handleDidNotRecite(student)}
-                            className={`${getStatusStyle(status, 'did_not_recite')} transition-all`}
+                            className="border-red-500/30 text-red-400 hover:bg-red-500/20"
                             disabled={saving}
                           >
                             <XCircle className="w-4 h-4 ml-1" />
@@ -369,24 +407,34 @@ const RecitationsNew = () => {
                       </div>
                       
                       {/* Show recitation details if exists */}
-                      {recitations[student.id] && recitations[student.id].length > 0 && (
-                        <div className="mt-3 p-2 rounded-lg bg-slate-900/50 text-sm">
-                          {recitations[student.id].map((rec, idx) => (
-                            <div key={idx} className="flex items-center gap-2 text-slate-300">
-                              {rec.did_not_recite ? (
-                                <span className="text-red-400">لم يسمّع</span>
-                              ) : (
-                                <>
-                                  {rec.juz_number && <span>الجزء {rec.juz_number}</span>}
-                                  {rec.page_from && rec.page_to && (
-                                    <span>ص {rec.page_from}-{rec.page_to}</span>
-                                  )}
-                                  {rec.passed_minimum && (
-                                    <span className="text-emerald-400">✓ اجتاز</span>
-                                  )}
-                                  <span className="text-amber-400">+{rec.points_earned} نقطة</span>
-                                </>
-                              )}
+                      {studentRecs.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          {studentRecs.map((rec, idx) => (
+                            <div key={idx} className="p-2 rounded-lg bg-slate-900/50 flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-sm text-slate-300">
+                                {rec.did_not_recite ? (
+                                  <span className="text-red-400">لم يسمّع</span>
+                                ) : (
+                                  <>
+                                    {rec.juz_number && <span>الجزء {rec.juz_number}</span>}
+                                    {rec.page_from && rec.page_to && (
+                                      <span>• ص {rec.page_from}-{rec.page_to}</span>
+                                    )}
+                                    {rec.passed_minimum && (
+                                      <span className="text-emerald-400">✓ اجتاز</span>
+                                    )}
+                                    <span className="text-amber-400">+{rec.points_earned || 0} نقطة</span>
+                                  </>
+                                )}
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => openDeleteConfirm(rec, student)}
+                                className="text-red-400 hover:text-red-300 hover:bg-red-500/20 h-8 w-8 p-0"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
                             </div>
                           ))}
                         </div>
@@ -399,42 +447,6 @@ const RecitationsNew = () => {
           </CardContent>
         </Card>
       </div>
-
-      {/* Summary */}
-      <Card className="glass-card border-white/10">
-        <CardHeader>
-          <CardTitle className="text-lg font-bold text-white">ملخص التسميع</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-emerald-500/10 text-center">
-              <CheckCircle className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
-              <p className="text-2xl font-bold text-white">
-                {Object.entries(recitations).filter(([id, recs]) => 
-                  recs.some(r => !r.did_not_recite)
-                ).length}
-              </p>
-              <p className="text-slate-400 text-sm">سمّع</p>
-            </div>
-            <div className="p-4 rounded-xl bg-red-500/10 text-center">
-              <XCircle className="w-8 h-8 mx-auto text-red-400 mb-2" />
-              <p className="text-2xl font-bold text-white">
-                {Object.entries(recitations).filter(([id, recs]) => 
-                  recs.some(r => r.did_not_recite)
-                ).length}
-              </p>
-              <p className="text-slate-400 text-sm">لم يسمّع</p>
-            </div>
-            <div className="p-4 rounded-xl bg-slate-500/10 text-center">
-              <Clock className="w-8 h-8 mx-auto text-slate-400 mb-2" />
-              <p className="text-2xl font-bold text-white">
-                {students.length - Object.keys(recitations).length}
-              </p>
-              <p className="text-slate-400 text-sm">لم يُسجل</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Recitation Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -665,6 +677,40 @@ const RecitationsNew = () => {
               disabled={saving || (!formData.has_new_memorization && !formData.has_review)}
             >
               {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'حفظ التسميع'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-red-400" />
+              تأكيد الحذف
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-slate-300">
+              هل أنت متأكد من حذف تسميع الطالب <strong className="text-white">{recitationToDelete?.student_name}</strong>؟
+            </p>
+            {recitationToDelete?.points_earned > 0 && (
+              <p className="text-amber-400 text-sm mt-2">
+                سيتم خصم {recitationToDelete.points_earned} نقطة من الطالب
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteConfirmOpen(false)} className="text-slate-400">
+              إلغاء
+            </Button>
+            <Button 
+              onClick={handleDeleteRecitation}
+              className="bg-red-500 hover:bg-red-600"
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : 'حذف'}
             </Button>
           </DialogFooter>
         </DialogContent>
