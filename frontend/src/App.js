@@ -13,6 +13,7 @@ import StudentDashboard from './pages/StudentDashboard';
 import Groups from './pages/Groups';
 import TrackingSheets from './pages/TrackingSheets';
 import Recitations from './pages/Recitations';
+import RecitationsNew from './pages/RecitationsNew';
 import Attendance from './pages/Attendance';
 import Activities from './pages/Activities';
 import Notifications from './pages/Notifications';
