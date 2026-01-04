@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   BookOpen, CheckCircle, XCircle, Loader2, Info, Users, 
-  Calendar as CalendarIcon, FileText, RotateCcw, Clock
+  Calendar as CalendarIcon, FileText, RotateCcw, Clock, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
