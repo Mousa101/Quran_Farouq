@@ -295,12 +295,17 @@ class Attendance(BaseModel):
 
 # Student Self Update Model
 class StudentSelfUpdate(BaseModel):
-    student_phone: Optional[str] = None
-    profile_image: Optional[str] = None
-    registration_date: Optional[str] = None
-    school_name: Optional[str] = None
-    school_grade: Optional[str] = None
-    school_average: Optional[str] = None  # معدل الطالب
+    """الحقول المسموح للطالب بتعديلها"""
+    name: Optional[str] = None  # الاسم
+    student_phone: Optional[str] = None  # رقم هاتف الطالب
+    father_phone: Optional[str] = None  # رقم هاتف الأب
+    mother_phone: Optional[str] = None  # رقم هاتف الأم
+    profile_image: Optional[str] = None  # الصورة الشخصية
+    birth_date: Optional[str] = None  # تاريخ الميلاد
+    school_name: Optional[str] = None  # اسم المدرسة
+    school_grade: Optional[str] = None  # الصف الدراسي
+    school_average: Optional[str] = None  # المعدل الدراسي
+    mosque_name: Optional[str] = None  # اسم المسجد
 
 # Activity Models
 class ActivityCreate(BaseModel):
