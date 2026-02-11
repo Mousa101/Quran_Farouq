@@ -4368,35 +4368,46 @@ async def create_fee(data: FeeCreate, current_user: dict = Depends(get_current_u
     if current_user["role"] != "admin":
         raise HTTPException(status_code=403, detail="فقط المدير يمكنه إضافة الرسوم")
     
+    # Validation
+    if not data.student_id:
+        raise HTTPException(status_code=400, detail="يجب تحديد الطالب")
+    if not data.amount or data.amount <= 0:
+        raise HTTPException(status_code=400, detail="المبلغ يجب أن يكون أكبر من صفر")
+    
     # Verify student exists
     student = await db.users.find_one({"id": data.student_id, "role": "student"})
     if not student:
         raise HTTPException(status_code=404, detail="الطالب غير موجود")
     
-    fee = Fee(
-        student_id=data.student_id,
-        fee_type=data.fee_type,
-        amount=data.amount,
-        description=data.description,
-        due_date=data.due_date,
-        created_by=current_user["user_id"]
-    )
-    
-    fee_dict = fee.model_dump()
-    fee_dict["created_at"] = fee_dict["created_at"].isoformat()
-    
-    await db.fees.insert_one(fee_dict)
-    
-    # Notify student
-    fee_types = {"subscription": "رسوم اشتراك", "umrah": "عمرة", "activity": "نشاط"}
-    await create_notification_internal(
-        data.student_id,
-        "رسوم مالية جديدة",
-        f"تم إضافة {fee_types.get(data.fee_type, data.fee_type)} بمبلغ {data.amount}",
-        "warning"
-    )
-    
-    return {"message": "تم إضافة الرسوم بنجاح", "fee_id": fee.id}
+    try:
+        fee = Fee(
+            student_id=data.student_id,
+            fee_type=data.fee_type or "subscription",
+            amount=data.amount,
+            description=data.description,
+            due_date=data.due_date,
+            month=data.month,
+            year=data.year,
+            created_by=current_user["user_id"]
+        )
+        
+        fee_dict = fee.model_dump()
+        fee_dict["created_at"] = fee_dict["created_at"].isoformat()
+        
+        await db.fees.insert_one(fee_dict)
+        
+        # Notify student
+        fee_types = {"subscription": "رسوم اشتراك", "umrah": "عمرة", "activity": "نشاط"}
+        await create_notification_internal(
+            data.student_id,
+            "رسوم مالية جديدة",
+            f"تم إضافة {fee_types.get(data.fee_type, data.fee_type)} بمبلغ {data.amount}",
+            "warning"
+        )
+        
+        return {"message": "تم إضافة الرسوم بنجاح", "fee_id": fee.id}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"فشل في إضافة الرسوم: {str(e)}")
 
 @api_router.get("/fees")
 async def get_fees(student_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
