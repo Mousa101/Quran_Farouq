@@ -205,7 +205,7 @@ const StudentDashboard = () => {
   }
 
   const studentAge = calculateAge(stats?.student?.birth_date);
-
+console.log(stats)
   return (
     <div className="space-y-6 animate-fadeIn" data-testid="student-dashboard">
       {/* Welcome & Points Header */}
@@ -495,7 +495,7 @@ const StudentDashboard = () => {
                 {/* المجموع الكلي */}
                 <div className="p-3 md:p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 text-center ">
                   <BookOpen className="w-6 h-6 md:w-8 md:h-8 mx-auto text-emerald-400 mb-2" />
-                  <p className="text-xl md:text-2xl font-bold text-emerald-400">{stats?.memorization?.total_memorized || 0}</p>
+                  <p className="text-xl md:text-2xl font-bold text-emerald-400">{stats?.memorization?.total_memorized  || 0}</p>
                   <p className="text-emerald-400 text-xs md:text-sm">المجموع الكلي</p>
                   <p className="text-emerald-500 text-[10px]">{Math.floor((stats?.memorization?.total_memorized || 0) / 20)} جزء</p>
                 </div>

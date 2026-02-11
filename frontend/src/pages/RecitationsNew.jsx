@@ -267,7 +267,6 @@ const RecitationsNew = () => {
     
     const didNotRecite = studentRecitations.some(r => r.did_not_recite);
     if (didNotRecite) return 'did_not_recite';
-    
     return 'recited';
   };
 

@@ -517,7 +517,8 @@ const Recitations = () => {
       </div>
     );
   }
-
+console.log("this is recition state: " ,recitations)
+console.log("this is from form data: " ,formData)
   return (
     <div className="space-y-8 animate-fadeIn" data-testid="recitations-page">
       <div className="flex items-center justify-between">
