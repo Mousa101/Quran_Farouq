@@ -2748,6 +2748,86 @@ async def update_my_profile(data: StudentSelfUpdate, current_user: dict = Depend
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"فشل في تحديث البيانات: {str(e)}")
 
+# نموذج تعديل بيانات الطالب من المعلم
+class SheikhUpdateStudent(BaseModel):
+    """الحقول المسموح للمعلم بتعديلها"""
+    name: Optional[str] = None
+    student_phone: Optional[str] = None
+    father_phone: Optional[str] = None
+    mother_phone: Optional[str] = None
+    birth_date: Optional[str] = None
+    school_name: Optional[str] = None
+    school_grade: Optional[str] = None
+    school_average: Optional[str] = None
+    mosque_name: Optional[str] = None
+    group_id: Optional[str] = None
+    tajweed_level: Optional[str] = None
+
+@api_router.put("/sheikh/students/{student_id}")
+async def sheikh_update_student(student_id: str, data: SheikhUpdateStudent, current_user: dict = Depends(get_current_user)):
+    """Update student data (Sheikh or Admin) - تعديل بيانات الطالب من المعلم"""
+    if current_user["role"] not in ["sheikh", "admin"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك بتعديل بيانات الطالب")
+    
+    # التحقق من وجود الطالب
+    student = await db.users.find_one({"id": student_id, "role": "student"})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    # التحقق من أن الطالب تابع للمعلم (إذا كان المستخدم معلم وليس مدير)
+    if current_user["role"] == "sheikh":
+        # جلب مجموعات المعلم
+        sheikh_groups = await db.groups.find({"sheikh_id": current_user["user_id"]}).to_list(100)
+        sheikh_group_ids = [g["id"] for g in sheikh_groups]
+        
+        if student.get("group_id") not in sheikh_group_ids:
+            raise HTTPException(status_code=403, detail="هذا الطالب ليس في مجموعاتك")
+    
+    # بناء بيانات التحديث
+    update_data = {}
+    
+    if data.name is not None and data.name.strip():
+        update_data["name"] = data.name.strip()
+    if data.student_phone is not None:
+        update_data["student_phone"] = data.student_phone
+    if data.father_phone is not None:
+        update_data["father_phone"] = data.father_phone
+    if data.mother_phone is not None:
+        update_data["mother_phone"] = data.mother_phone
+    if data.birth_date is not None:
+        update_data["birth_date"] = data.birth_date
+    if data.school_name is not None:
+        update_data["school_name"] = data.school_name
+    if data.school_grade is not None:
+        update_data["school_grade"] = data.school_grade
+    if data.school_average is not None:
+        update_data["school_average"] = data.school_average
+    if data.mosque_name is not None:
+        update_data["mosque_name"] = data.mosque_name
+    if data.tajweed_level is not None:
+        update_data["tajweed_level"] = data.tajweed_level
+    
+    # تغيير المجموعة (التحقق من الصلاحية)
+    if data.group_id is not None:
+        if current_user["role"] == "sheikh":
+            # التحقق من أن المجموعة الجديدة تابعة للمعلم
+            if data.group_id not in sheikh_group_ids:
+                raise HTTPException(status_code=403, detail="المجموعة المحددة ليست من مجموعاتك")
+        update_data["group_id"] = data.group_id
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="لم يتم تقديم أي بيانات للتحديث")
+    
+    try:
+        await db.users.update_one({"id": student_id}, {"$set": update_data})
+        return {
+            "message": "تم تحديث بيانات الطالب بنجاح",
+            "student_id": student_id,
+            "updated_fields": list(update_data.keys())
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"فشل في تحديث البيانات: {str(e)}")
+
 @api_router.get("/students/{student_id}/profile")
 async def get_student_profile(student_id: str, current_user: dict = Depends(get_current_user)):
     """Get complete student profile with all records"""
