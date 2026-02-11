@@ -562,6 +562,8 @@ class FeeCreate(BaseModel):
     amount: float
     description: Optional[str] = None
     due_date: Optional[str] = None
+    month: Optional[int] = None  # الشهر (1-12)
+    year: Optional[int] = None  # السنة
 
 class Fee(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -571,6 +573,8 @@ class Fee(BaseModel):
     amount: float
     description: Optional[str] = None
     due_date: Optional[str] = None
+    month: Optional[int] = None
+    year: Optional[int] = None
     is_paid: bool = False
     paid_date: Optional[str] = None
     created_by: str  # Admin ID
