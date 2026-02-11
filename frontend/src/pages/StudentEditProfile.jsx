@@ -6,22 +6,27 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { User, Phone, School, Camera, Save, ArrowRight, Loader2 } from 'lucide-react';
+import { User, Phone, School, Camera, Save, ArrowRight, Loader2, Calendar, Building } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 const StudentEditProfile = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
+    name: '',
     student_phone: '',
+    father_phone: '',
+    mother_phone: '',
     profile_image: '',
+    birth_date: '',
     school_name: '',
     school_grade: '',
-    school_average: ''
+    school_average: '',
+    mosque_name: ''
   });
 
   useEffect(() => {
@@ -33,11 +38,16 @@ const StudentEditProfile = () => {
       const response = await axios.get(`${API}/students/me/profile`);
       const data = response.data;
       setFormData({
+        name: data.name || '',
         student_phone: data.student_phone || '',
+        father_phone: data.father_phone || '',
+        mother_phone: data.mother_phone || '',
         profile_image: data.profile_image || '',
+        birth_date: data.birth_date || '',
         school_name: data.school_name || '',
         school_grade: data.school_grade || '',
-        school_average: data.school_average || ''
+        school_average: data.school_average || '',
+        mosque_name: data.mosque_name || ''
       });
     } catch (error) {
       console.error('Error:', error);
@@ -54,13 +64,26 @@ const StudentEditProfile = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validation
+    if (!formData.name || !formData.name.trim()) {
+      toast.error('الاسم مطلوب');
+      return;
+    }
+    
     setSaving(true);
     try {
-      await axios.put(`${API}/students/me/profile`, formData);
-      toast.success('تم تحديث بياناتك بنجاح');
+      const response = await axios.put(`${API}/students/me/profile`, formData);
+      toast.success(response.data.message || 'تم تحديث بياناتك بنجاح');
+      
+      // Update local user context if name changed
+      if (formData.name && updateUser) {
+        updateUser({ ...user, name: formData.name });
+      }
     } catch (error) {
       console.error('Error:', error);
-      toast.error('فشل في تحديث البيانات');
+      const errorMsg = error.response?.data?.detail || 'فشل في تحديث البيانات';
+      toast.error(errorMsg);
     } finally {
       setSaving(false);
     }
