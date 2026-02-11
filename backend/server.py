@@ -2706,10 +2706,28 @@ async def update_my_profile(data: StudentSelfUpdate, current_user: dict = Depend
     
     # Build update dict - only allowed fields for student
     update_data = {}
+    
+    # الاسم
+    if data.name is not None and data.name.strip():
+        update_data["name"] = data.name.strip()
+    
+    # أرقام الهواتف
     if data.student_phone is not None:
         update_data["student_phone"] = data.student_phone
+    if data.father_phone is not None:
+        update_data["father_phone"] = data.father_phone
+    if data.mother_phone is not None:
+        update_data["mother_phone"] = data.mother_phone
+    
+    # الصورة الشخصية
     if data.profile_image is not None:
         update_data["profile_image"] = data.profile_image
+    
+    # تاريخ الميلاد
+    if data.birth_date is not None:
+        update_data["birth_date"] = data.birth_date
+    
+    # بيانات المدرسة
     if data.school_name is not None:
         update_data["school_name"] = data.school_name
     if data.school_grade is not None:
@@ -2717,10 +2735,18 @@ async def update_my_profile(data: StudentSelfUpdate, current_user: dict = Depend
     if data.school_average is not None:
         update_data["school_average"] = data.school_average
     
-    if update_data:
-        await db.users.update_one({"id": student_id}, {"$set": update_data})
+    # المسجد
+    if data.mosque_name is not None:
+        update_data["mosque_name"] = data.mosque_name
     
-    return {"message": "تم تحديث بياناتك بنجاح"}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="لم يتم تقديم أي بيانات للتحديث")
+    
+    try:
+        await db.users.update_one({"id": student_id}, {"$set": update_data})
+        return {"message": "تم تحديث بياناتك بنجاح", "updated_fields": list(update_data.keys())}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"فشل في تحديث البيانات: {str(e)}")
 
 @api_router.get("/students/{student_id}/profile")
 async def get_student_profile(student_id: str, current_user: dict = Depends(get_current_user)):
