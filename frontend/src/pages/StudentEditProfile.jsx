@@ -146,57 +146,140 @@ const StudentEditProfile = () => {
               )}
             </div>
 
-            {/* Phone Number */}
+            {/* Name */}
             <div className="space-y-2">
               <Label className="text-slate-300 flex items-center gap-2">
-                <Phone className="w-4 h-4" />
-                رقم الهاتف
+                <User className="w-4 h-4" />
+                الاسم الكامل <span className="text-red-400">*</span>
               </Label>
               <Input
-                name="student_phone"
-                value={formData.student_phone}
+                name="name"
+                value={formData.name}
                 onChange={handleChange}
-                placeholder="05XXXXXXXX"
+                placeholder="الاسم الكامل"
+                className="bg-slate-800 border-slate-700 text-white"
+                required
+              />
+            </div>
+
+            {/* Birth Date */}
+            <div className="space-y-2">
+              <Label className="text-slate-300 flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                تاريخ الميلاد
+              </Label>
+              <Input
+                name="birth_date"
+                type="date"
+                value={formData.birth_date}
+                onChange={handleChange}
                 className="bg-slate-800 border-slate-700 text-white"
                 dir="ltr"
               />
             </div>
 
-            {/* School Name */}
+            {/* Phone Numbers Section */}
+            <div className="p-4 rounded-xl bg-slate-800/50 space-y-4">
+              <h3 className="text-white font-medium flex items-center gap-2">
+                <Phone className="w-4 h-4 text-emerald-400" />
+                أرقام الهواتف
+              </h3>
+              
+              {/* Student Phone */}
+              <div className="space-y-2">
+                <Label className="text-slate-300">رقم هاتف الطالب</Label>
+                <Input
+                  name="student_phone"
+                  value={formData.student_phone}
+                  onChange={handleChange}
+                  placeholder="05XXXXXXXX"
+                  className="bg-slate-800 border-slate-700 text-white"
+                  dir="ltr"
+                />
+              </div>
+
+              {/* Father Phone */}
+              <div className="space-y-2">
+                <Label className="text-slate-300">رقم هاتف الأب</Label>
+                <Input
+                  name="father_phone"
+                  value={formData.father_phone}
+                  onChange={handleChange}
+                  placeholder="05XXXXXXXX"
+                  className="bg-slate-800 border-slate-700 text-white"
+                  dir="ltr"
+                />
+              </div>
+
+              {/* Mother Phone */}
+              <div className="space-y-2">
+                <Label className="text-slate-300">رقم هاتف الأم</Label>
+                <Input
+                  name="mother_phone"
+                  value={formData.mother_phone}
+                  onChange={handleChange}
+                  placeholder="05XXXXXXXX"
+                  className="bg-slate-800 border-slate-700 text-white"
+                  dir="ltr"
+                />
+              </div>
+            </div>
+
+            {/* School Section */}
+            <div className="p-4 rounded-xl bg-slate-800/50 space-y-4">
+              <h3 className="text-white font-medium flex items-center gap-2">
+                <School className="w-4 h-4 text-blue-400" />
+                بيانات المدرسة
+              </h3>
+              
+              {/* School Name */}
+              <div className="space-y-2">
+                <Label className="text-slate-300">اسم المدرسة</Label>
+                <Input
+                  name="school_name"
+                  value={formData.school_name}
+                  onChange={handleChange}
+                  placeholder="مثال: مدرسة الأمل الابتدائية"
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+              </div>
+
+              {/* School Grade */}
+              <div className="space-y-2">
+                <Label className="text-slate-300">الصف الدراسي</Label>
+                <Input
+                  name="school_grade"
+                  value={formData.school_grade}
+                  onChange={handleChange}
+                  placeholder="مثال: الصف الخامس"
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+              </div>
+
+              {/* School Average */}
+              <div className="space-y-2">
+                <Label className="text-slate-300">المعدل الدراسي</Label>
+                <Input
+                  name="school_average"
+                  value={formData.school_average}
+                  onChange={handleChange}
+                  placeholder="مثال: 95%"
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+              </div>
+            </div>
+
+            {/* Mosque Name */}
             <div className="space-y-2">
               <Label className="text-slate-300 flex items-center gap-2">
-                <School className="w-4 h-4" />
-                اسم المدرسة
+                <Building className="w-4 h-4" />
+                اسم المسجد
               </Label>
               <Input
-                name="school_name"
-                value={formData.school_name}
+                name="mosque_name"
+                value={formData.mosque_name}
                 onChange={handleChange}
-                placeholder="مثال: مدرسة الأمل الابتدائية"
-                className="bg-slate-800 border-slate-700 text-white"
-              />
-            </div>
-
-            {/* School Grade */}
-            <div className="space-y-2">
-              <Label className="text-slate-300">الصف الدراسي</Label>
-              <Input
-                name="school_grade"
-                value={formData.school_grade}
-                onChange={handleChange}
-                placeholder="مثال: الصف الخامس"
-                className="bg-slate-800 border-slate-700 text-white"
-              />
-            </div>
-
-            {/* School Average */}
-            <div className="space-y-2">
-              <Label className="text-slate-300">المعدل الدراسي</Label>
-              <Input
-                name="school_average"
-                value={formData.school_average}
-                onChange={handleChange}
-                placeholder="مثال: 95%"
+                placeholder="اسم المسجد أو الحلقة"
                 className="bg-slate-800 border-slate-700 text-white"
               />
             </div>
