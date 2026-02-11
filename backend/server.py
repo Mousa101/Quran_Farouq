@@ -2908,36 +2908,94 @@ async def change_student_group(student_id: str, group_id: str, current_user: dic
     
     return {"message": "تم نقل الطالب مع جميع بياناته بنجاح"}
 
+# نموذج لإضافة طالب من المدير أو المعلم (بدون كود التسجيل)
+class AdminCreateStudent(BaseModel):
+    email: str
+    name: str
+    password: str
+    role: str = "student"
+    # Phone numbers
+    student_phone: Optional[str] = None
+    father_phone: Optional[str] = None
+    mother_phone: Optional[str] = None
+    # Student fields
+    mosque_name: Optional[str] = None
+    school_name: Optional[str] = None
+    school_grade: Optional[str] = None
+    birth_date: Optional[str] = None
+    profile_image: Optional[str] = None
+    group_id: Optional[str] = None
+
 @api_router.post("/admin/students")
-async def admin_create_student(data: UserCreateWithCode, current_user: dict = Depends(get_current_user)):
-    """Create a new student (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إضافة طالب")
+async def admin_create_student(data: AdminCreateStudent, current_user: dict = Depends(get_current_user)):
+    """Create a new student (Admin or Sheikh)"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك بإضافة طالب")
+    
+    # Validate data
+    if not data.email or not data.name or not data.password:
+        raise HTTPException(status_code=400, detail="الاسم والبريد الإلكتروني وكلمة المرور مطلوبة")
+    
+    if len(data.password) < 4:
+        raise HTTPException(status_code=400, detail="كلمة المرور يجب أن تكون 4 أحرف على الأقل")
     
     # Check if email exists
     existing = await db.users.find_one({"email": data.email})
     if existing:
         raise HTTPException(status_code=400, detail="البريد الإلكتروني مسجل مسبقاً")
     
-    # Create student
-    user = User(
-        email=data.email,
-        name=data.name,
-        role="student",
-        mosque_name=data.mosque_name,
-        school_name=data.school_name,
-        school_grade=data.school_grade,
-        birth_date=data.birth_date,
-        profile_image=data.profile_image
-    )
-    
-    user_dict = user.model_dump()
-    user_dict["password_hash"] = get_password_hash(data.password)
-    user_dict["created_at"] = user_dict["created_at"].isoformat()
-    
-    await db.users.insert_one(user_dict)
-    
-    return {"message": "تم إضافة الطالب بنجاح", "student_id": user.id}
+    try:
+        # Create student
+        user = User(
+            email=data.email,
+            name=data.name,
+            role="student",
+            mosque_name=data.mosque_name,
+            school_name=data.school_name,
+            school_grade=data.school_grade,
+            birth_date=data.birth_date,
+            profile_image=data.profile_image,
+            student_phone=data.student_phone,
+            father_phone=data.father_phone,
+            mother_phone=data.mother_phone,
+            is_active=True,
+            is_activated=True
+        )
+        
+        user_dict = user.model_dump()
+        user_dict["password_hash"] = get_password_hash(data.password)
+        user_dict["created_at"] = user_dict["created_at"].isoformat()
+        user_dict["registration_date"] = user_dict["registration_date"].isoformat()
+        
+        # إذا كان المعلم هو من أضاف الطالب، نضيفه لمجموعته
+        if current_user["role"] == "sheikh" and data.group_id:
+            # التحقق من أن المجموعة تابعة للمعلم
+            group = await db.groups.find_one({"id": data.group_id, "sheikh_id": current_user["user_id"]})
+            if group:
+                user_dict["group_id"] = data.group_id
+        elif data.group_id:
+            user_dict["group_id"] = data.group_id
+        
+        await db.users.insert_one(user_dict)
+        
+        # إنشاء سجل النقاط
+        await db.student_points.insert_one({
+            "student_id": user.id,
+            "total_points": 0,
+            "attendance_points": 0,
+            "recitation_points": 0,
+            "tracking_points": 0,
+            "bonus_points": 0,
+            "level": 1
+        })
+        
+        return {
+            "message": "تم إضافة الطالب بنجاح",
+            "student_id": user.id,
+            "student_name": user.name
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"فشل في إضافة الطالب: {str(e)}")
 
 # ============== WARNING SYSTEM ==============
 
