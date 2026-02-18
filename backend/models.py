@@ -3,6 +3,40 @@ from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
 
+# ============== TERM MANAGEMENT MODELS ==============
+
+class Term(BaseModel):
+    """نموذج الفصل الدراسي"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str  # اسم الفصل مثل "الفصل الأول 2026"
+    start_date: str
+    end_date: Optional[str] = None
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_by: str  # Admin ID
+
+class TermArchive(BaseModel):
+    """أرشيف بيانات الطلاب للفصل المنتهي"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    term_id: str
+    term_name: str
+    student_id: str
+    student_name: str
+    # بيانات الفصل
+    current_term_points: int = 0
+    follow_up_count: int = 0
+    recitation_count: int = 0
+    attendance_total: int = 0
+    attendance_present: int = 0
+    attendance_absent: int = 0
+    # تفاصيل إضافية
+    tracking_points: int = 0
+    recitation_points: int = 0
+    bonus_points: int = 0
+    archived_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # User Models - Updated with new fields
 class UserBase(BaseModel):
     email: EmailStr
