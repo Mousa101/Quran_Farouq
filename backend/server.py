@@ -5522,6 +5522,211 @@ async def check_tracking_submission_window(current_user: dict = Depends(get_curr
         }
     }
 
+
+# ============== TERM MANAGEMENT SYSTEM ==============
+
+class TermCreateRequest(BaseModel):
+    name: str  # اسم الفصل
+
+@api_router.get("/terms")
+async def get_terms(current_user: dict = Depends(get_current_user)):
+    """Get all terms (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول للفصول الدراسية")
+    
+    terms = await db.terms.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return terms
+
+@api_router.get("/terms/active")
+async def get_active_term(current_user: dict = Depends(get_current_user)):
+    """Get the currently active term"""
+    term = await db.terms.find_one({"is_active": True}, {"_id": 0})
+    if not term:
+        # إنشاء فصل افتراضي إذا لم يوجد
+        now = datetime.now(timezone.utc)
+        default_term = Term(
+            name=f"الفصل الأول {now.year}",
+            start_date=now.isoformat(),
+            is_active=True,
+            created_by="system"
+        )
+        term_dict = default_term.model_dump()
+        term_dict["created_at"] = term_dict["created_at"].isoformat()
+        await db.terms.insert_one(term_dict)
+        return term_dict
+    return term
+
+@api_router.post("/terms/close-and-start-new")
+async def close_term_and_start_new(data: TermCreateRequest, current_user: dict = Depends(get_current_user)):
+    """
+    إغلاق الفصل الحالي وبدء فصل جديد (Admin only)
+    1. أرشفة بيانات جميع الطلاب
+    2. تصفير بيانات الفصل الحالي
+    3. إنشاء فصل جديد
+    """
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إغلاق الفصل")
+    
+    if not data.name or not data.name.strip():
+        raise HTTPException(status_code=400, detail="يجب إدخال اسم الفصل الجديد")
+    
+    try:
+        # 1. جلب الفصل الحالي النشط
+        current_term = await db.terms.find_one({"is_active": True})
+        if not current_term:
+            # إنشاء فصل افتراضي إذا لم يوجد
+            current_term = {
+                "id": str(uuid.uuid4()),
+                "name": "فصل سابق",
+                "is_active": True
+            }
+        
+        term_id = current_term.get("id", str(uuid.uuid4()))
+        term_name = current_term.get("name", "فصل سابق")
+        
+        # 2. جلب جميع الطلاب
+        students = await db.users.find({"role": "student"}, {"_id": 0}).to_list(10000)
+        
+        # 3. أرشفة بيانات كل طالب
+        archives = []
+        for student in students:
+            student_id = student["id"]
+            
+            # جلب بيانات النقاط
+            points_data = await db.student_points.find_one({"student_id": student_id}, {"_id": 0})
+            
+            # حساب إحصائيات الحضور للفصل
+            attendance_stats = await db.attendance.aggregate([
+                {"$match": {"student_id": student_id}},
+                {"$group": {
+                    "_id": None,
+                    "total": {"$sum": 1},
+                    "present": {"$sum": {"$cond": [{"$eq": ["$status", "present"]}, 1, 0]}},
+                    "absent": {"$sum": {"$cond": [{"$eq": ["$status", "absent"]}, 1, 0]}}
+                }}
+            ]).to_list(1)
+            
+            att_total = attendance_stats[0]["total"] if attendance_stats else 0
+            att_present = attendance_stats[0]["present"] if attendance_stats else 0
+            att_absent = attendance_stats[0]["absent"] if attendance_stats else 0
+            
+            # حساب عدد التسميعات
+            recitation_count = await db.recitations.count_documents({
+                "student_id": student_id,
+                "did_not_recite": {"$ne": True}
+            })
+            
+            # حساب عدد ورق المتابعة
+            follow_up_count = await db.tracking_sheets.count_documents({"student_id": student_id})
+            
+            # إنشاء سجل الأرشيف
+            archive = TermArchive(
+                term_id=term_id,
+                term_name=term_name,
+                student_id=student_id,
+                student_name=student.get("name", ""),
+                current_term_points=points_data.get("total_points", 0) if points_data else 0,
+                follow_up_count=follow_up_count,
+                recitation_count=recitation_count,
+                attendance_total=att_total,
+                attendance_present=att_present,
+                attendance_absent=att_absent,
+                tracking_points=points_data.get("tracking_points", 0) if points_data else 0,
+                recitation_points=points_data.get("recitation_points", 0) if points_data else 0,
+                bonus_points=points_data.get("bonus_points", 0) if points_data else 0
+            )
+            
+            archive_dict = archive.model_dump()
+            archive_dict["archived_at"] = archive_dict["archived_at"].isoformat()
+            archives.append(archive_dict)
+        
+        # 4. حفظ الأرشيف دفعة واحدة
+        if archives:
+            await db.term_archives.insert_many(archives)
+        
+        # 5. تصفير بيانات الفصل الحالي لجميع الطلاب (Bulk Update)
+        # تصفير student_points (لكن نحتفظ بـ total_points العامة في حقل منفصل)
+        await db.student_points.update_many(
+            {},
+            {
+                "$set": {
+                    "current_term_points": 0,
+                    "attendance_points": 0,
+                    "recitation_points": 0,
+                    "tracking_points": 0,
+                    "bonus_points": 0
+                },
+                # نحتفظ بـ total_points كما هي - لا نصفرها
+            }
+        )
+        
+        # 6. إغلاق الفصل الحالي
+        now = datetime.now(timezone.utc)
+        await db.terms.update_many(
+            {"is_active": True},
+            {"$set": {"is_active": False, "end_date": now.isoformat()}}
+        )
+        
+        # 7. إنشاء الفصل الجديد
+        new_term = Term(
+            name=data.name.strip(),
+            start_date=now.isoformat(),
+            is_active=True,
+            created_by=current_user["user_id"]
+        )
+        
+        new_term_dict = new_term.model_dump()
+        new_term_dict["created_at"] = new_term_dict["created_at"].isoformat()
+        await db.terms.insert_one(new_term_dict)
+        
+        # 8. إشعار جميع الطلاب
+        for student in students:
+            await create_notification_internal(
+                student["id"],
+                "بداية فصل دراسي جديد",
+                f"تم بدء الفصل الجديد: {data.name}. تم أرشفة بياناتك السابقة.",
+                "info"
+            )
+        
+        return {
+            "message": f"تم إغلاق الفصل السابق وبدء الفصل الجديد: {data.name}",
+            "new_term_id": new_term.id,
+            "archived_students_count": len(archives),
+            "previous_term_name": term_name
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"فشل في إغلاق الفصل: {str(e)}")
+
+@api_router.get("/terms/archive")
+async def get_term_archives(term_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Get archived term data (Admin only)"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول للأرشيف")
+    
+    query = {}
+    if term_id:
+        query["term_id"] = term_id
+    
+    archives = await db.term_archives.find(query, {"_id": 0}).sort("archived_at", -1).to_list(10000)
+    return archives
+
+@api_router.get("/terms/archive/student/{student_id}")
+async def get_student_term_history(student_id: str, current_user: dict = Depends(get_current_user)):
+    """Get a student's historical term data"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        if current_user["role"] == "student" and current_user["user_id"] != student_id:
+            raise HTTPException(status_code=403, detail="لا يمكنك الوصول لسجلات طالب آخر")
+    
+    archives = await db.term_archives.find(
+        {"student_id": student_id}, 
+        {"_id": 0}
+    ).sort("archived_at", -1).to_list(100)
+    
+    return archives
+
+
+
 # Include the router
 app.include_router(api_router)
 
