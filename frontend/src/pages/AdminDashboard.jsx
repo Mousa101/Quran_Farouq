@@ -419,6 +419,80 @@ const AdminDashboard = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Term Management Dialog */}
+      <Dialog open={termDialogOpen} onOpenChange={setTermDialogOpen}>
+        <DialogContent className={`${isDark ? 'bg-slate-900 border-white/10' : 'bg-white'} max-w-md`}>
+          <DialogHeader>
+            <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>
+              إغلاق الفصل وبدء فصل جديد
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* تحذير */}
+            <div className={`p-4 rounded-lg ${isDark ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
+              <p className={`text-sm ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
+                <strong>تحذير:</strong> هذا الإجراء سيقوم بـ:
+              </p>
+              <ul className={`text-sm mt-2 space-y-1 ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>
+                <li>• أرشفة بيانات جميع الطلاب للفصل الحالي</li>
+                <li>• تصفير نقاط الفصل (الحضور، التسميع، المتابعة)</li>
+                <li>• الحفاظ على النقاط الإجمالية التراكمية</li>
+                <li>• إنشاء فصل دراسي جديد</li>
+              </ul>
+            </div>
+
+            {/* الفصل الحالي */}
+            {activeTerm && (
+              <div className={`p-3 rounded-lg ${isDark ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
+                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الفصل الحالي:</p>
+                <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{activeTerm.name}</p>
+              </div>
+            )}
+
+            {/* اسم الفصل الجديد */}
+            <div>
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>
+                اسم الفصل الجديد <span className="text-red-400">*</span>
+              </Label>
+              <Input
+                value={newTermName}
+                onChange={(e) => setNewTermName(e.target.value)}
+                placeholder="مثال: الفصل الثاني 2026"
+                className={`mt-1 ${isDark ? 'bg-slate-800 border-white/10 text-white' : ''}`}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setTermDialogOpen(false)}
+              className={isDark ? 'border-white/10' : ''}
+            >
+              إلغاء
+            </Button>
+            <Button 
+              onClick={handleCloseTermAndStartNew}
+              disabled={closingTerm || !newTermName.trim()}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              {closingTerm ? (
+                <>
+                  <RefreshCw className="w-4 h-4 ml-2 animate-spin" />
+                  جاري الإغلاق...
+                </>
+              ) : (
+                <>
+                  <Archive className="w-4 h-4 ml-2" />
+                  إغلاق وبدء فصل جديد
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
