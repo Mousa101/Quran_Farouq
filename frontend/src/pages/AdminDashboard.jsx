@@ -4,10 +4,14 @@ import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
+import { toast } from 'sonner';
 import { 
   Users, BookOpen, Calendar, Trophy, TrendingUp, 
   GraduationCap, UserCheck, Target, Eye, Medal,
-  ArrowUpRight, UserPlus, Clock
+  ArrowUpRight, UserPlus, Clock, Archive, RefreshCw
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -16,9 +20,14 @@ const AdminDashboard = () => {
   const { isDark } = useTheme();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [termDialogOpen, setTermDialogOpen] = useState(false);
+  const [newTermName, setNewTermName] = useState('');
+  const [closingTerm, setClosingTerm] = useState(false);
+  const [activeTerm, setActiveTerm] = useState(null);
 
   useEffect(() => {
     fetchData();
+    fetchActiveTerm();
   }, []);
 
   const fetchData = async () => {
@@ -29,6 +38,42 @@ const AdminDashboard = () => {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchActiveTerm = async () => {
+    try {
+      const res = await axios.get(`${API}/terms/active`);
+      setActiveTerm(res.data);
+    } catch (error) {
+      console.error('Error fetching active term:', error);
+    }
+  };
+
+  const handleCloseTermAndStartNew = async () => {
+    if (!newTermName.trim()) {
+      toast.error('يرجى إدخال اسم الفصل الجديد');
+      return;
+    }
+
+    setClosingTerm(true);
+    try {
+      const res = await axios.post(`${API}/terms/close-and-start-new`, {
+        name: newTermName.trim()
+      });
+      
+      toast.success(res.data.message);
+      setTermDialogOpen(false);
+      setNewTermName('');
+      
+      // تحديث البيانات
+      fetchData();
+      fetchActiveTerm();
+    } catch (error) {
+      console.error('Error closing term:', error);
+      toast.error(error.response?.data?.detail || 'فشل في إغلاق الفصل');
+    } finally {
+      setClosingTerm(false);
     }
   };
 
