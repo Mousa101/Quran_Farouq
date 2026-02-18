@@ -1,170 +1,161 @@
 <analysis>**original_problem_statement:**
-The user is building a comprehensive Quran memorization application. The initial scope included role-based access (Admin, Sheikh, Student), gamification, and management features.
+The user initiated the session with a request to resolve a  error. However, throughout the session, the user provided a series of extensive new feature requests and bug reports in Arabic, which became the primary focus.
 
-**New Features Requested in this Session:**
-1.  **UI/UX Enhancements:**
-    *   **Register Page:** Add a Join Date field, change the profile picture to a file upload, and add a Forgot Password feature.
-    *   **Student Dashboard:** Modify the Memorization card, add GPA, show the group name, and convert attendance/recitation stats into circular percentage gauges.
-2.  **Mobile Responsiveness:** Make the entire application, especially the dashboards and sidebar, fully responsive and usable on mobile devices.
-3.  **Expanded Registration & Roles:**
-    *   Allow Admins and Sheikhs (Teachers) to register through the main registration page.
-    *   Require an activation code (provided by a master Admin) for all new roles.
-4.  **Admin & Sheikh Feature Expansion:**
-    *   **Admin:** Add the ability to view, manage, and delete Sheikhs.
-    *   **Sheikh:** Add the ability for a Sheikh to edit their own personal profile, including their photo. Display this personal information on the Sheikh's main dashboard.
-5.  **Bug Report:** The logout button is not appearing on the mobile version of the site.
+**Latest User Request (Message 403 - HIGHEST PRIORITY):**
+The user requested a major overhaul of the application's core logic, focusing on data management and fixing persistent bugs, without rebuilding from scratch.
+1.  **Term Management System (Admin Only):** Create a system to close the current academic term and start a new one.
+    *   An admin-only button إغلاق الفصل وبدء فصل جديد (Close Term and Start New Term).
+    *   On click, archive the current term's student data (, , etc.) into a new  table.
+    *   Reset only the current term's counters to zero for all students.
+    *   The  must remain cumulative across terms.
+    *   A new  should be created for the new active term.
+2.  **Student Profile Page Rework:** Display a comprehensive data table on the student's profile page with fields like , , , , and , fetched directly from the database.
+3.  **Follow-up & Recitation Form Bug:** Fix a bug where form values reset to zero after submission.
+    *   The backend logic must be changed to **increment** counters (, ) instead of overwriting them.
+4.  **Data Safety & Performance:** Ensure all operations are safe, use database transactions, and are performant (e.g., use bulk updates for archiving).
 
-**User's preferred language**: ar
+**Previous User Requests from this Session (Mostly addressed, but context is important):**
+*   **Recitation System Overhaul:** The recitation page was completely redesigned to be similar to the attendance page, with recited and did not recite options, a new submission modal, and a delete functionality.
+*   **PDF Export:** Added functionality for admins/teachers to download a student's semester record as a PDF.
+*   **Tracking Sheet Deadlines:** Created a settings page for teachers/admins to define submission windows for tracking sheets. Submissions outside this window should award 0 points.
+*   **Percentage Calculation Bugs:** Multiple iterations were required to fix the logic for calculating and displaying the recitation percentage.
+*   **Profile Management:** Started implementing features for students and teachers to edit student profiles.
+*   **Fees System:** Started implementing fixes for the fee management system.
+
+**User's preferred language**: Arabic (العربية). The next agent MUST respond in Arabic.
 
 **what currently exists?**
-The application is a feature-rich Quran management platform with a responsive UI.
+The application is a full-stack solution for managing Quran memorization students. In this session, the agent has performed a massive overhaul of several features based on continuous user feedback. A new, attendance-style recitation page () was created, PDF generation for student records was added, and a system for setting tracking sheet deadlines was implemented. Numerous bugs related to data calculation (especially recitation percentages) and display were fixed.
 
-**Key implemented features include:**
-- **Comprehensive Dashboards:** Detailed and responsive dashboards for Students, Sheikhs, and Admins.
-- **Expanded Registration:** A unified registration flow supports Students, Sheikhs, and Admins, all requiring admin activation.
-- **Role-Based Features:**
-    - **Admin:** Full management capabilities, including a new page to manage Sheikhs (view/delete).
-    - **Sheikh:** Can view their students and groups, and now have a dedicated page to edit their personal profile (photo, specialty, experience, etc.), with this information displayed on their dashboard.
-    - **Student:** Can view their progress, including stats displayed in new circular gauges.
-- **Mobile-First UI:** The Sidebar, Login, Register, and all main dashboards have been refactored to be fully responsive, including a hamburger menu for navigation.
-- **UI Overhaul:** The Register and Student Dashboard pages have been significantly updated as per user requests, including new fields and components like a circular progress gauge.
+The agent has just begun implementing the latest major request: a Term Management System. It has added the necessary Pydantic models (, ) and backend API endpoints () to  and . It also added a new data table to the student dashboard UI ().
 
 **Last working item**:
-    - Last item agent was working: The user reported that the logout button is not visible on mobile devices. The agent has acknowledged the issue but has not started the fix.
-    - Status: NOT STARTED
-    - Agent Testing Done: N
-    - Which testing method agent to use? screenshot tool
-    - User Testing Done: N
+- **Last item agent was working:** Implementing the Term Management System. The agent had just added the backend APIs and was about to add the إغلاق الفصل وبدء فصل جديد (Close Term and Start New Term) button to the admin dashboard UI.
+- **Status:** IN PROGRESS
+- **Agent Testing Done:** N
+- **Which testing method agent to use?** After completing the full feature, use the backend testing agent to verify the archiving and data reset logic, and the frontend testing agent to confirm the UI changes and button functionality.
+- **User Testing Done:** N
 
 **All Pending/In progress Issue list**:
-  - Issue 1: Logout button not visible on mobile (Priority: P0)
-  
-  Issues Detail:
-  - Issue 1: 
-     - Attempted fixes: None. This was the last user report.
-     - Next debug checklist: 
-        1. Examine .
-        2. Check the CSS classes applied to the logout button and its container within the mobile menu view (). It's likely hidden by a responsive utility class (e.g., ) or is being pushed out of the visible area.
-        3. Adjust the Tailwind CSS classes to ensure the logout button is rendered correctly within the mobile sidebar drawer.
-     - Why fix this issue and what will be achieved with the fix? This is a critical usability issue, as mobile users cannot log out of their accounts.
-     - Status:  NOT STARTED
-     - Is recurring issue? N
-     - Should Test frontend/backend/both after fix? frontend
-     - Blocked on other issue: None
+- **Issue 1:** The backend logic for the follow-up and recitation forms is incorrect. (P0 - BLOCKER for correct data)
+
+**Issues Detail:**
+- **Issue 1:**
+    - **Description:** As per the user's request (message 403, item 3), when a student submits a tracking sheet or recitation, the backend overwrites the existing counts instead of incrementing them. For example,  is set to 1 instead of . The agent only made a minor frontend change and did not fix the core backend logic.
+    - **Attempted fixes:** The agent modified  in  to handle null values, but this does not solve the incrementing issue.
+    - **Next debug checklist:**
+        1.  Locate the backend endpoints responsible for creating tracking sheets () and recitations () in .
+        2.  Modify the logic to fetch the student's current stats first.
+        3.  Change the database update operation to use the  operator in MongoDB to increment the values (, , , , ).
+        4.  Ensure the API returns the newly updated values to the frontend.
+    - **Why fix this issue and what will be achieved with the fix?** This is a critical data integrity bug. Fixing it will ensure that student statistics are accumulated correctly over time, which is essential for the entire application.
+    - **Status:** NOT STARTED
+    - **Is recurring issue?** N
+    - **Should Test frontend/backend/both after fix?** Backend
+    - **Blocked on other issue:** None
 
 **In progress Task List**:
-  - None.
+- **Task 1:** Complete the Term Management System (P0 - HIGHEST PRIORITY)
+    - **Where to resume:** Add the إغلاق الفصل وبدء فصل جديد button to the admin dashboard (likely in  or a shared admin component).
+    - **What will be achieved with this?** Admins will be able to archive student data for a term and reset counters for a new term.
+    - **Status:** IN PROGRESS
+    - **Should Test frontend/backend/both after fix?** Both
+    - **Blocked on something:** None
+
+- **Task 2:** Verify and complete features from user request #296 (P2)
+    - **Where to resume:** The agent implemented APIs and UI changes for student/teacher profile editing and fixed a fee system model, but these changes were never tested or verified by the user before the next major request came in.
+    - **What will be achieved with this?** Resolve the bugs related to student registration, profile editing, and fee management.
+    - **Status:** IN PROGRESS
+    - **Should Test frontend/backend/both after fix?** Both
+    - **Blocked on something:** Task 1 and Issue 1 should be completed first.
 
 **Upcoming and Future Tasks**
-    Upcoming Tasks:
-    - P1: Re-implement Image Analysis for Tracking Sheets: The original goal to use Gemini for analyzing uploaded tracking sheets still needs to be properly implemented. The current solution is a manual entry form.
-    - P2: Implement Admin Feature to Reset Student Statistics: Admins should have an API endpoint and a UI button to reset student stats (like attendance/recitation) periodically (e.g., at the end of a semester). This was part of an earlier request but was not implemented.
-    
-    Future Tasks:
-    - PDF reports for students.
-    - A direct messaging system between Sheikhs and students.
-    - Mobile push notifications.
+- **Upcoming Tasks:**
+    - **Task 1 (P1):** Complete the Student Profile Page Rework. The agent added a static table structure to , but it needs to be connected to live data from the backend to fulfill the user's request.
+- **Future Tasks:**
+    - **Task 2 (P2):** Homework File-Upload Feature. This feature from a previous session remains incomplete and untested. It involves allowing students to upload files for homework, and teachers to view them. (From initial handoff).
 
 **Completed work in this session**
-- **Mobile Responsiveness:** Refactored the ,  layout, , , , and  to be fully responsive with a hamburger menu.
-- **New Registration Flow:** Updated the  page and backend (, ) to support the registration of , , and  roles, each requiring an activation code.
-- **Sheikh Management Module (Admin):**
-  - Created a new  page for Admins to view, search, and delete Sheikhs.
-  - Added backend APIs: , .
-- **Sheikh Profile Module (Sheikh):**
-  - Created a  page for Sheikhs to edit their personal data (photo, specialty, etc.).
-  - Created a  endpoint to handle profile updates.
-  - Redesigned  to prominently display the Sheikh's personal and professional information.
-- **UI/UX Enhancements:**
-  - Implemented all requested changes on the  and  pages, including adding a Join Date, file upload for photos, and new circular progress gauges.
-  - Created a new  page.
-- **Bug Fixes:**
-  - **Homework API Verified:** Confirmed that the  endpoint, previously suspected to be broken, is working correctly.
-  - **Duplicate Endpoint Removed:** Resolved a critical bug by renaming a duplicate  endpoint in  that was causing all registration attempts to fail.
-  - **Frontend Compilation Errors:** Fixed multiple JSX syntax errors in  and  that caused the frontend to crash.
+- **Recitation System Overhaul:**
+  - Created a new page  with an attendance-style UI.
+  - Implemented logic for recited (opening a modal for combined new memorization and review) and did not recite.
+  - Added a  endpoint and a corresponding delete button in the UI.
+  - Fixed multiple bugs related to date filtering, ensuring records are saved and displayed for the correct day.
+  - Fixed a display bug where combined recitation/review entries only showed the recitation part.
+- **Statistics and Ranking Fixes:**
+  - Corrected the recitation percentage formula in  to properly account for did not recite days, based on unique days.
+  - Updated the Teacher's Ranking page () to display the correct percentage with details and color-coding.
+- **New Admin/Teacher Features:**
+  - Implemented a PDF export feature for a student's semester record in .
+  - Created a settings page () and corresponding backend API () for admins/teachers to set submission deadlines for tracking sheets.
+  - Implemented logic in  to award 0 points for tracking sheets submitted outside the allowed time window.
+- **Account Recovery:**
+  - Verified and provided the credentials for the admin account when the user reported it was lost.
 
 **Earlier issues found/mentioned but not fixed**
-   - None. All previous issues were either resolved in this session or are now tracked in the Upcoming Tasks or Last working item sections.
-
-**Known issue recurrence from previous fork**
-  - None.
+- See **In progress Task List** and **Upcoming and Future Tasks**. The session was characterized by the user providing new, overriding requirements before previous ones could be fully completed and verified.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **Backend:** FastAPI, Pydantic, Motor (async MongoDB driver), JWT.
-- **Frontend:** React, React Router, Axios, Tailwind CSS, Shadcn/UI, Responsive Design (Mobile-First).
-- **Database:** MongoDB.
+- **Backend:** FastAPI, Motor (Async MongoDB), Pydantic, JWT. The agent added logic for database transactions using .
+- **Frontend:** React (, ), Axios, Tailwind CSS, Shadcn/ui, Sonner. New libraries  and  were added for PDF generation.
 
 **key DB schema**
-  - **users:** Includes , ,  (student, sheikh, admin), and role-specific fields like  and  for sheikhs.
-  - **(Other schemas remain as per previous handoff)**
-
-**changes in tech stack**
-  - None.
+- ****: (New) 
+- ****: (New) 
+- ****: A Wed Feb 18 14:39:59 UTC 2026 field was added to correctly log recitations on specific days.
+- ****: A  field was added.
+- ****: New fields for term-specific stats were added (e.g., , ).
 
 **All files of reference**
-*   **/app/frontend/src/components/Sidebar.jsx**: Overwritten to implement a responsive design with a hamburger menu for mobile.
-*   **/app/frontend/src/pages/Register.jsx**: Overwritten to add role selection (student, sheikh, admin), conditional fields, and other UI improvements.
-*   **/app/frontend/src/pages/SheikhManagement.jsx**: New page for admins to manage sheikhs.
-*   **/app/frontend/src/pages/SheikhEditProfile.jsx**: New page for sheikhs to edit their own profile.
-*   **/app/frontend/src/pages/SheikhDashboard.jsx**: Overwritten to display detailed personal info for the logged-in sheikh.
-*   **/app/frontend/src/pages/StudentDashboard.jsx**: Heavily updated to include new circular gauges and data points.
-*   **/app/frontend/src/pages/PendingStudents.jsx**: Rewritten to fix bugs and correctly display pending registrations for all user roles.
-*   **/app/backend/server.py**: Modified to add new APIs for sheikh management and user profile updates, and to fix a duplicate registration endpoint.
-*   **/app/backend/models.py**: Updated to support new fields in the User model and registration request.
-*   **/app/frontend/src/App.js**: Updated with new routes for sheikh management and profile editing.
-*   **/app/frontend/src/components/ui/circular-gauge.jsx**: New reusable component for displaying percentage-based stats.
+- : Heavily modified. Added entire Term Management API, new endpoints for profile editing, and fixed logic in statistics, recitation, and tracking sheet endpoints. **This file urgently needs refactoring.**
+- : Heavily modified. Added , , , and updated numerous other models (, , ).
+- : **(New/Rewritten)** A completely new page to handle recitations.
+- : Modified to add PDF generation logic.
+- : **(New)** UI for managing tracking sheet deadlines.
+- : Modified to add a new statistics table and a partial fix for the tracking sheet form.
+- : UI updated to show detailed recitation percentages.
+- : Routes added for new pages.
+- : Links added for new pages.
 
 **Areas that need refactoring**:
--  is a monolith that continues to grow. It urgently needs to be broken down into multiple  files based on functionality (e.g., , , ).
+- ****: This file is now over 5,500 lines long and contains all application logic. It is critically unmaintainable. It MUST be broken down into smaller, feature-specific routers using FastAPI's  (e.g., , , ).
 
 **key api endpoints**
-- : Updated to handle registration for , , and  roles.
-- : (New) Updates the profile of the currently authenticated user (used by Sheikhs).
-- : (New) Fetches a list of all sheikhs for the admin dashboard.
-- : (New) Allows an admin to delete a sheikh.
-- : (Updated) Fetches pending registrations for all roles.
-- : (New) Allows an admin to reset a user's password.
+- : **(New)** Archives the current term and resets student stats.
+- : **(Modified)** Now filters by date.
+- : **(Modified)** Now accepts a Wed Feb 18 14:39:59 UTC 2026 field.
+- : **(New)** Deletes a recitation entry.
+- : **(New)** Sets the submission window for tracking sheets.
+- : **(Fixed)** Now uses a dedicated model .
+- : **(Modified)** Allows students to update more personal data.
+- : **(New)** Allows teachers to update student data.
 
 **Critical Info for New Agent**
-- **Highest Priority:** The immediate task is to fix the missing logout button on mobile, as reported by the user in their last message.
-- **User Environment Confusion:** The user previously reported data not syncing because they were using two different URLs ( vs. ). Be mindful that this confusion might arise again. Always guide the user to use the single, correct preview URL.
-- **Refactoring Needed:** The  file is critically large and complex. While the immediate priority is the bug fix, any significant backend work should be prefaced with a plan to refactor the routes into smaller, manageable files.
-
-**documents and test_reports created in this job**
-  - None.
+- You are in the middle of a very large, multi-step feature implementation requested in message #403. Prioritize completing the **Term Management System**.
+- **The most critical bug to fix is the backend logic for incrementing student stats (Issue #1).** The current implementation overwrites data, leading to incorrect statistics. This must be fixed before any other feature is considered complete.
+- The user is technically savvy and provides detailed, specific requirements. Pay close attention to the details in their messages, such as using database transactions and incrementing vs. overwriting data.
+- The  file is extremely large. While you should not refactor it without user permission, be aware that finding and modifying logic will be difficult. Keep your changes clean and isolated.
 
 **Last 10 User Messages and any pending HUMAN messages**
-- User: زر تسجيل الخروج لا يظهر في نسخخة الهاتف
-- User: البيانات مش مربوطة عالتلفون بضيف طالب من الموقع ما بظهر عالتلفون
-- User: ضفت الطالب وظهر من هاض الرابط بشكل طبيعي quran-tracker-41.preview.emergentagent.com/dashboard بس لما ادخل على التلفون من هاد الرابط ما بطلع اشي https://quran-tracker-41.emergent.host
-- User: خلي البيانات الشخصية تطلع عند الصفحة الرئيسية عند المعلم
-- User: اعطي المعلم ميزت التعديل على بياناته الشخصيه ومنها اضافة صورته
-- User: حط في تسجيل الدخول مستخدم جديد كمدير أو كمعلم وكلهم بحتاجوا كودات من المدير وأضف صلاحية حذف المعلم أو الإطلاع على بياناته أو بيانات مجموعته وكافة تفاصيله عند المدير
-- User: خلي المواقع متاح للاستخدام على الهواتف
-- User: 1) تعديل واجهة المستخدم أول وخليها متناسقة واعمل النسب شكلها يظهر بشكل دئري مثل عداد السيارة 2)إعادة التعيين عبر المدير 3) نقوم بذلك لاحقا
+1.  **User (Msg 403):** Provided a huge list of critical new features: Term Management, Student Profile Rework, and fixing the form increment bug. (IN PROGRESS)
+2.  **User (Msg 296):** Reported 4 major bugs: teacher registering student, student editing profile, teacher editing student, and admin fees system. (PARTIALLY ADDRESSED, BUT SUPERSEDED BY MSG 403)
+3.  **User (Msg 241):** Reported that combined recitation+review entries were not displaying correctly. (RESOLVED)
+4.  **User (Msg 180):** Reported that the recitation percentage was still not calculating correctly over multiple days and that tracking sheets submitted late should get 0 points. (RESOLVED)
+5.  **User (Msg 143):** Reported a bug in the recitation percentage calculation (50% issue). (RESOLVED)
+6.  **User (Msg 90):** Reported multiple bugs with the new recitation page, PDF download, and tracking settings, and requested a way to recover the admin account. (RESOLVED)
 
 **Project Health Check:**
-- **Working:** Core application logic, all new features (responsive UI, expanded registration, Sheikh management/profile editing), and previously identified bugs are fixed.
-- **Broken:** The logout button is not visible on mobile devices.
-- **Mocked:** The image analysis for tracking sheets is still a manual entry form, not the intended AI-based solution.
+- **Broken:** The data integrity is broken due to the backend overwriting stats instead of incrementing them (Issue #1). Core functionality related to student progress tracking is unreliable until this is fixed.
+- **Mocked:** None.
 
 **3rd Party Integrations**
- - **Gemini 2.5 Flash:** Planned for image analysis of tracking sheets. This remains an upcoming task.
+-  / : For generating PDF reports.
 
 **Testing status**
-  - Testing agent used after significant changes: NO
-  - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: []
-  - Known regressions: None.
-
-**Credentials to test flow:**
-- **Admin:**  / 
-- **Sheikh:**  / 
-- **Student:** Can be registered via the UI.
-- **New Registration:** New  or  accounts can be created from the  page. An existing Admin must then log in, go to the طلبات التسجيل (Pending Registrations) page to get the activation code for the new user.
-
-**What agent forgot to execute**
-- The agent did not implement the Admin reset student stats feature that was part of the original UI/UX request for the student dashboard. It has been added to Upcoming Tasks.</analysis>
+- **Testing agent used after significant changes:** YES (but only for a subset of features before more requests came in).
+- **Troubleshoot agent used after agent stuck in loop:** NO
+- **Test files created:** None
+- **Known regressions:** The core logic for saving student progress (recitations, tracking sheets) is functionally regressed because it overwrites data instead of incrementing it.</analysis>
