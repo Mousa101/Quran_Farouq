@@ -105,8 +105,22 @@ const AdminDashboard = () => {
           <div>
             <h1 className={`text-lg md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>مرحباً بك في لوحة التحكم</h1>
             <p className={`text-sm md:text-base ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>نظرة شاملة على أداء المركز</p>
+            {activeTerm && (
+              <p className={`text-xs mt-1 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                الفصل الحالي: {activeTerm.name}
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button 
+              onClick={() => setTermDialogOpen(true)}
+              variant="outline" 
+              size="sm" 
+              className={`text-xs md:text-sm text-amber-400 border-amber-500/30 hover:bg-amber-500/10 ${isDark ? '' : 'border-amber-300'}`}
+            >
+              <Archive className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
+              إغلاق الفصل وبدء فصل جديد
+            </Button>
             <Link to="/admin-rankings">
               <Button variant="outline" size="sm" className={`text-xs md:text-sm ${isDark ? 'border-white/10 hover:bg-white/5' : ''}`}>
                 <TrendingUp className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
