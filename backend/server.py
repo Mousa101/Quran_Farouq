@@ -29,7 +29,8 @@ from models import (
     AdminExamCreate, AdminExam,
     TajweedExamCreate, TajweedExam,
     WEEKLY_BADGES, WeeklyBadge,
-    OnlineExamCreate, OnlineExam, ExamSubmissionCreate, ExamSubmission, ExamQuestion
+    OnlineExamCreate, OnlineExam, ExamSubmissionCreate, ExamSubmission, ExamQuestion,
+    Term, TermArchive
 )
 
 class BaseModel(PydanticBaseModel):
