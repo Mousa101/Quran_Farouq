@@ -548,7 +548,7 @@ console.log(stats)
                     </div>
                   </td>
                   <td className="py-3 px-2 text-center">
-                    <span className="text-blue-400 font-bold text-lg">{stats?.tracking?.total_sheets || 0}</span>
+                    <span className="text-blue-400 font-bold text-lg">{stats?.tracking?.sheets_count || 0}</span>
                   </td>
                 </tr>
                 <tr className="border-b border-slate-800 hover:bg-slate-800/50">
@@ -581,7 +581,7 @@ console.log(stats)
                     </div>
                   </td>
                   <td className="py-3 px-2 text-center">
-                    <span className="text-amber-400 font-bold text-lg">{stats?.attendance?.rate || 0}%</span>
+                    <span className="text-amber-400 font-bold text-lg">{stats?.attendance?.percentage || 0}%</span>
                   </td>
                 </tr>
               </tbody>
