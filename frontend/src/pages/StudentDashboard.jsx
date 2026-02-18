@@ -150,16 +150,38 @@ const StudentDashboard = () => {
       sunday.setDate(today.getDate() - today.getDay());
       const week_start = sunday.toISOString().split('T')[0];
       
-      await axios.post(`${API}/tracking-sheets/student`, {
+      // تحويل القيم لأرقام صحيحة وتجنب إرسال undefined أو NaN
+      const formDataToSend = {
         week_start,
-        ...trackingForm
-      });
+        prayers_count: parseInt(trackingForm.prayers_count) || 0,
+        adhkar_after_prayer: parseInt(trackingForm.adhkar_after_prayer) || 0,
+        quran_sitting_days: parseInt(trackingForm.quran_sitting_days) || 0,
+        duha_prayers: parseInt(trackingForm.duha_prayers) || 0,
+        family_recitation: parseInt(trackingForm.family_recitation) || 0,
+        study_hours: parseInt(trackingForm.study_hours) || 0,
+        witr_prayers_days: parseInt(trackingForm.witr_prayers_days) || 0,
+        sunnah_prayers: parseInt(trackingForm.sunnah_prayers) || 0,
+        night_prayer: parseInt(trackingForm.night_prayer) || 0,
+        fasting: parseInt(trackingForm.fasting) || 0,
+        notes: trackingForm.notes || ''
+      };
       
-      toast.success('تم حفظ ورقة المتابعة بنجاح');
+      const response = await axios.post(`${API}/tracking-sheets/student`, formDataToSend);
+      
+      // عرض رسالة نجاح مع النقاط المكتسبة
+      const pointsEarned = response.data.points_earned || 0;
+      if (response.data.submitted_outside_window) {
+        toast.warning(`تم حفظ ورقة المتابعة بدون نقاط (خارج وقت التسليم)`);
+      } else {
+        toast.success(`تم حفظ ورقة المتابعة بنجاح! +${pointsEarned} نقطة`);
+      }
+      
       setTrackingDialogOpen(false);
-      fetchData(); // إعادة تحميل البيانات
       
-      // إعادة تعيين النموذج
+      // تحديث البيانات فوراً بدون reload
+      await fetchData();
+      
+      // إعادة تعيين النموذج فقط بعد النجاح
       setTrackingForm({
         prayers_count: 0,
         adhkar_after_prayer: 0,
@@ -174,7 +196,9 @@ const StudentDashboard = () => {
         notes: ''
       });
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'فشل في حفظ ورقة المتابعة');
+      console.error('Error submitting tracking:', error);
+      const errorMsg = error.response?.data?.detail || 'فشل في حفظ ورقة المتابعة';
+      toast.error(errorMsg);
     } finally {
       setSubmittingTracking(false);
     }
