@@ -476,6 +476,96 @@ console.log(stats)
         </CardContent>
       </Card>
 
+      {/* جدول بيانات الفصل الحالي */}
+      <Card className="glass-card border-white/10">
+        <CardHeader className="pb-2 md:pb-3">
+          <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+            <Trophy className="w-4 h-4 md:w-5 md:h-5 text-amber-400" />
+            إحصائياتي في الفصل الحالي
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-700">
+                  <th className="text-right text-slate-400 text-xs md:text-sm py-2 px-2">البيان</th>
+                  <th className="text-center text-slate-400 text-xs md:text-sm py-2 px-2">القيمة</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b border-slate-800 hover:bg-slate-800/50">
+                  <td className="py-3 px-2 text-slate-300 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Award className="w-4 h-4 text-emerald-400" />
+                      نقاط الفصل الحالي
+                    </div>
+                  </td>
+                  <td className="py-3 px-2 text-center">
+                    <span className="text-emerald-400 font-bold text-lg">{stats?.total_points || 0}</span>
+                  </td>
+                </tr>
+                <tr className="border-b border-slate-800 hover:bg-slate-800/50">
+                  <td className="py-3 px-2 text-slate-300 text-sm">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-purple-400" />
+                      عدد مرات التسميع
+                    </div>
+                  </td>
+                  <td className="py-3 px-2 text-center">
+                    <span className="text-purple-400 font-bold text-lg">{stats?.recitation?.recitations_count || 0}</span>
+                  </td>
+                </tr>
+                <tr className="border-b border-slate-800 hover:bg-slate-800/50">
+                  <td className="py-3 px-2 text-slate-300 text-sm">
+                    <div className="flex items-center gap-2">
+                      <BookMarked className="w-4 h-4 text-blue-400" />
+                      عدد ورق المتابعة
+                    </div>
+                  </td>
+                  <td className="py-3 px-2 text-center">
+                    <span className="text-blue-400 font-bold text-lg">{stats?.tracking?.total_sheets || 0}</span>
+                  </td>
+                </tr>
+                <tr className="border-b border-slate-800 hover:bg-slate-800/50">
+                  <td className="py-3 px-2 text-slate-300 text-sm">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-400" />
+                      مجموع الدوام (حضور)
+                    </div>
+                  </td>
+                  <td className="py-3 px-2 text-center">
+                    <span className="text-green-400 font-bold text-lg">{stats?.attendance?.present || 0}</span>
+                  </td>
+                </tr>
+                <tr className="border-b border-slate-800 hover:bg-slate-800/50">
+                  <td className="py-3 px-2 text-slate-300 text-sm">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-red-400" />
+                      أيام الغياب
+                    </div>
+                  </td>
+                  <td className="py-3 px-2 text-center">
+                    <span className="text-red-400 font-bold text-lg">{stats?.attendance?.absent || 0}</span>
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-800/50">
+                  <td className="py-3 px-2 text-slate-300 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-amber-400" />
+                      نسبة الحضور
+                    </div>
+                  </td>
+                  <td className="py-3 px-2 text-center">
+                    <span className="text-amber-400 font-bold text-lg">{stats?.attendance?.rate || 0}%</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Memorization & Attendance/Recitation Gauges */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Memorization Progress */}
