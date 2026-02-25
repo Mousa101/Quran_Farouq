@@ -416,6 +416,62 @@ const AdminDashboard = () => {
         </CardContent>
       </Card>
 
+      {/* جدول الفصول الدراسية */}
+      <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+        <CardHeader>
+          <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <Calendar className="w-5 h-5 text-purple-400" />
+            الفصول الدراسية
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loadingTerms ? (
+            <div className="flex items-center justify-center py-4">
+              <RefreshCw className="w-5 h-5 animate-spin text-emerald-400" />
+            </div>
+          ) : allTerms.length === 0 ? (
+            <p className={`text-center py-4 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا توجد فصول دراسية</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className={`border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>اسم الفصل</th>
+                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>تاريخ البداية</th>
+                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>تاريخ النهاية</th>
+                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الحالة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allTerms.map((term) => (
+                    <tr key={term.id} className={`border-b ${isDark ? 'border-white/5 hover:bg-white/5' : 'border-slate-100 hover:bg-slate-50'}`}>
+                      <td className={`px-4 py-3 font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{term.name}</td>
+                      <td className={`px-4 py-3 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        {term.start_date ? new Date(term.start_date).toLocaleDateString('ar-SA') : '-'}
+                      </td>
+                      <td className={`px-4 py-3 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        {term.end_date ? new Date(term.end_date).toLocaleDateString('ar-SA') : '-'}
+                      </td>
+                      <td className="px-4 py-3">
+                        {term.is_active ? (
+                          <span className="px-2 py-1 rounded-full text-xs bg-emerald-500/20 text-emerald-400">
+                            نشط
+                          </span>
+                        ) : (
+                          <span className={`px-2 py-1 rounded-full text-xs ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-600'}`}>
+                            مغلق
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Points System Info */}
       <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
         <CardHeader>
