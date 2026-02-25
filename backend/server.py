@@ -5748,6 +5748,141 @@ async def close_term_and_start_new(data: TermCreateRequest, current_user: dict =
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"فشل في إغلاق الفصل: {str(e)}")
 
+# API إعادة تعيين الفصل (POST /admin/terms/reset) - نفس وظيفة close-and-start-new
+@api_router.post("/admin/terms/reset")
+async def admin_reset_term(data: TermCreateRequest, current_user: dict = Depends(get_current_user)):
+    """
+    إعادة تعيين الفصل - للمدير فقط
+    يقوم بـ:
+    1. أرشفة بيانات الفصل الحالي
+    2. تصفير جميع النقاط والعدادات
+    3. إنشاء فصل جديد
+    البيانات القديمة تبقى محفوظة ويمكن الاستعلام عنها
+    """
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إعادة تعيين الفصل")
+    
+    if not data.name or not data.name.strip():
+        raise HTTPException(status_code=400, detail="يرجى إدخال اسم الفصل الجديد")
+    
+    try:
+        # 1. الحصول على الفصل الحالي
+        current_term = await db.terms.find_one({"is_active": True}, {"_id": 0})
+        term_id = current_term["id"] if current_term else "no_term"
+        term_name = current_term["name"] if current_term else "بدون فصل"
+        
+        # 2. جلب جميع الطلاب
+        students = await db.users.find({"role": "student"}, {"_id": 0, "id": 1, "name": 1}).to_list(10000)
+        
+        # 3. أرشفة بيانات كل طالب للفصل الحالي فقط (حسب term_id)
+        archives = []
+        for student in students:
+            student_id = student["id"]
+            
+            # جلب نقاط الطالب
+            points_data = await db.student_points.find_one({"student_id": student_id}, {"_id": 0})
+            
+            # جلب الحضور للفصل الحالي فقط
+            att_query = {"student_id": student_id}
+            if current_term:
+                att_query["term_id"] = term_id
+            
+            att_present = await db.attendance.count_documents({**att_query, "status": "present"})
+            att_absent = await db.attendance.count_documents({**att_query, "status": "absent"})
+            att_total = att_present + att_absent
+            
+            # جلب التسميعات للفصل الحالي فقط
+            rec_query = {"student_id": student_id, "did_not_recite": {"$ne": True}}
+            if current_term:
+                rec_query["term_id"] = term_id
+            recitation_count = await db.recitations.count_documents(rec_query)
+            
+            # حساب عدد ورق المتابعة للفصل الحالي فقط
+            track_query = {"student_id": student_id}
+            if current_term:
+                track_query["term_id"] = term_id
+            follow_up_count = await db.tracking_sheets.count_documents(track_query)
+            
+            # إنشاء سجل الأرشيف
+            archive = TermArchive(
+                term_id=term_id,
+                term_name=term_name,
+                student_id=student_id,
+                student_name=student.get("name", ""),
+                current_term_points=points_data.get("total_points", 0) if points_data else 0,
+                follow_up_count=follow_up_count,
+                recitation_count=recitation_count,
+                attendance_total=att_total,
+                attendance_present=att_present,
+                attendance_absent=att_absent,
+                tracking_points=points_data.get("tracking_points", 0) if points_data else 0,
+                recitation_points=points_data.get("recitation_points", 0) if points_data else 0,
+                bonus_points=points_data.get("bonus_points", 0) if points_data else 0
+            )
+            
+            archive_dict = archive.model_dump()
+            archive_dict["archived_at"] = archive_dict["archived_at"].isoformat()
+            archives.append(archive_dict)
+        
+        # 4. حفظ الأرشيف دفعة واحدة
+        if archives:
+            await db.term_archives.insert_many(archives)
+        
+        # 5. تصفير جميع نقاط الطلاب (Bulk Update)
+        await db.student_points.update_many(
+            {},
+            {
+                "$set": {
+                    "total_points": 0,
+                    "current_term_points": 0,
+                    "attendance_points": 0,
+                    "recitation_points": 0,
+                    "tracking_points": 0,
+                    "bonus_points": 0,
+                    "interaction_points": 0,
+                    "admin_bonus_points": 0
+                }
+            }
+        )
+        
+        # 6. إغلاق الفصل الحالي
+        now = datetime.now(timezone.utc)
+        await db.terms.update_many(
+            {"is_active": True},
+            {"$set": {"is_active": False, "end_date": now.isoformat()}}
+        )
+        
+        # 7. إنشاء الفصل الجديد
+        new_term = Term(
+            name=data.name.strip(),
+            start_date=now.isoformat(),
+            is_active=True,
+            created_by=current_user["user_id"]
+        )
+        
+        new_term_dict = new_term.model_dump()
+        new_term_dict["created_at"] = new_term_dict["created_at"].isoformat()
+        await db.terms.insert_one(new_term_dict)
+        
+        # 8. إشعار جميع الطلاب
+        for student in students:
+            await create_notification_internal(
+                student["id"],
+                "بداية فصل دراسي جديد",
+                f"تم بدء الفصل الجديد: {data.name}. تم أرشفة بياناتك السابقة وتصفير النقاط.",
+                "info"
+            )
+        
+        return {
+            "message": f"تم إعادة تعيين الفصل بنجاح. الفصل الجديد: {data.name}",
+            "new_term_id": new_term.id,
+            "archived_students_count": len(archives),
+            "previous_term_name": term_name
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"فشل في إعادة تعيين الفصل: {str(e)}")
+
 @api_router.get("/terms/archive")
 async def get_term_archives(term_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Get archived term data (Admin only)"""
