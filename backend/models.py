@@ -488,6 +488,28 @@ class Badge(BaseModel):
     points_required: int = 0
     category: str  # attendance, recitation, tracking, interaction, special
 
+# نماذج إدارة الشارات
+class BadgeTypeCreate(BaseModel):
+    """إنشاء نوع شارة جديد - المدير فقط"""
+    id: str
+    name: str
+    description: str
+    icon: str
+    points_required: int = 0
+    category: str
+
+class BadgeAssign(BaseModel):
+    """تعيين شارة لطالب - الشيخ فقط"""
+    student_id: str
+    badge_id: str
+    notes: Optional[str] = None
+
+class BadgeRemove(BaseModel):
+    """إزالة شارة من طالب - الشيخ فقط"""
+    student_id: str
+    badge_id: str
+    reason: Optional[str] = None
+
 class WeeklyBadge(BaseModel):
     """شارة أسبوعية للطالب"""
     model_config = ConfigDict(extra="ignore")
