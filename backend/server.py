@@ -2645,7 +2645,7 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
             "total_previous": total_previous,
             "new_pages": total_new_pages,
             "total_memorized": total_memorized,
-            "percentage": round((total_memorized / 604) * 100, 1)
+            "percentage": round((total_memorized / TOTAL_QURAN_PAGES) * 100, 1)
         },
         "tracking": {
             "weekly": weekly_data,
