@@ -453,7 +453,7 @@ const AdminDashboard = () => {
 
       {/* Term Management Dialog */}
       <Dialog open={termDialogOpen} onOpenChange={setTermDialogOpen}>
-        <DialogContent className={`${isDark ? 'bg-slate-900 border-white/10' : 'bg-white'} max-w-md`}>
+        <DialogContent className={`${isDark ? 'bg-slate-900 border-white/10' : 'bg-white'} max-w-2xl max-h-[90vh] overflow-y-auto`}>
           <DialogHeader>
             <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>
               إغلاق الفصل وبدء فصل جديد
@@ -462,14 +462,13 @@ const AdminDashboard = () => {
           
           <div className="space-y-4 py-4">
             {/* تحذير */}
-            <div className={`p-4 rounded-lg ${isDark ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
-              <p className={`text-sm ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
-                <strong>تحذير:</strong> هذا الإجراء سيقوم بـ:
+            <div className={`p-4 rounded-lg ${isDark ? 'bg-red-500/10 border border-red-500/30' : 'bg-red-50 border border-red-200'}`}>
+              <p className={`text-sm font-bold ${isDark ? 'text-red-400' : 'text-red-700'}`}>
+                تحذير هام:
               </p>
-              <ul className={`text-sm mt-2 space-y-1 ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>
+              <ul className={`text-sm mt-2 space-y-1 ${isDark ? 'text-red-300' : 'text-red-600'}`}>
                 <li>• أرشفة بيانات جميع الطلاب للفصل الحالي</li>
-                <li>• تصفير نقاط الفصل (الحضور، التسميع، المتابعة)</li>
-                <li>• الحفاظ على النقاط الإجمالية التراكمية</li>
+                <li>• <strong>تصفير جميع نقاط الطلاب إلى 0</strong></li>
                 <li>• إنشاء فصل دراسي جديد</li>
               </ul>
             </div>
@@ -477,22 +476,99 @@ const AdminDashboard = () => {
             {/* الفصل الحالي */}
             {activeTerm && (
               <div className={`p-3 rounded-lg ${isDark ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
-                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الفصل الحالي:</p>
+                <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الفصل الحالي (سيتم إغلاقه):</p>
                 <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{activeTerm.name}</p>
               </div>
             )}
 
-            {/* اسم الفصل الجديد */}
-            <div>
-              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>
-                اسم الفصل الجديد <span className="text-red-400">*</span>
-              </Label>
-              <Input
-                value={newTermName}
-                onChange={(e) => setNewTermName(e.target.value)}
-                placeholder="مثال: الفصل الثاني 2026"
-                className={`mt-1 ${isDark ? 'bg-slate-800 border-white/10 text-white' : ''}`}
-              />
+            {/* جدول الفصول السابقة */}
+            {allTerms.length > 0 && (
+              <div>
+                <Label className={`mb-2 block ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  اختر فصلاً سابقاً أو أنشئ جديداً:
+                </Label>
+                <div className={`rounded-lg border ${isDark ? 'border-white/10' : 'border-slate-200'} max-h-48 overflow-y-auto`}>
+                  <table className="w-full">
+                    <thead className={`sticky top-0 ${isDark ? 'bg-slate-800' : 'bg-slate-50'}`}>
+                      <tr>
+                        <th className={`px-3 py-2 text-right text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>اختر</th>
+                        <th className={`px-3 py-2 text-right text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>اسم الفصل</th>
+                        <th className={`px-3 py-2 text-right text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الحالة</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* خيار إنشاء فصل جديد */}
+                      <tr 
+                        className={`cursor-pointer ${selectedTermId === 'new' ? (isDark ? 'bg-emerald-500/20' : 'bg-emerald-50') : ''} ${isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}
+                        onClick={() => setSelectedTermId('new')}
+                      >
+                        <td className="px-3 py-2">
+                          <input 
+                            type="radio" 
+                            checked={selectedTermId === 'new'} 
+                            onChange={() => setSelectedTermId('new')}
+                            className="accent-emerald-500"
+                          />
+                        </td>
+                        <td className={`px-3 py-2 font-medium ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                          + إنشاء فصل جديد
+                        </td>
+                        <td className="px-3 py-2">-</td>
+                      </tr>
+                      {/* الفصول الموجودة */}
+                      {allTerms.filter(t => !t.is_active).map(term => (
+                        <tr 
+                          key={term.id}
+                          className={`cursor-pointer ${selectedTermId === term.id ? (isDark ? 'bg-blue-500/20' : 'bg-blue-50') : ''} ${isDark ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'}`}
+                          onClick={() => setSelectedTermId(term.id)}
+                        >
+                          <td className="px-3 py-2">
+                            <input 
+                              type="radio" 
+                              checked={selectedTermId === term.id} 
+                              onChange={() => setSelectedTermId(term.id)}
+                              className="accent-blue-500"
+                            />
+                          </td>
+                          <td className={`px-3 py-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                            {term.name}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={`text-xs px-2 py-1 rounded ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-600'}`}>
+                              مغلق
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* اسم الفصل الجديد (يظهر فقط عند اختيار إنشاء جديد) */}
+            {selectedTermId === 'new' && (
+              <div>
+                <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>
+                  اسم الفصل الجديد <span className="text-red-400">*</span>
+                </Label>
+                <Input
+                  value={newTermName}
+                  onChange={(e) => setNewTermName(e.target.value)}
+                  placeholder="مثال: الفصل الثاني 2026"
+                  className={`mt-1 ${isDark ? 'bg-slate-800 border-white/10 text-white' : ''}`}
+                />
+              </div>
+            )}
+
+            {/* ملخص الاختيار */}
+            <div className={`p-3 rounded-lg ${isDark ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-blue-50 border border-blue-200'}`}>
+              <p className={`text-sm ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
+                <strong>سيتم:</strong> {selectedTermId === 'new' 
+                  ? `إنشاء فصل جديد باسم "${newTermName || '...'}"` 
+                  : `استخدام الفصل "${allTerms.find(t => t.id === selectedTermId)?.name || ''}"`
+                }
+              </p>
             </div>
           </div>
 
@@ -506,8 +582,8 @@ const AdminDashboard = () => {
             </Button>
             <Button 
               onClick={handleCloseTermAndStartNew}
-              disabled={closingTerm || !newTermName.trim()}
-              className="bg-amber-600 hover:bg-amber-700"
+              disabled={closingTerm || (selectedTermId === 'new' && !newTermName.trim())}
+              className="bg-red-600 hover:bg-red-700"
             >
               {closingTerm ? (
                 <>
@@ -517,7 +593,7 @@ const AdminDashboard = () => {
               ) : (
                 <>
                   <Archive className="w-4 h-4 ml-2" />
-                  إغلاق وبدء فصل جديد
+                  إغلاق وتصفير النقاط
                 </>
               )}
             </Button>
