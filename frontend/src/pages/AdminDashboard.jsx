@@ -24,10 +24,14 @@ const AdminDashboard = () => {
   const [newTermName, setNewTermName] = useState('');
   const [closingTerm, setClosingTerm] = useState(false);
   const [activeTerm, setActiveTerm] = useState(null);
+  const [allTerms, setAllTerms] = useState([]);
+  const [selectedTermId, setSelectedTermId] = useState('new');
+  const [loadingTerms, setLoadingTerms] = useState(false);
 
   useEffect(() => {
     fetchData();
     fetchActiveTerm();
+    fetchAllTerms();
   }, []);
 
   const fetchData = async () => {
@@ -50,25 +54,52 @@ const AdminDashboard = () => {
     }
   };
 
+  const fetchAllTerms = async () => {
+    setLoadingTerms(true);
+    try {
+      const res = await axios.get(`${API}/terms`);
+      setAllTerms(res.data || []);
+    } catch (error) {
+      console.error('Error fetching terms:', error);
+    } finally {
+      setLoadingTerms(false);
+    }
+  };
+
   const handleCloseTermAndStartNew = async () => {
-    if (!newTermName.trim()) {
+    // التحقق من الإدخال
+    if (selectedTermId === 'new' && !newTermName.trim()) {
       toast.error('يرجى إدخال اسم الفصل الجديد');
+      return;
+    }
+
+    // تحديد اسم الفصل الجديد
+    let termName = newTermName.trim();
+    if (selectedTermId !== 'new') {
+      const selected = allTerms.find(t => t.id === selectedTermId);
+      termName = selected ? selected.name : newTermName.trim();
+    }
+
+    if (!termName) {
+      toast.error('يرجى اختيار فصل أو إدخال اسم جديد');
       return;
     }
 
     setClosingTerm(true);
     try {
       const res = await axios.post(`${API}/terms/close-and-start-new`, {
-        name: newTermName.trim()
+        name: termName
       });
       
       toast.success(res.data.message);
       setTermDialogOpen(false);
       setNewTermName('');
+      setSelectedTermId('new');
       
       // تحديث البيانات
       fetchData();
       fetchActiveTerm();
+      fetchAllTerms();
     } catch (error) {
       console.error('Error closing term:', error);
       toast.error(error.response?.data?.detail || 'فشل في إغلاق الفصل');
