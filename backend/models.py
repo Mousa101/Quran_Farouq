@@ -370,6 +370,27 @@ class StudentSelfUpdate(BaseModel):
     school_average: Optional[str] = None  # المعدل الدراسي
     mosque_name: Optional[str] = None  # اسم المسجد
 
+# Sheikh Update Student Model - ما يمكن للشيخ تعديله
+class SheikhUpdateStudent(BaseModel):
+    """الحقول المسموح للشيخ بتعديلها - لا يشمل email أو role أو id"""
+    # بيانات شخصية
+    name: Optional[str] = None
+    student_phone: Optional[str] = None
+    father_phone: Optional[str] = None
+    mother_phone: Optional[str] = None
+    profile_image: Optional[str] = None
+    birth_date: Optional[str] = None
+    school_name: Optional[str] = None
+    school_grade: Optional[str] = None
+    school_average: Optional[str] = None
+    mosque_name: Optional[str] = None
+    join_date: Optional[str] = None
+    # التقييم الأولي
+    initial_assessment_done: Optional[bool] = None
+    previous_memorization_juz: Optional[List[int]] = None
+    previous_memorization_pages: Optional[int] = None
+    tajweed_level: Optional[str] = None
+
 # Activity Models
 class ActivityCreate(BaseModel):
     title: str
