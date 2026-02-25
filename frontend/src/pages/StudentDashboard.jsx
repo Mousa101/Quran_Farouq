@@ -594,6 +594,78 @@ console.log(stats)
         </CardContent>
       </Card>
 
+      {/* جدول سجل التسميع */}
+      <Card className="glass-card border-white/10">
+        <CardHeader className="pb-2 md:pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
+              <History className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
+              سجل التسميع
+            </CardTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowTasmeeHistory(!showTasmeeHistory)}
+              className="text-slate-400 hover:text-white"
+            >
+              {showTasmeeHistory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {showTasmeeHistory ? 'إخفاء' : 'عرض الكل'}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {tasmeeHistory.length === 0 ? (
+            <p className="text-center text-slate-400 py-4">لا يوجد سجل تسميع بعد</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-700">
+                    <th className="text-right text-slate-400 text-xs md:text-sm py-2 px-2">التاريخ</th>
+                    <th className="text-center text-slate-400 text-xs md:text-sm py-2 px-2">حفظ جديد</th>
+                    <th className="text-center text-slate-400 text-xs md:text-sm py-2 px-2">مراجعة</th>
+                    <th className="text-center text-slate-400 text-xs md:text-sm py-2 px-2">الحالة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(showTasmeeHistory ? tasmeeHistory : tasmeeHistory.slice(0, 5)).map((rec, idx) => (
+                    <tr key={rec.id || idx} className="border-b border-slate-800 hover:bg-slate-800/50">
+                      <td className="py-3 px-2 text-slate-300 text-sm">
+                        {rec.date ? new Date(rec.date).toLocaleDateString('ar-SA') : '-'}
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <span className={`font-bold ${rec.new_pages > 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                          {rec.new_pages || 0}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <span className={`font-bold ${rec.review_pages > 0 ? 'text-blue-400' : 'text-slate-500'}`}>
+                          {rec.review_pages || 0}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        {rec.did_not_recite ? (
+                          <span className="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400">لم يسمع</span>
+                        ) : rec.passed ? (
+                          <span className="text-xs px-2 py-1 rounded bg-emerald-500/20 text-emerald-400">✓ اجتاز</span>
+                        ) : (
+                          <span className="text-xs px-2 py-1 rounded bg-amber-500/20 text-amber-400">لم يجتز</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!showTasmeeHistory && tasmeeHistory.length > 5 && (
+                <p className="text-center text-slate-500 text-xs mt-2">
+                  عرض {Math.min(5, tasmeeHistory.length)} من {tasmeeHistory.length} سجل
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Memorization & Attendance/Recitation Gauges */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Memorization Progress */}
