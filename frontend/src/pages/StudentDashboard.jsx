@@ -15,7 +15,7 @@ import {
   BookOpen, Clock, Users, Trophy, Calendar, CheckCircle, 
   User, Phone, School, Home, Star, AlertTriangle, Award,
   Sunrise, Moon, BookMarked, Hand, Mail, Cake, MapPin, GraduationCap,
-  ChevronDown, ChevronUp, Plus, Edit2, Sparkles
+  ChevronDown, ChevronUp, Plus, Edit2, Sparkles, History
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -28,6 +28,8 @@ const StudentDashboard = () => {
   const [groupInfo, setGroupInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showMorePersonal, setShowMorePersonal] = useState(false);
+  const [tasmeeHistory, setTasmeeHistory] = useState([]);
+  const [showTasmeeHistory, setShowTasmeeHistory] = useState(false);
   const [trackingDialogOpen, setTrackingDialogOpen] = useState(false);
   const [submittingTracking, setSubmittingTracking] = useState(false);
   const [trackingForm, setTrackingForm] = useState({
