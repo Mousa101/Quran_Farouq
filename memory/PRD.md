@@ -15,6 +15,7 @@
 - تسجيل التسميع اليومي (حفظ جديد/مراجعة)
 - تتبع الصفحات والأجزاء
 - حساب نسبة التسميع
+- جدول سجل التسميع (التاريخ | حفظ جديد | مراجعة | الحالة) ✅
 
 #### 3. ورقة المتابعة الإيمانية (100 نقطة/أسبوع)
 - تتبع الصلوات والأذكار
@@ -33,53 +34,54 @@
 
 #### 6. نظام إدارة الفصول الدراسية ✅
 - إغلاق الفصل الحالي وأرشفة البيانات
-- **تصفير جميع نقاط الطلاب إلى 0**
+- تصفير جميع نقاط الطلاب إلى 0
 - بدء فصل جديد أو اختيار فصل سابق
 - جدول الفصول الدراسية في لوحة التحكم
+- `term_id` لعزل البيانات حسب الفصل
 
 ---
 
 ## ما تم تنفيذه
 
-### الجلسة الحالية (25 فبراير 2026)
+### الجلسة الحالية (25 فبراير 2026 - التحديثات الهيكلية)
 
 #### P0 - تم الإنجاز:
-1. **إصلاح تصفير النقاط:**
-   - الآن يصفّر `total_points` لجميع الطلاب إلى 0 (كان يصفر فقط current_term_points)
-   - يصفّر جميع أنواع النقاط (attendance, recitation, tracking, bonus, interaction, admin_bonus)
+1. **نظام إعادة تعيين الفصول (Term-Based Reset):**
+   - `POST /api/admin/terms/reset` - إعادة تعيين الفصل (المدير فقط)
+   - إضافة `term_id` للجداول: attendance, recitations, tracking_sheets
+   - البيانات القديمة تبقى محفوظة ويمكن الاستعلام عنها
+   - فهارس لتحسين الأداء
 
-2. **جدول الفصول في Dialog:**
-   - يعرض الفصول السابقة للاختيار منها
-   - خيار إنشاء فصل جديد أو استخدام فصل سابق
-   - تحذير واضح باللون الأحمر عن تصفير النقاط
+2. **هيكل سجل التسميع (Tasmee History):**
+   - حقول جديدة: `new_pages`, `review_pages`, `record_date`, `term_id`
+   - `GET /api/students/{id}/tasmee-history` - جلب سجل التسميع
+   - جدول في صفحة الطالب: التاريخ | حفظ جديد | مراجعة | الحالة
 
-3. **جدول الفصول في لوحة التحكم:**
-   - قسم "الفصول الدراسية" يعرض جميع الفصول
-   - اسم الفصل، تاريخ البداية/النهاية، الحالة (نشط/مغلق)
+3. **صلاحيات الشارات (Badge RBAC):**
+   - المدير: ينشئ أنواع الشارات فقط (`POST /api/badges/types`)
+   - الشيخ: يعين/يزيل الشارات (`POST /api/badges/assign`, `DELETE /api/badges/remove`)
+   - المدير لا يستطيع تعيين شارات (403)
 
-#### P1 - تم الإنجاز:
-4. **جدول إحصائيات الطالب:**
-   - نقاط الفصل الحالي
-   - عدد مرات التسميع
-   - عدد ورق المتابعة
-   - مجموع الدوام (حضور)
-   - أيام الغياب
-   - نسبة الحضور
+4. **صلاحيات تعديل الطالب للشيخ:**
+   - `PUT /api/sheikh/students/{id}` - الشيخ فقط
+   - جدول `audit_logs` لتتبع التغييرات
+   - `GET /api/audit-logs` - المدير فقط
 
-### الجلسة السابقة (18 فبراير 2026):
-- زر "إغلاق الفصل وبدء فصل جديد" في لوحة تحكم المدير
-- APIs للفصول (`/api/terms/active`, `/api/terms`, `/api/terms/close-and-start-new`)
-- نظام التسميع الجديد (RecitationsNew.jsx)
-- تصدير PDF لسجل الطالب
-- إعدادات مواعيد تسليم ورقة المتابعة
+5. **إصلاح حساب الصفحات:**
+   - 1 جزء = 20 صفحة (ثابت `PAGES_PER_JUZ`)
+   - إجمالي القرآن = 600 صفحة (ثابت `TOTAL_QURAN_PAGES`)
+   - دالة مساعدة `calculate_pages_from_juz()`
+
+#### P1 - تم سابقاً:
+- جدول إحصائيات الطالب
+- نظام إغلاق الفصل في واجهة المدير
 
 ---
 
 ## Backlog (المهام المتبقية)
 
 ### P1 - الأولوية العالية:
-1. التحقق من ميزات تعديل الملف الشخصي (طالب/معلم)
-2. نظام إدارة الرسوم المالية
+1. نظام إدارة الرسوم المالية
 
 ### P2 - الأولوية المتوسطة:
 1. نظام رفع ملفات الواجبات
@@ -93,6 +95,7 @@
 - FastAPI + Motor (Async MongoDB)
 - JWT Authentication
 - Pydantic Models
+- RBAC (Role-Based Access Control)
 
 ### Frontend
 - React + Tailwind CSS
@@ -102,26 +105,48 @@
 ### Database Collections
 - `users` - المستخدمين
 - `groups` - المجموعات
-- `tracking_sheets` - ورق المتابعة
-- `recitations` - التسميعات
-- `attendance` - الحضور
+- `tracking_sheets` - ورق المتابعة (+ term_id)
+- `recitations` - التسميعات (+ term_id, record_date, new_pages, review_pages)
+- `attendance` - الحضور (+ term_id)
 - `terms` - الفصول الدراسية
 - `term_archives` - أرشيف الفصول
 - `student_points` - نقاط الطلاب
+- `badge_types` - أنواع الشارات
+- `weekly_badges` - شارات الطلاب
+- `audit_logs` - سجلات التدقيق
+
+### Database Indexes
+- `attendance.term_id`
+- `recitations.term_id`
+- `recitations.student_id, record_date`
+- `tracking_sheets.term_id`
+- `audit_logs.target_student_id, timestamp`
+- `badge_types.id` (unique)
 
 ---
 
 ## ملفات مرجعية مهمة
 - `/app/backend/server.py` - الخادم الرئيسي
-- `/app/backend/models.py` - النماذج
+- `/app/backend/models.py` - النماذج (+ AuditLog, SheikhUpdateStudent, BadgeAssign/Remove)
 - `/app/frontend/src/pages/AdminDashboard.jsx` - لوحة تحكم المدير
-- `/app/frontend/src/pages/StudentDashboard.jsx` - لوحة تحكم الطالب
+- `/app/frontend/src/pages/StudentDashboard.jsx` - لوحة تحكم الطالب (+ جدول سجل التسميع)
 - `/app/frontend/src/pages/RecitationsNew.jsx` - صفحة التسميع
 
 ---
 
 ## نتائج الاختبار
 - **تاريخ آخر اختبار:** 25 فبراير 2026
-- **Backend:** 100% (13/13 اختبار)
+- **Backend:** 100% (28/28 اختبار)
 - **Frontend:** 100%
-- **ملف التقرير:** `/app/test_reports/iteration_3.json`
+- **ملف التقرير:** `/app/test_reports/iteration_4.json`
+
+### APIs الجديدة:
+| API | الصلاحية | الوظيفة |
+|-----|----------|---------|
+| `POST /api/admin/terms/reset` | admin | إعادة تعيين الفصل |
+| `POST /api/badges/types` | admin | إنشاء نوع شارة |
+| `POST /api/badges/assign` | sheikh | تعيين شارة لطالب |
+| `DELETE /api/badges/remove` | sheikh | إزالة شارة من طالب |
+| `PUT /api/sheikh/students/{id}` | sheikh | تعديل بيانات الطالب |
+| `GET /api/students/{id}/tasmee-history` | all | سجل التسميع |
+| `GET /api/audit-logs` | admin | سجلات التدقيق |
