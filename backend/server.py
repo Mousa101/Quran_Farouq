@@ -5644,19 +5644,20 @@ async def close_term_and_start_new(data: TermCreateRequest, current_user: dict =
         if archives:
             await db.term_archives.insert_many(archives)
         
-        # 5. تصفير بيانات الفصل الحالي لجميع الطلاب (Bulk Update)
-        # تصفير student_points (لكن نحتفظ بـ total_points العامة في حقل منفصل)
+        # 5. تصفير جميع نقاط الطلاب (Bulk Update)
         await db.student_points.update_many(
             {},
             {
                 "$set": {
+                    "total_points": 0,
                     "current_term_points": 0,
                     "attendance_points": 0,
                     "recitation_points": 0,
                     "tracking_points": 0,
-                    "bonus_points": 0
-                },
-                # نحتفظ بـ total_points كما هي - لا نصفرها
+                    "bonus_points": 0,
+                    "interaction_points": 0,
+                    "admin_bonus_points": 0
+                }
             }
         )
         
