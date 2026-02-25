@@ -1712,22 +1712,48 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     if current_user["role"] != "sheikh":
         raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تسجيل التسميع")
     
+    # الحصول على الفصل النشط
+    active_term_id = await get_active_term_id()
+    
     # تحديد التاريخ - إذا لم يُحدد يستخدم التاريخ الحالي
     if recitation_data.date:
         try:
             # تحويل التاريخ المحدد إلى datetime
             recitation_date = datetime.strptime(recitation_data.date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            record_date = recitation_data.date
         except ValueError:
             recitation_date = datetime.now(timezone.utc)
+            record_date = recitation_date.strftime("%Y-%m-%d")
     else:
         recitation_date = datetime.now(timezone.utc)
+        record_date = recitation_date.strftime("%Y-%m-%d")
+    
+    # حساب عدد صفحات الحفظ الجديد
+    new_pages = 0
+    if recitation_data.page_from is not None and recitation_data.page_to is not None:
+        new_pages = max(0, recitation_data.page_to - recitation_data.page_from + 1)
+    elif recitation_data.new_pages:
+        new_pages = recitation_data.new_pages
+    elif recitation_data.pages_count:
+        new_pages = recitation_data.pages_count
+    
+    # حساب عدد صفحات المراجعة
+    review_pages = recitation_data.review_pages or 0
+    if recitation_data.review_juz and len(recitation_data.review_juz) > 0:
+        review_pages += len(recitation_data.review_juz) * PAGES_PER_JUZ
+    if recitation_data.partial_review_pages:
+        review_pages += recitation_data.partial_review_pages
     
     # إذا لم يسمع - لا يُسجل التسميع ولا نقاط
     if recitation_data.did_not_recite:
         recitation = Recitation(
             student_id=recitation_data.student_id,
             sheikh_id=current_user["user_id"],
+            term_id=active_term_id,
             recitation_type="did_not_recite",
+            record_date=record_date,
+            new_pages=0,
+            review_pages=0,
             did_not_recite=True,
             passed_minimum=False,
             passed_review_minimum=False,
@@ -1759,16 +1785,9 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
         has_review = True
     
     if has_new or recitation_data.recitation_type == "new_memorization":
-        # حفظ جديد
-        pages_count = 1
-        if recitation_data.page_from and recitation_data.page_to:
-            pages_count = recitation_data.page_to - recitation_data.page_from + 1
-        elif recitation_data.pages_count:
-            pages_count = recitation_data.pages_count
-        
         # Build description - بدون التقييم
         juz_text = f"الجزء {recitation_data.juz_number}" if recitation_data.juz_number else ""
-        page_range = f"من صفحة {recitation_data.page_from} إلى {recitation_data.page_to}" if recitation_data.page_from and recitation_data.page_to else f"{pages_count} صفحة"
+        page_range = f"من صفحة {recitation_data.page_from} إلى {recitation_data.page_to}" if recitation_data.page_from and recitation_data.page_to else f"{new_pages} صفحة"
         error_text = f"- الأخطاء: {recitation_data.error_count}" if recitation_data.error_count else ""
         pass_text = "✓ اجتاز" if recitation_data.passed_minimum else "✗ لم يجتز"
         
@@ -1797,11 +1816,15 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     recitation = Recitation(
         student_id=recitation_data.student_id,
         sheikh_id=current_user["user_id"],
+        term_id=active_term_id,
         recitation_type=recitation_data.recitation_type,
+        record_date=record_date,
         # New fields
         juz_number=recitation_data.juz_number,
         page_from=recitation_data.page_from,
         page_to=recitation_data.page_to,
+        new_pages=new_pages,
+        review_pages=review_pages,
         error_count=recitation_data.error_count,
         partial_review_juz=recitation_data.partial_review_juz,
         partial_review_pages=recitation_data.partial_review_pages,
@@ -1816,8 +1839,7 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
         points_earned=points,
         # Legacy
         pages_count=recitation_data.pages_count,
-        review_type=recitation_data.review_type,
-        review_pages=recitation_data.review_pages
+        review_type=recitation_data.review_type
     )
     
     recitation_dict = recitation.model_dump()
@@ -1847,7 +1869,7 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     if recitation_count == 1:
         await award_badge(recitation_data.student_id, "first_recitation")
     
-    return {"message": "تم تسجيل التسميع بنجاح", "recitation_id": recitation.id, "points_earned": points}
+    return {"message": "تم تسجيل التسميع بنجاح", "recitation_id": recitation.id, "points_earned": points, "new_pages": new_pages, "review_pages": review_pages}
 
 class RecitationUpdate(BaseModel):
     recitation_type: Optional[str] = None
