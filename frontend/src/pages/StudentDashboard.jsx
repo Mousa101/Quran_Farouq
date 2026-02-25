@@ -50,15 +50,17 @@ const StudentDashboard = () => {
     if (!user?.id) return;
     
     try {
-      const [statsRes, activitiesRes, rankingsRes] = await Promise.all([
+      const [statsRes, activitiesRes, rankingsRes, tasmeeRes] = await Promise.all([
         axios.get(`${API}/statistics/student/${user.id}`),
         axios.get(`${API}/activities`),
-        axios.get(`${API}/rankings/group`)  // ترتيب حسب المجموعة فقط
+        axios.get(`${API}/rankings/group`),  // ترتيب حسب المجموعة فقط
+        axios.get(`${API}/students/${user.id}/tasmee-history`)
       ]);
       
       setStats(statsRes.data);
       setActivities(activitiesRes.data.slice(0, 3));
       setRankings(rankingsRes.data);
+      setTasmeeHistory(tasmeeRes.data || []);
       
       // جلب معلومات المجموعة
       if (statsRes.data?.student?.group_id) {
