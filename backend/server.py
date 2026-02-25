@@ -2087,6 +2087,9 @@ async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict 
     if current_user["role"] != "sheikh":
         raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تسجيل الحضور")
     
+    # الحصول على الفصل النشط
+    active_term_id = await get_active_term_id()
+    
     # Get student's group
     student = await db.users.find_one({"id": attendance_data.student_id}, {"_id": 0})
     if not student:
@@ -2113,6 +2116,7 @@ async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict 
         student_id=attendance_data.student_id,
         sheikh_id=current_user["user_id"],
         group_id=student.get("group_id") or "",
+        term_id=active_term_id,
         date=attendance_data.date,
         status=attendance_data.status,
         excuse_reason=attendance_data.excuse_reason
