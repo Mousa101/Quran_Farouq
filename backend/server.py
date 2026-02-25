@@ -929,8 +929,8 @@ async def get_student_progress(student_id: str, current_user: dict = Depends(get
     total_juz = total_pages // 20
     remaining_pages = total_pages % 20
     
-    # Calculate percentage of Quran (604 pages total)
-    progress_percentage = round((total_pages / 604) * 100, 1)
+    # Calculate percentage of Quran (600 pages total = 30 juz * 20 pages)
+    progress_percentage = round((total_pages / TOTAL_QURAN_PAGES) * 100, 1)
     
     return {
         "student_name": student.get("name"),
