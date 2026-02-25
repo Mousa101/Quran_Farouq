@@ -350,6 +350,7 @@ class Attendance(BaseModel):
     student_id: str
     sheikh_id: str
     group_id: str
+    term_id: Optional[str] = None  # معرف الفصل الدراسي
     date: str
     status: str
     excuse_reason: Optional[str] = None  # سبب العذر
