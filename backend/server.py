@@ -20,7 +20,7 @@ from models import (
     NotificationCreate, Notification,
     StudentScore, WeeklyRanking,
     StudentProfileUpdate, StudentCreate, QURAN_JUZ,
-    InitialAssessment, StudentSelfUpdate,
+    InitialAssessment, StudentSelfUpdate, SheikhUpdateStudent,
     StudentRegistrationRequest, ActivationRequest,
     CurriculumCreate, Curriculum, CurriculumEntryCreate, CurriculumEntry,
     ScheduleCreate, Schedule, ScheduleSlotCreate, ScheduleSlot,
@@ -28,9 +28,10 @@ from models import (
     HomeworkCreate, Homework, HomeworkSubmission,
     AdminExamCreate, AdminExam,
     TajweedExamCreate, TajweedExam,
-    WEEKLY_BADGES, WeeklyBadge,
+    WEEKLY_BADGES, WeeklyBadge, BadgeTypeCreate, BadgeAssign, BadgeRemove,
     OnlineExamCreate, OnlineExam, ExamSubmissionCreate, ExamSubmission, ExamQuestion,
-    Term, TermArchive
+    Term, TermArchive, AuditLog,
+    calculate_pages_from_juz, PAGES_PER_JUZ, TOTAL_QURAN_PAGES
 )
 
 class BaseModel(PydanticBaseModel):
