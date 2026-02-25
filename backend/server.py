@@ -5910,6 +5910,232 @@ async def get_student_term_history(student_id: str, current_user: dict = Depends
     
     return archives
 
+# ============== BADGE MANAGEMENT ROUTES ==============
+
+@api_router.post("/badges/types")
+async def create_badge_type(data: BadgeTypeCreate, current_user: dict = Depends(get_current_user)):
+    """إنشاء نوع شارة جديد - المدير فقط"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إنشاء أنواع الشارات")
+    
+    # التحقق من عدم وجود شارة بنفس المعرف
+    existing = await db.badge_types.find_one({"id": data.id})
+    if existing:
+        raise HTTPException(status_code=400, detail="يوجد نوع شارة بهذا المعرف")
+    
+    badge_dict = data.model_dump()
+    badge_dict["created_by"] = current_user["user_id"]
+    badge_dict["created_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.badge_types.insert_one(badge_dict)
+    
+    return {"message": f"تم إنشاء نوع الشارة: {data.name}"}
+
+@api_router.get("/badges/types")
+async def get_badge_types(current_user: dict = Depends(get_current_user)):
+    """جلب جميع أنواع الشارات"""
+    badge_types = await db.badge_types.find({}, {"_id": 0}).to_list(1000)
+    # إضافة الشارات الأسبوعية الافتراضية
+    weekly_badges = [
+        {"id": k, "name": v["name"], "description": v["description"], "icon": v["icon"], "category": v["category"]}
+        for k, v in WEEKLY_BADGES.items()
+    ]
+    return badge_types + weekly_badges
+
+@api_router.post("/badges/assign")
+async def assign_badge(data: BadgeAssign, current_user: dict = Depends(get_current_user)):
+    """تعيين شارة لطالب - الشيخ فقط"""
+    if current_user["role"] != "sheikh":
+        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تعيين الشارات للطلاب")
+    
+    # التحقق من وجود الطالب
+    student = await db.users.find_one({"id": data.student_id, "role": "student"})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    # التحقق من أن الشارة موجودة
+    badge_info = WEEKLY_BADGES.get(data.badge_id)
+    if not badge_info:
+        badge_info = await db.badge_types.find_one({"id": data.badge_id}, {"_id": 0})
+    
+    if not badge_info:
+        raise HTTPException(status_code=404, detail="الشارة غير موجودة")
+    
+    # الحصول على بداية الأسبوع الحالي
+    today = datetime.now(timezone.utc)
+    week_start = (today - timedelta(days=today.weekday())).strftime("%Y-%m-%d")
+    
+    # التحقق من عدم وجود نفس الشارة للطالب في هذا الأسبوع
+    existing = await db.weekly_badges.find_one({
+        "student_id": data.student_id,
+        "badge_id": data.badge_id,
+        "week_start": week_start
+    })
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="الطالب حاصل على هذه الشارة هذا الأسبوع")
+    
+    # إنشاء سجل الشارة
+    badge_record = WeeklyBadge(
+        student_id=data.student_id,
+        badge_id=data.badge_id,
+        badge_name=badge_info.get("name", badge_info["name"]) if isinstance(badge_info, dict) else badge_info.name,
+        badge_icon=badge_info.get("icon", "🏅") if isinstance(badge_info, dict) else badge_info.icon,
+        week_start=week_start,
+        granted_by=current_user["user_id"]
+    )
+    
+    badge_dict = badge_record.model_dump()
+    badge_dict["granted_at"] = badge_dict["granted_at"].isoformat()
+    
+    await db.weekly_badges.insert_one(badge_dict)
+    
+    # تحديث شارات الطالب
+    await db.student_points.update_one(
+        {"student_id": data.student_id},
+        {
+            "$addToSet": {"weekly_badges": data.badge_id},
+            "$inc": {"badges_count": 1}
+        },
+        upsert=True
+    )
+    
+    # إشعار الطالب
+    badge_name = badge_info.get("name", "") if isinstance(badge_info, dict) else badge_info.name
+    await create_notification_internal(
+        data.student_id,
+        "شارة جديدة 🎖️",
+        f"تهانينا! حصلت على شارة: {badge_name}",
+        "success"
+    )
+    
+    return {"message": f"تم تعيين شارة {badge_name} للطالب"}
+
+@api_router.delete("/badges/remove")
+async def remove_badge(data: BadgeRemove, current_user: dict = Depends(get_current_user)):
+    """إزالة شارة من طالب - الشيخ فقط"""
+    if current_user["role"] != "sheikh":
+        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه إزالة الشارات من الطلاب")
+    
+    # البحث عن الشارة وحذفها
+    result = await db.weekly_badges.delete_one({
+        "student_id": data.student_id,
+        "badge_id": data.badge_id
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="الشارة غير موجودة للطالب")
+    
+    # تحديث شارات الطالب
+    await db.student_points.update_one(
+        {"student_id": data.student_id},
+        {
+            "$pull": {"weekly_badges": data.badge_id},
+            "$inc": {"badges_count": -1}
+        }
+    )
+    
+    # سجل التدقيق
+    await create_audit_log(
+        actor_id=current_user["user_id"],
+        actor_role=current_user["role"],
+        target_student_id=data.student_id,
+        field_changed="badge_removed",
+        old_value=data.badge_id,
+        new_value=data.reason or ""
+    )
+    
+    return {"message": "تم إزالة الشارة من الطالب"}
+
+# ============== SHEIKH UPDATE STUDENT ROUTES ==============
+
+@api_router.put("/sheikh/students/{student_id}")
+async def sheikh_update_student(student_id: str, data: SheikhUpdateStudent, current_user: dict = Depends(get_current_user)):
+    """تعديل بيانات الطالب - الشيخ فقط"""
+    if current_user["role"] != "sheikh":
+        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تعديل بيانات الطلاب")
+    
+    # التحقق من وجود الطالب
+    student = await db.users.find_one({"id": student_id, "role": "student"}, {"_id": 0})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    update_data = data.model_dump(exclude_unset=True)
+    
+    if not update_data:
+        return {"message": "لا توجد بيانات للتحديث"}
+    
+    # إنشاء سجلات التدقيق
+    for field, new_value in update_data.items():
+        old_value = str(student.get(field, ""))
+        await create_audit_log(
+            actor_id=current_user["user_id"],
+            actor_role=current_user["role"],
+            target_student_id=student_id,
+            field_changed=field,
+            old_value=old_value,
+            new_value=str(new_value) if new_value is not None else ""
+        )
+    
+    # تحديث البيانات
+    await db.users.update_one(
+        {"id": student_id},
+        {"$set": update_data}
+    )
+    
+    return {"message": "تم تحديث بيانات الطالب بنجاح"}
+
+@api_router.get("/audit-logs")
+async def get_audit_logs(student_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """جلب سجلات التدقيق - المدير فقط"""
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول لسجلات التدقيق")
+    
+    query = {}
+    if student_id:
+        query["target_student_id"] = student_id
+    
+    logs = await db.audit_logs.find(query, {"_id": 0}).sort("timestamp", -1).limit(500).to_list(500)
+    return logs
+
+# ============== STUDENT TASMEE HISTORY ==============
+
+@api_router.get("/students/{student_id}/tasmee-history")
+async def get_student_tasmee_history(student_id: str, term_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """جلب سجل التسميع للطالب"""
+    # التحقق من الصلاحيات
+    if current_user["role"] == "student" and current_user["user_id"] != student_id:
+        raise HTTPException(status_code=403, detail="لا يمكنك الوصول لسجلات طالب آخر")
+    
+    query = {"student_id": student_id}
+    
+    # تصفية حسب الفصل
+    if term_id:
+        query["term_id"] = term_id
+    else:
+        # الفصل النشط فقط إذا لم يُحدد فصل
+        active_term_id = await get_active_term_id()
+        if active_term_id:
+            query["term_id"] = active_term_id
+    
+    recitations = await db.recitations.find(query, {"_id": 0}).sort("record_date", -1).to_list(1000)
+    
+    # تحويل البيانات لتنسيق الجدول المطلوب
+    history = []
+    for rec in recitations:
+        history.append({
+            "id": rec.get("id"),
+            "date": rec.get("record_date", rec.get("created_at", "")[:10]),
+            "new_pages": rec.get("new_pages", rec.get("pages_count", 0) or 0),
+            "review_pages": rec.get("review_pages", rec.get("partial_review_pages", 0) or 0),
+            "juz_number": rec.get("juz_number"),
+            "passed": rec.get("passed_minimum") or rec.get("passed_review_minimum"),
+            "did_not_recite": rec.get("did_not_recite", False),
+            "notes": rec.get("notes")
+        })
+    
+    return history
+
 
 
 # Include the router
