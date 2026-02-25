@@ -287,11 +287,13 @@ class RecitationCreate(BaseModel):
     juz_number: Optional[int] = None  # رقم الجزء (1-30)
     page_from: Optional[int] = None  # من صفحة
     page_to: Optional[int] = None  # إلى صفحة
+    new_pages: int = 0  # عدد صفحات الحفظ الجديد
     error_count: Optional[int] = None  # عدد الأخطاء
     passed_minimum: bool = False  # اجتاز الحد الأدنى
     did_not_recite: bool = False  # لم يسمع - لا يُحسب التسميع
     # For review - combined juz and pages
     review_juz: Optional[List[int]] = None  # أرقام الأجزاء المراجعة كاملة
+    review_pages: int = 0  # عدد صفحات المراجعة
     partial_review_juz: Optional[int] = None  # جزء المراجعة الجزئية
     partial_review_pages: Optional[int] = None  # عدد صفحات المراجعة الجزئية
     passed_review_minimum: bool = False  # اجتاز الحد الأدنى للمراجعة
@@ -302,23 +304,26 @@ class RecitationCreate(BaseModel):
     # Legacy fields (for backward compatibility)
     pages_count: Optional[int] = None
     review_type: Optional[str] = None
-    review_pages: Optional[int] = None
 
 class Recitation(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     student_id: str
     sheikh_id: str
+    term_id: Optional[str] = None  # معرف الفصل الدراسي
     recitation_type: str
+    record_date: str = Field(default_factory=lambda: datetime.now(timezone.utc).strftime("%Y-%m-%d"))  # تاريخ السجل
     # New memorization fields
     juz_number: Optional[int] = None
     page_from: Optional[int] = None
     page_to: Optional[int] = None
+    new_pages: int = 0  # عدد صفحات الحفظ الجديد
     error_count: Optional[int] = None
     passed_minimum: bool = False
     did_not_recite: bool = False  # لم يسمع
     # Review fields
     review_juz: Optional[List[int]] = None
+    review_pages: int = 0  # عدد صفحات المراجعة
     partial_review_juz: Optional[int] = None
     partial_review_pages: Optional[int] = None
     passed_review_minimum: bool = False
@@ -330,7 +335,6 @@ class Recitation(BaseModel):
     # Legacy fields
     pages_count: Optional[int] = None
     review_type: Optional[str] = None
-    review_pages: Optional[int] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Attendance Models
