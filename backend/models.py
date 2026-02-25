@@ -1,7 +1,17 @@
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 import uuid
+
+# ============== HELPER FUNCTIONS ==============
+
+def calculate_pages_from_juz(juz_count: int) -> int:
+    """حساب عدد الصفحات من عدد الأجزاء - 1 جزء = 20 صفحة"""
+    return juz_count * 20
+
+PAGES_PER_JUZ = 20  # ثابت: عدد الصفحات في كل جزء
+TOTAL_JUZ = 30
+TOTAL_QURAN_PAGES = TOTAL_JUZ * PAGES_PER_JUZ  # 600 صفحة
 
 # ============== TERM MANAGEMENT MODELS ==============
 
@@ -36,6 +46,20 @@ class TermArchive(BaseModel):
     recitation_points: int = 0
     bonus_points: int = 0
     archived_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+# ============== AUDIT LOG MODEL ==============
+
+class AuditLog(BaseModel):
+    """سجل التدقيق للتغييرات"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    actor_id: str  # من قام بالتغيير
+    actor_role: str  # دور من قام بالتغيير
+    target_student_id: str  # الطالب المستهدف
+    field_changed: str  # الحقل الذي تغير
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # User Models - Updated with new fields
 class UserBase(BaseModel):
