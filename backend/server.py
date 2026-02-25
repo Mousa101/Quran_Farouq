@@ -73,6 +73,28 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ============== HELPER FUNCTIONS ==============
+
+async def get_active_term_id() -> Optional[str]:
+    """الحصول على معرف الفصل النشط"""
+    term = await db.terms.find_one({"is_active": True}, {"id": 1})
+    return term["id"] if term else None
+
+async def create_audit_log(actor_id: str, actor_role: str, target_student_id: str, 
+                          field_changed: str, old_value: str, new_value: str):
+    """إنشاء سجل تدقيق للتغييرات"""
+    log = AuditLog(
+        actor_id=actor_id,
+        actor_role=actor_role,
+        target_student_id=target_student_id,
+        field_changed=field_changed,
+        old_value=old_value,
+        new_value=new_value
+    )
+    log_dict = log.model_dump()
+    log_dict["timestamp"] = log_dict["timestamp"].isoformat()
+    await db.audit_logs.insert_one(log_dict)
+
 # ============== REGISTRATION CODES ==============
 
 class RegistrationCodeCreate(BaseModel):
