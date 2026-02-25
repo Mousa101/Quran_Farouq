@@ -6101,7 +6101,7 @@ async def get_audit_logs(student_id: Optional[str] = None, current_user: dict = 
 # ============== STUDENT TASMEE HISTORY ==============
 
 @api_router.get("/students/{student_id}/tasmee-history")
-async def get_student_tasmee_history(student_id: str, term_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+async def get_student_tasmee_history(student_id: str, term_id: Optional[str] = None, all_terms: bool = False, current_user: dict = Depends(get_current_user)):
     """جلب سجل التسميع للطالب"""
     # التحقق من الصلاحيات
     if current_user["role"] == "student" and current_user["user_id"] != student_id:
@@ -6112,13 +6112,17 @@ async def get_student_tasmee_history(student_id: str, term_id: Optional[str] = N
     # تصفية حسب الفصل
     if term_id:
         query["term_id"] = term_id
-    else:
-        # الفصل النشط فقط إذا لم يُحدد فصل
+    elif not all_terms:
+        # الفصل النشط أو السجلات القديمة (بدون term_id)
         active_term_id = await get_active_term_id()
         if active_term_id:
-            query["term_id"] = active_term_id
+            query["$or"] = [
+                {"term_id": active_term_id},
+                {"term_id": None},
+                {"term_id": {"$exists": False}}
+            ]
     
-    recitations = await db.recitations.find(query, {"_id": 0}).sort("record_date", -1).to_list(1000)
+    recitations = await db.recitations.find(query, {"_id": 0}).sort([("record_date", -1), ("created_at", -1)]).to_list(1000)
     
     # تحويل البيانات لتنسيق الجدول المطلوب
     history = []
