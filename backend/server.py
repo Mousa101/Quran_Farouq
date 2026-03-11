@@ -2212,6 +2212,7 @@ async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict 
 async def get_attendance(
     student_id: Optional[str] = None,
     date: Optional[str] = None,
+    term_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     query = {}
@@ -2226,6 +2227,19 @@ async def get_attendance(
     
     if date:
         query["date"] = date
+    
+    # تصفية حسب الفصل - إذا لم يُحدد، استخدم الفصل النشط
+    if term_id:
+        query["term_id"] = term_id
+    else:
+        active_term_id = await get_active_term_id()
+        if active_term_id:
+            # عرض سجلات الفصل النشط فقط أو السجلات القديمة (بدون term_id)
+            query["$or"] = [
+                {"term_id": active_term_id},
+                {"term_id": None},
+                {"term_id": {"$exists": False}}
+            ]
     
     attendance = await db.attendance.find(query, {"_id": 0}).to_list(1000)
     return attendance
