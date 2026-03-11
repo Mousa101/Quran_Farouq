@@ -5631,23 +5631,41 @@ async def close_term_and_start_new(data: TermCreateRequest, current_user: dict =
         if archives:
             await db.term_archives.insert_many(archives)
         
-        # 5. تصفير جميع نقاط الطلاب (Bulk Update)
+        # ─────────────────────────────────────────────
+        # 5. أرشفة سجلات الحضور كاملةً ثم حذفها
+        # ─────────────────────────────────────────────
+            all_attendance = await db.attendance.find({}, {"_id": 0}).to_list(100000)
+        if all_attendance:
+            for rec in all_attendance:
+                rec["term_id"] = term_id
+                rec["term_name"] = term_name
+            await db.attendance_archives.insert_many(all_attendance)
+        await db.attendance.delete_many({})
+
+        # ─────────────────────────────────────────────
+        # 6. أرشفة سجلات التسميع كاملةً ثم حذفها
+        # ─────────────────────────────────────────────
+        all_recitations = await db.recitations.find({}, {"_id": 0}).to_list(100000)
+        if all_recitations:
+            for rec in all_recitations:
+                rec["term_id"] = term_id
+                rec["term_name"] = term_name
+            await db.recitations_archives.insert_many(all_recitations)
+        await db.recitations.delete_many({})
+        # 7. تصفير نقاط الطلاب
         await db.student_points.update_many(
             {},
-            {
-                "$set": {
-                    "total_points": 0,
-                    "current_term_points": 0,
-                    "attendance_points": 0,
-                    "recitation_points": 0,
-                    "tracking_points": 0,
-                    "bonus_points": 0,
-                    "interaction_points": 0,
-                    "admin_bonus_points": 0
-                }
-            }
+            {"$set": {
+                "total_points": 0,
+                "current_term_points": 0,
+                "attendance_points": 0,
+                "recitation_points": 0,
+                "tracking_points": 0,
+                "bonus_points": 0,
+                "interaction_points": 0,
+                "admin_bonus_points": 0
+            }}
         )
-        
         # 6. إغلاق الفصل الحالي
         now = datetime.now(timezone.utc)
         await db.terms.update_many(
@@ -5680,6 +5698,8 @@ async def close_term_and_start_new(data: TermCreateRequest, current_user: dict =
             "message": f"تم إغلاق الفصل السابق وبدء الفصل الجديد: {data.name}",
             "new_term_id": new_term.id,
             "archived_students_count": len(archives),
+            "archived_attendance_count": len(all_attendance),
+            "archived_recitations_count": len(all_recitations),
             "previous_term_name": term_name
         }
         
