@@ -11,7 +11,7 @@ import { Calendar } from '../components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { 
   BookOpen, CheckCircle, XCircle, Loader2, Info, Users, 
-  FileText, RotateCcw, Clock, Trash2
+  FileText, RotateCcw, Clock, Trash2, Archive, Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
