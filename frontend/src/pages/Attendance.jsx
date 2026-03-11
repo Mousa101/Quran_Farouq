@@ -124,6 +124,12 @@ const Attendance = () => {
   };
 
   const handleStatusChange = async (studentId, status, reason = null) => {
+    // منع التعديل إذا كان يعرض فصل قديم
+    if (isViewingOldTerm) {
+      toast.error('لا يمكن التعديل على سجلات الفصول السابقة');
+      return;
+    }
+    
     setSaving(true);
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
