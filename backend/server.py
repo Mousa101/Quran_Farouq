@@ -5895,6 +5895,67 @@ async def get_student_term_history(student_id: str, current_user: dict = Depends
     
     return archives
 
+# جلب سجلات فصل معين (الحضور والتسميعات المؤرشفة)
+@api_router.get("/terms/{term_id}/records")
+async def get_term_records(term_id: str, student_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """جلب سجلات فصل معين - الحضور والتسميعات المؤرشفة"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        if current_user["role"] == "student":
+            student_id = current_user["user_id"]
+        else:
+            raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    # التحقق من وجود الفصل
+    term = await db.terms.find_one({"id": term_id}, {"_id": 0})
+    if not term:
+        raise HTTPException(status_code=404, detail="الفصل غير موجود")
+    
+    # بناء الاستعلام
+    query = {"term_id": term_id}
+    if student_id:
+        query["student_id"] = student_id
+    
+    # جلب الحضور المؤرشف
+    attendance_archived = await db.attendance_archives.find(query, {"_id": 0}).to_list(10000)
+    # جلب الحضور الحالي للفصل (إذا كان نشطاً)
+    attendance_current = await db.attendance.find(query, {"_id": 0}).to_list(10000)
+    
+    # جلب التسميعات المؤرشفة
+    recitations_archived = await db.recitations_archives.find(query, {"_id": 0}).to_list(10000)
+    # جلب التسميعات الحالية للفصل
+    recitations_current = await db.recitations.find(query, {"_id": 0}).to_list(10000)
+    
+    # جلب أرشيف الطلاب للفصل
+    archive_query = {"term_id": term_id}
+    if student_id:
+        archive_query["student_id"] = student_id
+    student_archives = await db.term_archives.find(archive_query, {"_id": 0}).to_list(1000)
+    
+    return {
+        "term": term,
+        "attendance": attendance_archived + attendance_current,
+        "recitations": recitations_archived + recitations_current,
+        "student_archives": student_archives
+    }
+
+# تفعيل فصل للعرض فقط (بدون تغيير الفصل النشط الفعلي)
+@api_router.post("/terms/{term_id}/view")
+async def set_viewing_term(term_id: str, current_user: dict = Depends(get_current_user)):
+    """تحديد فصل للعرض - هذا لا يغير الفصل النشط الفعلي"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    
+    # التحقق من وجود الفصل
+    term = await db.terms.find_one({"id": term_id}, {"_id": 0})
+    if not term:
+        raise HTTPException(status_code=404, detail="الفصل غير موجود")
+    
+    return {
+        "message": f"يمكنك الآن عرض سجلات الفصل: {term['name']}",
+        "term": term,
+        "term_id": term_id
+    }
+
 # ============== BADGE MANAGEMENT ROUTES ==============
 
 @api_router.post("/badges/types")
