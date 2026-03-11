@@ -152,7 +152,11 @@ const RecitationsNew = () => {
   const fetchRecitations = async () => {
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const response = await axios.get(`${API}/recitations?date=${dateStr}`);
+      let url = `${API}/recitations?date=${dateStr}`;
+      if (selectedTermId) {
+        url += `&term_id=${selectedTermId}`;
+      }
+      const response = await axios.get(url);
       
       // Convert to map by student_id
       const recitationMap = {};
@@ -169,6 +173,11 @@ const RecitationsNew = () => {
   };
 
   const handleDidNotRecite = async (student) => {
+    if (isViewingOldTerm) {
+      toast.error('لا يمكن التعديل على سجلات الفصول السابقة');
+      return;
+    }
+    
     setSaving(true);
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -190,6 +199,11 @@ const RecitationsNew = () => {
   };
 
   const openRecitationDialog = (student) => {
+    if (isViewingOldTerm) {
+      toast.error('لا يمكن التعديل على سجلات الفصول السابقة');
+      return;
+    }
+    
     setSelectedStudent(student);
     setFormData({
       has_new_memorization: true,
