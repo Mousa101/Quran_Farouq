@@ -2020,6 +2020,7 @@ async def get_recitation(recitation_id: str, current_user: dict = Depends(get_cu
 async def get_recitations(
     student_id: Optional[str] = None,
     date: Optional[str] = None,
+    term_id: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     query = {}
@@ -2041,6 +2042,18 @@ async def get_recitations(
                 date
             ]
         }
+    
+    # تصفية حسب الفصل - إذا لم يُحدد، استخدم الفصل النشط
+    if term_id:
+        query["term_id"] = term_id
+    elif not date:  # إذا لم يكن هناك تاريخ محدد
+        active_term_id = await get_active_term_id()
+        if active_term_id:
+            query["$or"] = [
+                {"term_id": active_term_id},
+                {"term_id": None},
+                {"term_id": {"$exists": False}}
+            ]
     
     recitations = await db.recitations.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
     return recitations
