@@ -5544,9 +5544,9 @@ class TermCreateRequest(BaseModel):
 
 @api_router.get("/terms")
 async def get_terms(current_user: dict = Depends(get_current_user)):
-    """Get all terms (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول للفصول الدراسية")
+    """Get all terms (Admin and Sheikh can view)"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك بالوصول للفصول الدراسية")
     
     terms = await db.terms.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return terms
