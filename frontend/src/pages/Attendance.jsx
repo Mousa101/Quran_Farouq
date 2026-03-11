@@ -98,7 +98,14 @@ const Attendance = () => {
   const fetchAttendance = async () => {
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const response = await axios.get(`${API}/attendance?date=${dateStr}`);
+      let url = `${API}/attendance?date=${dateStr}`;
+      
+      // إضافة معرف الفصل للاستعلام
+      if (selectedTermId) {
+        url += `&term_id=${selectedTermId}`;
+      }
+      
+      const response = await axios.get(url);
       
       // Convert to map
       const attendanceMap = {};
