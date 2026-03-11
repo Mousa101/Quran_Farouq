@@ -8,7 +8,7 @@ import { Calendar } from '../components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { UserCheck, CheckCircle, XCircle, Clock, Loader2, Star, Sparkles } from 'lucide-react';
+import { UserCheck, CheckCircle, XCircle, Clock, Loader2, Star, Sparkles, Archive, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -25,6 +25,11 @@ const Attendance = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
+  // Term selection for viewing old records
+  const [terms, setTerms] = useState([]);
+  const [selectedTermId, setSelectedTermId] = useState('');
+  const [isViewingOldTerm, setIsViewingOldTerm] = useState(false);
+  
   // Excuse dialog state
   const [excuseDialogOpen, setExcuseDialogOpen] = useState(false);
   const [selectedStudentForExcuse, setSelectedStudentForExcuse] = useState(null);
@@ -37,6 +42,7 @@ const Attendance = () => {
 
   useEffect(() => {
     fetchGroups();
+    fetchTerms();
   }, []);
 
   useEffect(() => {
@@ -44,7 +50,27 @@ const Attendance = () => {
       fetchStudents();
       fetchAttendance();
     }
-  }, [selectedGroup, selectedDate]);
+  }, [selectedGroup, selectedDate, selectedTermId]);
+
+  const fetchTerms = async () => {
+    try {
+      const response = await axios.get(`${API}/terms`);
+      setTerms(response.data || []);
+      // Set active term as default
+      const activeTerm = response.data.find(t => t.is_active);
+      if (activeTerm) {
+        setSelectedTermId(activeTerm.id);
+      }
+    } catch (error) {
+      console.error('Error fetching terms:', error);
+    }
+  };
+
+  const handleTermChange = (termId) => {
+    setSelectedTermId(termId);
+    const term = terms.find(t => t.id === termId);
+    setIsViewingOldTerm(term && !term.is_active);
+  };
 
   const fetchGroups = async () => {
     try {
