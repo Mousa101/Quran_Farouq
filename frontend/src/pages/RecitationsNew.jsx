@@ -60,6 +60,11 @@ const RecitationsNew = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   
+  // Term selection for viewing old records
+  const [terms, setTerms] = useState([]);
+  const [selectedTermId, setSelectedTermId] = useState('');
+  const [isViewingOldTerm, setIsViewingOldTerm] = useState(false);
+  
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -84,13 +89,33 @@ const RecitationsNew = () => {
 
   useEffect(() => {
     fetchMyStudents();
+    fetchTerms();
   }, []);
 
   useEffect(() => {
     if (students.length > 0) {
       fetchRecitations();
     }
-  }, [selectedDate, students]);
+  }, [selectedDate, students, selectedTermId]);
+
+  const fetchTerms = async () => {
+    try {
+      const response = await axios.get(`${API}/terms`);
+      setTerms(response.data || []);
+      const activeTerm = response.data.find(t => t.is_active);
+      if (activeTerm) {
+        setSelectedTermId(activeTerm.id);
+      }
+    } catch (error) {
+      console.error('Error fetching terms:', error);
+    }
+  };
+
+  const handleTermChange = (termId) => {
+    setSelectedTermId(termId);
+    const term = terms.find(t => t.id === termId);
+    setIsViewingOldTerm(term && !term.is_active);
+  };
 
   // جلب طلاب المعلم (من مجموعاته)
   const fetchMyStudents = async () => {
