@@ -240,6 +240,18 @@ const Attendance = () => {
         <p className="text-slate-400">تسجيل حضور وغياب الطلاب</p>
       </div>
 
+      {/* تحذير إذا كان يعرض فصل قديم */}
+      {isViewingOldTerm && (
+        <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+          <div className="flex items-center gap-2">
+            <Eye className="w-5 h-5 text-amber-400" />
+            <p className="text-amber-400 font-medium">
+              أنت تعرض سجلات فصل سابق (للقراءة فقط) - لا يمكن التعديل
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendar & Group Selection */}
         <Card className="glass-card border-white/10">
@@ -247,6 +259,32 @@ const Attendance = () => {
             <CardTitle className="text-lg font-bold text-white">اختر التاريخ والمجموعة</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* اختيار الفصل */}
+            <div>
+              <Label className="text-slate-300 mb-2 block">الفصل الدراسي</Label>
+              <Select value={selectedTermId} onValueChange={handleTermChange}>
+                <SelectTrigger className="bg-slate-800 border-slate-700 text-white" data-testid="term-select">
+                  <SelectValue placeholder="اختر الفصل" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-700">
+                  {terms.map((term) => (
+                    <SelectItem key={term.id} value={term.id} className="text-white">
+                      <div className="flex items-center gap-2">
+                        {term.is_active ? (
+                          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                        ) : (
+                          <Archive className="w-3 h-3 text-slate-400" />
+                        )}
+                        {term.name}
+                        {term.is_active && <span className="text-xs text-emerald-400">(نشط)</span>}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* اختيار المجموعة */}
             <Select value={selectedGroup} onValueChange={setSelectedGroup}>
               <SelectTrigger className="bg-slate-800 border-slate-700 text-white" data-testid="group-select">
                 <SelectValue placeholder="اختر المجموعة" />
