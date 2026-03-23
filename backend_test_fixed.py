@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import base64
 
 class QuranAppAPITester:
-    def __init__(self, base_url="https://hafiz-tracker-4.preview.emergentagent.com/api"):
+    def __init__(self, base_url="https://student-points-reset.preview.emergentagent.com/api"):
         self.base_url = base_url
         self.tokens = {}  # Store tokens for different users
         self.users = {}   # Store user data
