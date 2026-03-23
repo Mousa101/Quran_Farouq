@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { toast } from 'sonner';
 import { 
   Users, BookOpen, Calendar, Trophy, TrendingUp, 
   GraduationCap, UserCheck, Target, Eye, Medal,
-  ArrowUpRight, UserPlus, Clock, Archive, RefreshCw
+  ArrowUpRight, UserPlus, Clock, Archive, RefreshCw, Download, FileSpreadsheet
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -27,6 +28,9 @@ const AdminDashboard = () => {
   const [allTerms, setAllTerms] = useState([]);
   const [selectedTermId, setSelectedTermId] = useState('new');
   const [loadingTerms, setLoadingTerms] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [selectedExportTermId, setSelectedExportTermId] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchData();
