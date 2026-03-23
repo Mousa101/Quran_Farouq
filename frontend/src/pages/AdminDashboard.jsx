@@ -743,6 +743,88 @@ const AdminDashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Export Excel Dialog */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className={`${isDark ? 'bg-slate-900 border-white/10' : 'bg-white'} max-w-lg`}>
+          <DialogHeader>
+            <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-400" />
+                تحميل بيانات الطلاب
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+              اختر الفصل الدراسي لتحميل بياناته:
+            </p>
+            
+            {/* الفصل النشط */}
+            <div 
+              onClick={() => handleExportStudents(activeTerm?.id)}
+              className={`p-4 rounded-lg border cursor-pointer transition-colors ${isDark ? 'border-emerald-500/30 hover:bg-emerald-500/10' : 'border-emerald-200 hover:bg-emerald-50'}`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full bg-emerald-400" />
+                  <div>
+                    <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                      {activeTerm?.name || 'الفصل الحالي'}
+                    </p>
+                    <p className={`text-xs ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>نشط</p>
+                  </div>
+                </div>
+                <Download className={`w-5 h-5 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
+              </div>
+            </div>
+
+            {/* الفصول المغلقة */}
+            {allTerms.filter(t => !t.is_active).length > 0 && (
+              <div>
+                <p className={`text-xs mb-2 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+                  الفصول السابقة (الأرشيف):
+                </p>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {allTerms.filter(t => !t.is_active).map(term => (
+                    <div 
+                      key={term.id}
+                      onClick={() => handleExportTermArchive(term.id)}
+                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${isDark ? 'border-white/10 hover:bg-white/5' : 'border-slate-200 hover:bg-slate-50'}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Archive className={`w-4 h-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+                          <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{term.name}</span>
+                        </div>
+                        <Download className={`w-4 h-4 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {exporting && (
+              <div className="flex items-center justify-center py-4">
+                <RefreshCw className="w-6 h-6 animate-spin text-emerald-400" />
+                <span className={`mr-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>جاري التحميل...</span>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setExportDialogOpen(false)}
+              className={isDark ? 'border-white/10' : ''}
+            >
+              إغلاق
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
