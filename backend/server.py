@@ -6428,12 +6428,13 @@ async def export_all_students_excel(term_id: Optional[str] = None, current_user:
     workbook.close()
     output.seek(0)
     
-    filename = f"hafiz_tracker_{term_name}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    # إنشاء اسم ملف آمن (ASCII فقط)
+    filename = f"hafiz_tracker_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 
