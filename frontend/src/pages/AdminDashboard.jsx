@@ -112,6 +112,80 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleExportStudents = async (termId = null) => {
+    setExporting(true);
+    try {
+      let url = `${API}/export/students`;
+      if (termId) {
+        url += `?term_id=${termId}`;
+      }
+      
+      const response = await axios.get(url, {
+        responseType: 'blob'
+      });
+      
+      // إنشاء رابط التحميل
+      const blob = new Blob([response.data], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      
+      // استخراج اسم الملف
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'hafiz_tracker.xlsx';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8'')?([^;\n]*)/);
+        if (filenameMatch) {
+          filename = decodeURIComponent(filenameMatch[1]);
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      
+      toast.success('تم تحميل الملف بنجاح');
+      setExportDialogOpen(false);
+    } catch (error) {
+      console.error('Error exporting:', error);
+      toast.error('فشل في تحميل الملف');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportTermArchive = async (termId) => {
+    setExporting(true);
+    try {
+      const response = await axios.get(`${API}/export/term/${termId}`, {
+        responseType: 'blob'
+      });
+      
+      const blob = new Blob([response.data], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', 'hafiz_archive.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      
+      toast.success('تم تحميل أرشيف الفصل بنجاح');
+    } catch (error) {
+      console.error('Error exporting archive:', error);
+      toast.error('فشل في تحميل الأرشيف');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const getRankBadge = (rank) => {
     if (rank === 1) return { bg: 'bg-amber-500/20', text: 'text-amber-400', icon: '🥇' };
     if (rank === 2) return { bg: 'bg-slate-400/20', text: 'text-slate-300', icon: '🥈' };
