@@ -6666,13 +6666,12 @@ async def export_student_excel(student_id: str, term_id: Optional[str] = None, c
     workbook.close()
     output.seek(0)
     
-    student_name = student.get("name", "student").replace(" ", "_")
-    filename = f"hafiz_student_{student_name}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    filename = f"hafiz_student_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 
