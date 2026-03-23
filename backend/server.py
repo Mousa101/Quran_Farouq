@@ -6190,6 +6190,476 @@ async def get_student_tasmee_history(student_id: str, term_id: Optional[str] = N
     return history
 
 
+# ============== EXCEL EXPORT ROUTES ==============
+
+@api_router.get("/export/students")
+async def export_all_students_excel(term_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """تحميل بيانات جميع الطلاب على شكل ملف Excel"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك بتحميل البيانات")
+    
+    # جلب الفصل
+    if term_id:
+        term = await db.terms.find_one({"id": term_id}, {"_id": 0})
+    else:
+        term = await db.terms.find_one({"is_active": True}, {"_id": 0})
+    
+    term_name = term["name"] if term else "جميع الفصول"
+    term_id_filter = term["id"] if term else None
+    
+    # جلب جميع الطلاب
+    students = await db.users.find({"role": "student"}, {"_id": 0}).to_list(1000)
+    
+    # إنشاء ملف Excel
+    output = io.BytesIO()
+    workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    
+    # تنسيقات
+    header_format = workbook.add_format({
+        'bold': True, 'bg_color': '#1e3a5f', 'font_color': 'white',
+        'border': 1, 'align': 'center', 'valign': 'vcenter', 'font_size': 12
+    })
+    cell_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'valign': 'vcenter', 'font_size': 11
+    })
+    title_format = workbook.add_format({
+        'bold': True, 'font_size': 16, 'align': 'center', 'valign': 'vcenter',
+        'bg_color': '#0d9488', 'font_color': 'white'
+    })
+    success_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'bg_color': '#d1fae5', 'font_color': '#065f46'
+    })
+    warning_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'bg_color': '#fef3c7', 'font_color': '#92400e'
+    })
+    danger_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'bg_color': '#fee2e2', 'font_color': '#991b1b'
+    })
+    
+    # ورقة الملخص العام
+    summary_sheet = workbook.add_worksheet('الملخص العام')
+    summary_sheet.right_to_left()
+    
+    # العنوان
+    summary_sheet.merge_range('A1:L1', f'نادي الحفاظ - {term_name}', title_format)
+    summary_sheet.merge_range('A2:L2', f'تاريخ التصدير: {datetime.now().strftime("%Y-%m-%d")}', cell_format)
+    
+    # رؤوس الأعمدة
+    headers = ['#', 'اسم الطالب', 'المجموعة', 'النقاط', 'الحضور', 'الغياب', 'نسبة الحضور', 
+               'عدد التسميعات', 'نسبة التسميع', 'ورق المتابعة', 'الشارات', 'ملاحظات']
+    
+    for col, header in enumerate(headers):
+        summary_sheet.write(3, col, header, header_format)
+    
+    summary_sheet.set_column('A:A', 5)
+    summary_sheet.set_column('B:B', 25)
+    summary_sheet.set_column('C:C', 15)
+    summary_sheet.set_column('D:K', 12)
+    summary_sheet.set_column('L:L', 30)
+    
+    row = 4
+    for idx, student in enumerate(students, 1):
+        student_id = student["id"]
+        
+        # جلب نقاط الطالب
+        points = await db.student_points.find_one({"student_id": student_id}, {"_id": 0})
+        total_points = points.get("total_points", 0) if points else 0
+        
+        # جلب الحضور
+        att_query = {"student_id": student_id}
+        if term_id_filter:
+            att_query["$or"] = [{"term_id": term_id_filter}, {"term_id": None}, {"term_id": {"$exists": False}}]
+        
+        present_count = await db.attendance.count_documents({**att_query, "status": "present"})
+        absent_count = await db.attendance.count_documents({**att_query, "status": "absent"})
+        total_attendance = present_count + absent_count
+        attendance_rate = round((present_count / total_attendance * 100), 1) if total_attendance > 0 else 0
+        
+        # جلب التسميعات
+        rec_query = {"student_id": student_id, "did_not_recite": {"$ne": True}}
+        if term_id_filter:
+            rec_query["$or"] = [{"term_id": term_id_filter}, {"term_id": None}, {"term_id": {"$exists": False}}]
+        
+        recitation_count = await db.recitations.count_documents(rec_query)
+        did_not_recite_count = await db.recitations.count_documents({
+            "student_id": student_id, "did_not_recite": True,
+            "$or": [{"term_id": term_id_filter}, {"term_id": None}, {"term_id": {"$exists": False}}] if term_id_filter else []
+        } if term_id_filter else {"student_id": student_id, "did_not_recite": True})
+        
+        total_recitation_days = recitation_count + did_not_recite_count
+        recitation_rate = round((recitation_count / total_recitation_days * 100), 1) if total_recitation_days > 0 else 0
+        
+        # جلب ورق المتابعة
+        track_query = {"student_id": student_id}
+        if term_id_filter:
+            track_query["$or"] = [{"term_id": term_id_filter}, {"term_id": None}, {"term_id": {"$exists": False}}]
+        tracking_count = await db.tracking_sheets.count_documents(track_query)
+        
+        # جلب الشارات
+        badges_count = points.get("badges_count", 0) if points else 0
+        
+        # جلب المجموعة
+        group_name = ""
+        if student.get("group_id"):
+            group = await db.groups.find_one({"id": student["group_id"]}, {"_id": 0, "name": 1})
+            group_name = group["name"] if group else ""
+        
+        # كتابة الصف
+        summary_sheet.write(row, 0, idx, cell_format)
+        summary_sheet.write(row, 1, student.get("name", ""), cell_format)
+        summary_sheet.write(row, 2, group_name, cell_format)
+        summary_sheet.write(row, 3, total_points, cell_format)
+        summary_sheet.write(row, 4, present_count, success_format if present_count > 0 else cell_format)
+        summary_sheet.write(row, 5, absent_count, danger_format if absent_count > 0 else cell_format)
+        summary_sheet.write(row, 6, f"{attendance_rate}%", success_format if attendance_rate >= 80 else (warning_format if attendance_rate >= 60 else danger_format))
+        summary_sheet.write(row, 7, recitation_count, cell_format)
+        summary_sheet.write(row, 8, f"{recitation_rate}%", success_format if recitation_rate >= 80 else (warning_format if recitation_rate >= 60 else danger_format))
+        summary_sheet.write(row, 9, tracking_count, cell_format)
+        summary_sheet.write(row, 10, badges_count, cell_format)
+        summary_sheet.write(row, 11, "", cell_format)
+        
+        row += 1
+    
+    # إنشاء ورقة لكل طالب
+    for student in students:
+        student_id = student["id"]
+        student_name = student.get("name", "طالب")[:31]  # Excel يحد اسم الورقة بـ 31 حرف
+        
+        # إنشاء ورقة الطالب
+        student_sheet = workbook.add_worksheet(student_name)
+        student_sheet.right_to_left()
+        
+        # معلومات الطالب
+        student_sheet.merge_range('A1:F1', f'سجل الطالب: {student.get("name", "")}', title_format)
+        student_sheet.write('A3', 'الاسم:', header_format)
+        student_sheet.write('B3', student.get("name", ""), cell_format)
+        student_sheet.write('C3', 'المجموعة:', header_format)
+        
+        group_name = ""
+        if student.get("group_id"):
+            group = await db.groups.find_one({"id": student["group_id"]}, {"_id": 0, "name": 1})
+            group_name = group["name"] if group else ""
+        student_sheet.write('D3', group_name, cell_format)
+        
+        student_sheet.write('A4', 'هاتف الطالب:', header_format)
+        student_sheet.write('B4', student.get("student_phone", ""), cell_format)
+        student_sheet.write('C4', 'هاتف الأب:', header_format)
+        student_sheet.write('D4', student.get("father_phone", ""), cell_format)
+        
+        # جدول الحضور
+        student_sheet.merge_range('A6:F6', 'سجل الحضور', title_format)
+        att_headers = ['#', 'التاريخ', 'الحالة', 'سبب العذر']
+        for col, h in enumerate(att_headers):
+            student_sheet.write(6, col, h, header_format)
+        
+        att_query = {"student_id": student_id}
+        if term_id_filter:
+            att_query["$or"] = [{"term_id": term_id_filter}, {"term_id": None}, {"term_id": {"$exists": False}}]
+        
+        attendances = await db.attendance.find(att_query, {"_id": 0}).sort("date", -1).to_list(100)
+        
+        att_row = 7
+        for i, att in enumerate(attendances, 1):
+            student_sheet.write(att_row, 0, i, cell_format)
+            student_sheet.write(att_row, 1, att.get("date", ""), cell_format)
+            status = att.get("status", "")
+            status_text = "حاضر" if status == "present" else ("غائب" if status == "absent" else "معذور")
+            fmt = success_format if status == "present" else (danger_format if status == "absent" else warning_format)
+            student_sheet.write(att_row, 2, status_text, fmt)
+            student_sheet.write(att_row, 3, att.get("excuse_reason", ""), cell_format)
+            att_row += 1
+        
+        # جدول التسميعات
+        rec_start_row = att_row + 2
+        student_sheet.merge_range(rec_start_row, 0, rec_start_row, 5, 'سجل التسميع', title_format)
+        rec_headers = ['#', 'التاريخ', 'حفظ جديد', 'مراجعة', 'الحالة', 'ملاحظات']
+        for col, h in enumerate(rec_headers):
+            student_sheet.write(rec_start_row + 1, col, h, header_format)
+        
+        rec_query = {"student_id": student_id}
+        if term_id_filter:
+            rec_query["$or"] = [{"term_id": term_id_filter}, {"term_id": None}, {"term_id": {"$exists": False}}]
+        
+        recitations = await db.recitations.find(rec_query, {"_id": 0}).sort([("record_date", -1), ("created_at", -1)]).to_list(100)
+        
+        rec_row = rec_start_row + 2
+        for i, rec in enumerate(recitations, 1):
+            student_sheet.write(rec_row, 0, i, cell_format)
+            student_sheet.write(rec_row, 1, rec.get("record_date", rec.get("created_at", "")[:10]), cell_format)
+            student_sheet.write(rec_row, 2, rec.get("new_pages", 0) or 0, cell_format)
+            student_sheet.write(rec_row, 3, rec.get("review_pages", 0) or 0, cell_format)
+            
+            if rec.get("did_not_recite"):
+                status_text = "لم يسمع"
+                fmt = danger_format
+            elif rec.get("passed_minimum") or rec.get("passed_review_minimum"):
+                status_text = "اجتاز"
+                fmt = success_format
+            else:
+                status_text = "لم يجتز"
+                fmt = warning_format
+            
+            student_sheet.write(rec_row, 4, status_text, fmt)
+            student_sheet.write(rec_row, 5, rec.get("notes", ""), cell_format)
+            rec_row += 1
+        
+        # ضبط عرض الأعمدة
+        student_sheet.set_column('A:A', 5)
+        student_sheet.set_column('B:B', 15)
+        student_sheet.set_column('C:C', 12)
+        student_sheet.set_column('D:D', 12)
+        student_sheet.set_column('E:E', 12)
+        student_sheet.set_column('F:F', 25)
+    
+    workbook.close()
+    output.seek(0)
+    
+    filename = f"hafiz_tracker_{term_name}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"}
+    )
+
+
+@api_router.get("/export/term/{term_id}")
+async def export_term_archive_excel(term_id: str, current_user: dict = Depends(get_current_user)):
+    """تحميل أرشيف فصل معين على شكل ملف Excel"""
+    if current_user["role"] not in ["admin", "sheikh"]:
+        raise HTTPException(status_code=403, detail="غير مصرح لك بتحميل البيانات")
+    
+    # جلب الفصل
+    term = await db.terms.find_one({"id": term_id}, {"_id": 0})
+    if not term:
+        raise HTTPException(status_code=404, detail="الفصل غير موجود")
+    
+    term_name = term["name"]
+    
+    # جلب أرشيف الفصل
+    archives = await db.term_archives.find({"term_id": term_id}, {"_id": 0}).to_list(1000)
+    
+    # إنشاء ملف Excel
+    output = io.BytesIO()
+    workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    
+    # تنسيقات
+    header_format = workbook.add_format({
+        'bold': True, 'bg_color': '#1e3a5f', 'font_color': 'white',
+        'border': 1, 'align': 'center', 'valign': 'vcenter', 'font_size': 12
+    })
+    cell_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'valign': 'vcenter', 'font_size': 11
+    })
+    title_format = workbook.add_format({
+        'bold': True, 'font_size': 16, 'align': 'center', 'valign': 'vcenter',
+        'bg_color': '#0d9488', 'font_color': 'white'
+    })
+    
+    # ورقة الأرشيف
+    sheet = workbook.add_worksheet('أرشيف الفصل')
+    sheet.right_to_left()
+    
+    # العنوان
+    sheet.merge_range('A1:L1', f'أرشيف الفصل: {term_name}', title_format)
+    sheet.merge_range('A2:L2', f'تاريخ التصدير: {datetime.now().strftime("%Y-%m-%d")}', cell_format)
+    
+    # رؤوس الأعمدة
+    headers = ['#', 'اسم الطالب', 'النقاط', 'الحضور', 'الغياب', 'نسبة الحضور',
+               'التسميعات', 'ورق المتابعة', 'نقاط التسميع', 'نقاط المتابعة', 'نقاط إضافية', 'تاريخ الأرشفة']
+    
+    for col, header in enumerate(headers):
+        sheet.write(3, col, header, header_format)
+    
+    sheet.set_column('A:A', 5)
+    sheet.set_column('B:B', 25)
+    sheet.set_column('C:L', 12)
+    
+    row = 4
+    for idx, archive in enumerate(archives, 1):
+        total_att = archive.get("attendance_present", 0) + archive.get("attendance_absent", 0)
+        att_rate = round((archive.get("attendance_present", 0) / total_att * 100), 1) if total_att > 0 else 0
+        
+        sheet.write(row, 0, idx, cell_format)
+        sheet.write(row, 1, archive.get("student_name", ""), cell_format)
+        sheet.write(row, 2, archive.get("current_term_points", 0), cell_format)
+        sheet.write(row, 3, archive.get("attendance_present", 0), cell_format)
+        sheet.write(row, 4, archive.get("attendance_absent", 0), cell_format)
+        sheet.write(row, 5, f"{att_rate}%", cell_format)
+        sheet.write(row, 6, archive.get("recitation_count", 0), cell_format)
+        sheet.write(row, 7, archive.get("follow_up_count", 0), cell_format)
+        sheet.write(row, 8, archive.get("recitation_points", 0), cell_format)
+        sheet.write(row, 9, archive.get("tracking_points", 0), cell_format)
+        sheet.write(row, 10, archive.get("bonus_points", 0), cell_format)
+        
+        archived_at = archive.get("archived_at", "")
+        if isinstance(archived_at, str):
+            archived_at = archived_at[:10]
+        sheet.write(row, 11, archived_at, cell_format)
+        
+        row += 1
+    
+    workbook.close()
+    output.seek(0)
+    
+    filename = f"hafiz_archive_{term_name}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"}
+    )
+
+
+@api_router.get("/export/student/{student_id}")
+async def export_student_excel(student_id: str, term_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """تحميل بيانات طالب واحد على شكل ملف Excel"""
+    # التحقق من الصلاحيات
+    if current_user["role"] == "student" and current_user["user_id"] != student_id:
+        raise HTTPException(status_code=403, detail="لا يمكنك تحميل بيانات طالب آخر")
+    
+    # جلب الطالب
+    student = await db.users.find_one({"id": student_id, "role": "student"}, {"_id": 0})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    
+    # جلب الفصل
+    if term_id:
+        term = await db.terms.find_one({"id": term_id}, {"_id": 0})
+    else:
+        term = await db.terms.find_one({"is_active": True}, {"_id": 0})
+    
+    term_name = term["name"] if term else "جميع الفصول"
+    term_id_filter = term["id"] if term else None
+    
+    # إنشاء ملف Excel
+    output = io.BytesIO()
+    workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    
+    # تنسيقات
+    header_format = workbook.add_format({
+        'bold': True, 'bg_color': '#1e3a5f', 'font_color': 'white',
+        'border': 1, 'align': 'center', 'valign': 'vcenter', 'font_size': 12
+    })
+    cell_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'valign': 'vcenter', 'font_size': 11
+    })
+    title_format = workbook.add_format({
+        'bold': True, 'font_size': 16, 'align': 'center', 'valign': 'vcenter',
+        'bg_color': '#0d9488', 'font_color': 'white'
+    })
+    success_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'bg_color': '#d1fae5', 'font_color': '#065f46'
+    })
+    warning_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'bg_color': '#fef3c7', 'font_color': '#92400e'
+    })
+    danger_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'bg_color': '#fee2e2', 'font_color': '#991b1b'
+    })
+    
+    # ورقة الطالب
+    sheet = workbook.add_worksheet('سجل الطالب')
+    sheet.right_to_left()
+    
+    # معلومات الطالب
+    sheet.merge_range('A1:F1', f'سجل الطالب: {student.get("name", "")} - {term_name}', title_format)
+    
+    sheet.write('A3', 'الاسم:', header_format)
+    sheet.write('B3', student.get("name", ""), cell_format)
+    sheet.write('C3', 'البريد:', header_format)
+    sheet.write('D3', student.get("email", ""), cell_format)
+    
+    sheet.write('A4', 'هاتف الطالب:', header_format)
+    sheet.write('B4', student.get("student_phone", ""), cell_format)
+    sheet.write('C4', 'هاتف الأب:', header_format)
+    sheet.write('D4', student.get("father_phone", ""), cell_format)
+    
+    group_name = ""
+    if student.get("group_id"):
+        group = await db.groups.find_one({"id": student["group_id"]}, {"_id": 0, "name": 1})
+        group_name = group["name"] if group else ""
+    
+    sheet.write('A5', 'المجموعة:', header_format)
+    sheet.write('B5', group_name, cell_format)
+    
+    # جدول الحضور
+    sheet.merge_range('A7:D7', 'سجل الحضور', title_format)
+    att_headers = ['#', 'التاريخ', 'الحالة', 'سبب العذر']
+    for col, h in enumerate(att_headers):
+        sheet.write(7, col, h, header_format)
+    
+    att_query = {"student_id": student_id}
+    if term_id_filter:
+        att_query["$or"] = [{"term_id": term_id_filter}, {"term_id": None}, {"term_id": {"$exists": False}}]
+    
+    attendances = await db.attendance.find(att_query, {"_id": 0}).sort("date", -1).to_list(500)
+    
+    att_row = 8
+    for i, att in enumerate(attendances, 1):
+        sheet.write(att_row, 0, i, cell_format)
+        sheet.write(att_row, 1, att.get("date", ""), cell_format)
+        status = att.get("status", "")
+        status_text = "حاضر" if status == "present" else ("غائب" if status == "absent" else "معذور")
+        fmt = success_format if status == "present" else (danger_format if status == "absent" else warning_format)
+        sheet.write(att_row, 2, status_text, fmt)
+        sheet.write(att_row, 3, att.get("excuse_reason", ""), cell_format)
+        att_row += 1
+    
+    # جدول التسميعات
+    rec_start_row = att_row + 2
+    sheet.merge_range(rec_start_row, 0, rec_start_row, 5, 'سجل التسميع', title_format)
+    rec_headers = ['#', 'التاريخ', 'حفظ جديد', 'مراجعة', 'الحالة', 'ملاحظات']
+    for col, h in enumerate(rec_headers):
+        sheet.write(rec_start_row + 1, col, h, header_format)
+    
+    rec_query = {"student_id": student_id}
+    if term_id_filter:
+        rec_query["$or"] = [{"term_id": term_id_filter}, {"term_id": None}, {"term_id": {"$exists": False}}]
+    
+    recitations = await db.recitations.find(rec_query, {"_id": 0}).sort([("record_date", -1), ("created_at", -1)]).to_list(500)
+    
+    rec_row = rec_start_row + 2
+    for i, rec in enumerate(recitations, 1):
+        sheet.write(rec_row, 0, i, cell_format)
+        sheet.write(rec_row, 1, rec.get("record_date", rec.get("created_at", "")[:10]), cell_format)
+        sheet.write(rec_row, 2, rec.get("new_pages", 0) or 0, cell_format)
+        sheet.write(rec_row, 3, rec.get("review_pages", 0) or 0, cell_format)
+        
+        if rec.get("did_not_recite"):
+            status_text = "لم يسمع"
+            fmt = danger_format
+        elif rec.get("passed_minimum") or rec.get("passed_review_minimum"):
+            status_text = "اجتاز"
+            fmt = success_format
+        else:
+            status_text = "لم يجتز"
+            fmt = warning_format
+        
+        sheet.write(rec_row, 4, status_text, fmt)
+        sheet.write(rec_row, 5, rec.get("notes", ""), cell_format)
+        rec_row += 1
+    
+    # ضبط عرض الأعمدة
+    sheet.set_column('A:A', 5)
+    sheet.set_column('B:B', 15)
+    sheet.set_column('C:C', 15)
+    sheet.set_column('D:D', 15)
+    sheet.set_column('E:E', 12)
+    sheet.set_column('F:F', 30)
+    
+    workbook.close()
+    output.seek(0)
+    
+    student_name = student.get("name", "student").replace(" ", "_")
+    filename = f"hafiz_student_{student_name}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"}
+    )
+
 
 # Include the router
 app.include_router(api_router)
