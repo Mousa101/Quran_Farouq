@@ -222,6 +222,15 @@ const AdminDashboard = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button 
+              onClick={() => setExportDialogOpen(true)}
+              variant="outline" 
+              size="sm" 
+              className={`text-xs md:text-sm text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 ${isDark ? '' : 'border-emerald-300'}`}
+            >
+              <FileSpreadsheet className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
+              تحميل Excel
+            </Button>
+            <Button 
               onClick={() => setTermDialogOpen(true)}
               variant="outline" 
               size="sm" 
