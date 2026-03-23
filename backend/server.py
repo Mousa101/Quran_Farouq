@@ -6321,12 +6321,26 @@ async def export_all_students_excel(term_id: Optional[str] = None, current_user:
         row += 1
     
     # إنشاء ورقة لكل طالب
-    for student in students:
+    used_names = set()
+    for idx, student in enumerate(students, 1):
         student_id = student["id"]
-        student_name = student.get("name", "طالب")[:31]  # Excel يحد اسم الورقة بـ 31 حرف
+        base_name = student.get("name", "طالب")[:28]  # Excel يحد اسم الورقة بـ 31 حرف
+        
+        # جعل الاسم فريداً
+        student_name = base_name
+        counter = 1
+        while student_name in used_names:
+            student_name = f"{base_name}_{counter}"
+            counter += 1
+        used_names.add(student_name)
         
         # إنشاء ورقة الطالب
-        student_sheet = workbook.add_worksheet(student_name)
+        try:
+            student_sheet = workbook.add_worksheet(student_name)
+        except:
+            # في حالة فشل الإنشاء، استخدم رقم الطالب
+            student_sheet = workbook.add_worksheet(f"طالب_{idx}")
+        
         student_sheet.right_to_left()
         
         # معلومات الطالب
