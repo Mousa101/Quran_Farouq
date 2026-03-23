@@ -527,6 +527,7 @@ const AdminDashboard = () => {
                     <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>تاريخ البداية</th>
                     <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>تاريخ النهاية</th>
                     <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الحالة</th>
+                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>تحميل</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -549,6 +550,17 @@ const AdminDashboard = () => {
                             مغلق
                           </span>
                         )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => term.is_active ? handleExportStudents(term.id) : handleExportTermArchive(term.id)}
+                          className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                          disabled={exporting}
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
                       </td>
                     </tr>
                   ))}
