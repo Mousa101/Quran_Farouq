@@ -6517,12 +6517,12 @@ async def export_term_archive_excel(term_id: str, current_user: dict = Depends(g
     workbook.close()
     output.seek(0)
     
-    filename = f"hafiz_archive_{term_name}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    filename = f"hafiz_archive_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
 
