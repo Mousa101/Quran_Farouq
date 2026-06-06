@@ -208,13 +208,13 @@ const StudentRecord = () => {
         const trackingData = semesterTracking.slice(0, 10).map(t => [
           formatDate(t.week_start),
           `${t.data?.prayers_count || 0}/35`,
-          `${t.data?.duha_prayers || 0}/7`,
+          `${t.data?.quran_sitting_days || 0}/35`,
           `${t.points_earned || 0}`
         ]);
-        
+
         autoTable(doc, {
           startY: yPos,
-          head: [['Week', 'Prayers', 'Duha', 'Points']],
+          head: [['Week', 'Prayers', 'Sitting', 'Points']],
           body: trackingData,
           theme: 'grid',
           styles: { halign: 'center', fontSize: 9 },
@@ -488,26 +488,14 @@ const StudentRecord = () => {
                         </Badge>
                       </div>
                       {sheet.data && (
-                        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+                        <div className="grid grid-cols-2 gap-2 text-sm">
                           <div className="text-center p-2 rounded-lg bg-slate-700/30">
                             <p className="text-slate-400">الصلوات</p>
                             <p className="text-white font-bold">{sheet.data.prayers_count || 0}/35</p>
                           </div>
                           <div className="text-center p-2 rounded-lg bg-slate-700/30">
-                            <p className="text-slate-400">الأذكار</p>
-                            <p className="text-white font-bold">{sheet.data.adhkar_after_prayer || 0}/7</p>
-                          </div>
-                          <div className="text-center p-2 rounded-lg bg-slate-700/30">
-                            <p className="text-slate-400">الضحى</p>
-                            <p className="text-white font-bold">{sheet.data.duha_prayers || 0}/7</p>
-                          </div>
-                          <div className="text-center p-2 rounded-lg bg-slate-700/30">
-                            <p className="text-slate-400">الوتر</p>
-                            <p className="text-white font-bold">{sheet.data.witr_prayers_days || 0}/7</p>
-                          </div>
-                          <div className="text-center p-2 rounded-lg bg-slate-700/30">
-                            <p className="text-slate-400">قيام الليل</p>
-                            <p className="text-white font-bold">{sheet.data.night_prayer || 0}</p>
+                            <p className="text-slate-400">الجلوس مع القرآن</p>
+                            <p className="text-white font-bold">{sheet.data.quran_sitting_days || 0}/35</p>
                           </div>
                         </div>
                       )}

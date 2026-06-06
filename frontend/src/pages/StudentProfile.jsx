@@ -221,6 +221,32 @@ const StudentProfile = () => {
                 </Badge>
               </div>
             )}
+
+            {/* الأجزاء القوية والضعيفة (من التقييم) */}
+            {(progressData.strong_juz?.length > 0 || progressData.weak_juz?.length > 0) && (
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {progressData.strong_juz?.length > 0 && (
+                  <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                    <p className="text-emerald-400 text-sm font-bold mb-2">الأجزاء القوية ({progressData.strong_juz.length})</p>
+                    <div className="flex flex-wrap gap-1">
+                      {[...progressData.strong_juz].sort((a, b) => a - b).map((j) => (
+                        <span key={j} className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-xs font-bold">{j}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {progressData.weak_juz?.length > 0 && (
+                  <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
+                    <p className="text-red-400 text-sm font-bold mb-2">الأجزاء الضعيفة ({progressData.weak_juz.length})</p>
+                    <div className="flex flex-wrap gap-1">
+                      {[...progressData.weak_juz].sort((a, b) => a - b).map((j) => (
+                        <span key={j} className="px-2 py-0.5 rounded bg-red-500/20 text-red-300 text-xs font-bold">{j}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

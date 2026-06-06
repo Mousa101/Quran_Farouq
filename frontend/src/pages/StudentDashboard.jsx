@@ -34,21 +34,23 @@ const StudentDashboard = () => {
   const [submittingTracking, setSubmittingTracking] = useState(false);
   const [trackingForm, setTrackingForm] = useState({
     prayers_count: 0,
-    adhkar_after_prayer: 0,  // أذكار بعد الصلاة
     quran_sitting_days: 0,
-    duha_prayers: 0,
-    family_recitation: 0,
-    study_hours: 0,
-    witr_prayers_days: 0,
-    sunnah_prayers: 0,
-    night_prayer: 0,
-    fasting: 0,
     notes: ''
   });
+  const [customItems, setCustomItems] = useState([]);
+  const [customValues, setCustomValues] = useState({});
+
+  useEffect(() => {
+    axios.get(`${API}/tracking-items`).then(r => setCustomItems(r.data || [])).catch(() => {});
+  }, []);
+
+  const customTrackingTotal = () =>
+    customItems.reduce((sum, it) => sum + Math.min(Math.max(parseInt(customValues[it.id]) || 0, 0), it.max_points), 0);
+  const customTrackingMax = () => customItems.reduce((sum, it) => sum + it.max_points, 0);
 
   const fetchData = async () => {
     if (!user?.id) return;
-    
+
     try {
       const [statsRes, activitiesRes, rankingsRes, tasmeeRes] = await Promise.all([
         axios.get(`${API}/statistics/student/${user.id}`),
@@ -158,15 +160,8 @@ const StudentDashboard = () => {
       const formDataToSend = {
         week_start,
         prayers_count: parseInt(trackingForm.prayers_count) || 0,
-        adhkar_after_prayer: parseInt(trackingForm.adhkar_after_prayer) || 0,
         quran_sitting_days: parseInt(trackingForm.quran_sitting_days) || 0,
-        duha_prayers: parseInt(trackingForm.duha_prayers) || 0,
-        family_recitation: parseInt(trackingForm.family_recitation) || 0,
-        study_hours: parseInt(trackingForm.study_hours) || 0,
-        witr_prayers_days: parseInt(trackingForm.witr_prayers_days) || 0,
-        sunnah_prayers: parseInt(trackingForm.sunnah_prayers) || 0,
-        night_prayer: parseInt(trackingForm.night_prayer) || 0,
-        fasting: parseInt(trackingForm.fasting) || 0,
+        custom_values: customValues,
         notes: trackingForm.notes || ''
       };
       
@@ -188,17 +183,10 @@ const StudentDashboard = () => {
       // إعادة تعيين النموذج فقط بعد النجاح
       setTrackingForm({
         prayers_count: 0,
-        adhkar_after_prayer: 0,
         quran_sitting_days: 0,
-        duha_prayers: 0,
-        family_recitation: 0,
-        study_hours: 0,
-        witr_prayers_days: 0,
-        sunnah_prayers: 0,
-        night_prayer: 0,
-        fasting: 0,
         notes: ''
       });
+      setCustomValues({});
     } catch (error) {
       console.error('Error submitting tracking:', error);
       const errorMsg = error.response?.data?.detail || 'فشل في حفظ ورقة المتابعة';
@@ -210,18 +198,8 @@ const StudentDashboard = () => {
 
   const calculateTrackingPoints = () => {
     const prayers = Math.min(trackingForm.prayers_count, 35);
-    const adhkar = Math.min(trackingForm.adhkar_after_prayer || 0, 7);  // أذكار بعد الصلاة
-    const quran = Math.min(trackingForm.quran_sitting_days, 7);
-    const duha = Math.min(trackingForm.duha_prayers, 7);
-    const family = Math.min(trackingForm.family_recitation, 7);
-    const study = Math.min(trackingForm.study_hours, 7);
-    const witr = Math.min(trackingForm.witr_prayers_days, 7);
-    const sunnah = Math.min(trackingForm.sunnah_prayers, 7);
-    // قيام الليل: إذا أتم يوم = 8 نقاط كاملة
-    const night = trackingForm.night_prayer >= 1 ? 8 : 0;
-    // الصيام: إذا أتم يوم = 8 نقاط كاملة
-    const fasting = trackingForm.fasting >= 1 ? 8 : 0;
-    return Math.min(prayers + adhkar + quran + duha + family + study + witr + sunnah + night + fasting, 100);
+    const quran = Math.min(trackingForm.quran_sitting_days, 35);
+    return prayers + quran + customTrackingTotal(); // 70 + بنود المعلم
   };
 
   if (loading) {
@@ -828,7 +806,7 @@ console.log(stats)
               <Calendar className="w-4 h-4" />
               هذا الأسبوع
             </h4>
-            <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <div className="p-2 md:p-3 rounded-xl bg-emerald-500/10 text-center">
                 <Hand className="w-5 h-5 md:w-6 md:h-6 mx-auto text-emerald-400 mb-1" />
                 <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.prayers || 0}<span className="text-xs text-slate-500">/35</span></p>
@@ -836,54 +814,13 @@ console.log(stats)
               </div>
               <div className="p-2 md:p-3 rounded-xl bg-blue-500/10 text-center">
                 <BookMarked className="w-5 h-5 md:w-6 md:h-6 mx-auto text-blue-400 mb-1" />
-                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.quran_sitting || 0}<span className="text-xs text-slate-500">/7</span></p>
-                <p className="text-blue-400 text-[10px] md:text-xs">القرآن</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-amber-500/10 text-center">
-                <Sunrise className="w-5 h-5 md:w-6 md:h-6 mx-auto text-amber-400 mb-1" />
-                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.duha_prayers || 0}<span className="text-xs text-slate-500">/7</span></p>
-                <p className="text-amber-400 text-[10px] md:text-xs">الضحى</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-pink-500/10 text-center">
-                <Users className="w-5 h-5 md:w-6 md:h-6 mx-auto text-pink-400 mb-1" />
-                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.family_recitation || 0}<span className="text-xs text-slate-500">/7</span></p>
-                <p className="text-pink-400 text-[10px] md:text-xs">التسميع</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-purple-500/10 text-center">
-                <GraduationCap className="w-5 h-5 md:w-6 md:h-6 mx-auto text-purple-400 mb-1" />
-                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.study_hours || 0}<span className="text-xs text-slate-500">/7</span></p>
-                <p className="text-purple-400 text-[10px] md:text-xs">الدراسة</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-indigo-500/10 text-center">
-                <Moon className="w-5 h-5 md:w-6 md:h-6 mx-auto text-indigo-400 mb-1" />
-                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.witr || 0}<span className="text-xs text-slate-500">/7</span></p>
-                <p className="text-indigo-400 text-[10px] md:text-xs">الوتر</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-teal-500/10 text-center">
-                <Sparkles className="w-5 h-5 md:w-6 md:h-6 mx-auto text-teal-400 mb-1" />
-                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.sunnah_prayers || 0}<span className="text-xs text-slate-500">/7</span></p>
-                <p className="text-teal-400 text-[10px] md:text-xs">السنن</p>
-              </div>
-              <div className="p-2 rounded-xl bg-purple-500/10 text-center">
-              <Hand className="w-8 h-8 mx-auto text-purple-400 mb-2" />
-              <p className="text-2xl font-bold text-white">{stats?.tracking?.total_adhkar || 0}<span className="text-xs text-slate-500">/7</span></p>
-              <p className="text-purple-400 text-xs">أذكار بعد الصلاة</p>
-            </div>
-              <div className="p-2 md:p-3 rounded-xl bg-yellow-500/10 text-center">
-                <Star className="w-5 h-5 md:w-6 md:h-6 mx-auto text-yellow-400 mb-1" />
-                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.night_prayer >= 1 ? '8' : '0'}<span className="text-xs text-slate-500">/8</span></p>
-                <p className="text-yellow-400 text-[10px] md:text-xs">قيام الليل</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-cyan-500/10 text-center">
-                <Calendar className="w-5 h-5 md:w-6 md:h-6 mx-auto text-cyan-400 mb-1" />
-                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.fasting >= 1 ? '8' : '0'}<span className="text-xs text-slate-500">/8</span></p>
-                <p className="text-cyan-400 text-[10px] md:text-xs">الصيام</p>
+                <p className="text-lg md:text-xl font-bold text-white">{(stats?.tracking?.weekly?.quran ?? stats?.tracking?.weekly?.quran_sitting) || 0}<span className="text-xs text-slate-500">/35</span></p>
+                <p className="text-blue-400 text-[10px] md:text-xs">الجلوس مع القرآن</p>
               </div>
             </div>
             <div className="mt-2 text-center">
               <span className="text-sm text-slate-400">نقاط الأسبوع: </span>
               <span className="text-lg font-bold text-emerald-400">{stats?.tracking?.weekly?.total_points || 0}</span>
-              <span className="text-sm text-slate-500">/100</span>
             </div>
           </div>
 
@@ -896,42 +833,14 @@ console.log(stats)
               <Trophy className="w-4 h-4" />
               المجموع الفصلي
             </h4>
-            <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-emerald-500/20">
                 <p className="text-lg md:text-xl font-bold text-emerald-400">{stats?.tracking?.semester?.prayers || 0}</p>
                 <p className="text-slate-400 text-[10px] md:text-xs">الصلوات</p>
               </div>
               <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-blue-500/20">
-                <p className="text-lg md:text-xl font-bold text-blue-400">{stats?.tracking?.semester?.quran_sitting || 0}</p>
-                <p className="text-slate-400 text-[10px] md:text-xs">القرآن</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-amber-500/20">
-                <p className="text-lg md:text-xl font-bold text-amber-400">{stats?.tracking?.semester?.duha_prayers || 0}</p>
-                <p className="text-slate-400 text-[10px] md:text-xs">الضحى</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-pink-500/20">
-                <p className="text-lg md:text-xl font-bold text-pink-400">{stats?.tracking?.semester?.family_recitation || 0}</p>
-                <p className="text-slate-400 text-[10px] md:text-xs">التسميع</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-purple-500/20">
-                <p className="text-lg md:text-xl font-bold text-purple-400">{stats?.tracking?.semester?.study_hours || 0}</p>
-                <p className="text-slate-400 text-[10px] md:text-xs">الدراسة</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-indigo-500/20">
-                <p className="text-lg md:text-xl font-bold text-indigo-400">{stats?.tracking?.semester?.witr || 0}</p>
-                <p className="text-slate-400 text-[10px] md:text-xs">الوتر</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-teal-500/20">
-                <p className="text-lg md:text-xl font-bold text-teal-400">{stats?.tracking?.semester?.sunnah_prayers || 0}</p>
-                <p className="text-slate-400 text-[10px] md:text-xs">السنن</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-yellow-500/20">
-                <p className="text-lg md:text-xl font-bold text-yellow-400">{stats?.tracking?.semester?.night_prayer || 0}</p>
-                <p className="text-slate-400 text-[10px] md:text-xs">قيام الليل</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-cyan-500/20">
-                <p className="text-lg md:text-xl font-bold text-cyan-400">{stats?.tracking?.semester?.fasting || 0}</p>
-                <p className="text-slate-400 text-[10px] md:text-xs">الصيام</p>
+                <p className="text-lg md:text-xl font-bold text-blue-400">{(stats?.tracking?.semester?.quran ?? stats?.tracking?.semester?.quran_sitting) || 0}</p>
+                <p className="text-slate-400 text-[10px] md:text-xs">الجلوس مع القرآن</p>
               </div>
             </div>
             <div className="mt-3 flex justify-between items-center text-sm">
@@ -1029,134 +938,40 @@ console.log(stats)
                   className="bg-slate-800 border-white/10 text-white"
                 />
               </div>
-              
+
               {/* الجلوس مع القرآن */}
               <div>
                 <Label className="text-slate-300 flex items-center gap-2">
                   <BookMarked className="w-4 h-4 text-blue-400" />
-                  القرآن (من 7)
+                  الجلوس مع القرآن (من 35)
                 </Label>
                 <Input
                   type="number"
                   min="0"
-                  max="7"
+                  max="35"
                   value={trackingForm.quran_sitting_days}
                   onChange={(e) => setTrackingForm({ ...trackingForm, quran_sitting_days: parseInt(e.target.value) || 0 })}
                   className="bg-slate-800 border-white/10 text-white"
                 />
               </div>
 
-              {/* صلاة الضحى */}
-              <div>
-                <Label className="text-slate-300 flex items-center gap-2">
-                  <Sunrise className="w-4 h-4 text-amber-400" />
-                  الضحى (من 7)
-                </Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="7"
-                  value={trackingForm.duha_prayers}
-                  onChange={(e) => setTrackingForm({ ...trackingForm, duha_prayers: parseInt(e.target.value) || 0 })}
-                  className="bg-slate-800 border-white/10 text-white"
-                />
-              </div>
-
-              {/* التسميع للأهل */}
-              <div>
-                <Label className="text-slate-300 flex items-center gap-2">
-                  <Users className="w-4 h-4 text-pink-400" />
-                  التسميع (من 7)
-                </Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="7"
-                  value={trackingForm.family_recitation}
-                  onChange={(e) => setTrackingForm({ ...trackingForm, family_recitation: parseInt(e.target.value) || 0 })}
-                  className="bg-slate-800 border-white/10 text-white"
-                />
-              </div>
-
-              {/* ساعات الدراسة */}
-              <div>
-                <Label className="text-slate-300 flex items-center gap-2">
-                  <GraduationCap className="w-4 h-4 text-purple-400" />
-                  الدراسة (من 7)
-                </Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="7"
-                  value={trackingForm.study_hours}
-                  onChange={(e) => setTrackingForm({ ...trackingForm, study_hours: parseInt(e.target.value) || 0 })}
-                  className="bg-slate-800 border-white/10 text-white"
-                />
-              </div>
-
-              {/* الوتر */}
-              <div>
-                <Label className="text-slate-300 flex items-center gap-2">
-                  <Moon className="w-4 h-4 text-indigo-400" />
-                  الوتر (من 7)
-                </Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="7"
-                  value={trackingForm.witr_prayers_days}
-                  onChange={(e) => setTrackingForm({ ...trackingForm, witr_prayers_days: parseInt(e.target.value) || 0 })}
-                  className="bg-slate-800 border-white/10 text-white"
-                />
-              </div>
-
-              {/* السنن */}
-              <div>
-                <Label className="text-slate-300 flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-teal-400" />
-                  السنن (من 7)
-                </Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="7"
-                  value={trackingForm.sunnah_prayers}
-                  onChange={(e) => setTrackingForm({ ...trackingForm, sunnah_prayers: parseInt(e.target.value) || 0 })}
-                  className="bg-slate-800 border-white/10 text-white"
-                />
-              </div>
-
-              {/* قيام الليل */}
-              <div>
-                <Label className="text-slate-300 flex items-center gap-2">
-                  <Star className="w-4 h-4 text-yellow-400" />
-                  قيام الليل (0 أو 1) = 8 نقاط
-                </Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="1"
-                  value={trackingForm.night_prayer}
-                  onChange={(e) => setTrackingForm({ ...trackingForm, night_prayer: parseInt(e.target.value) || 0 })}
-                  className="bg-slate-800 border-white/10 text-white"
-                />
-              </div>
-
-              {/* الصيام */}
-              <div>
-                <Label className="text-slate-300 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-cyan-400" />
-                  الصيام (0 أو 1) = 8 نقاط
-                </Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="1"
-                  value={trackingForm.fasting}
-                  onChange={(e) => setTrackingForm({ ...trackingForm, fasting: parseInt(e.target.value) || 0 })}
-                  className="bg-slate-800 border-white/10 text-white"
-                />
-              </div>
+              {/* بنود المعلم المخصصة */}
+              {customItems.map((it) => (
+                <div key={it.id}>
+                  <Label className="text-slate-300 flex items-center gap-2">
+                    <Star className="w-4 h-4 text-purple-400" />
+                    {it.name} (من {it.max_points})
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max={it.max_points}
+                    value={customValues[it.id] ?? 0}
+                    onChange={(e) => setCustomValues({ ...customValues, [it.id]: parseInt(e.target.value) || 0 })}
+                    className="bg-slate-800 border-white/10 text-white"
+                  />
+                </div>
+              ))}
             </div>
 
             {/* ملاحظات */}

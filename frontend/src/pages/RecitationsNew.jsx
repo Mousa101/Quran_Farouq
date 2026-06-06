@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -10,8 +11,8 @@ import { Checkbox } from '../components/ui/checkbox';
 import { Calendar } from '../components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { 
-  BookOpen, CheckCircle, XCircle, Loader2, Info, Users, 
-  FileText, RotateCcw, Clock, Trash2, Archive, Eye
+  BookOpen, CheckCircle, XCircle, Loader2, Info, Users,
+  FileText, RotateCcw, Clock, Trash2, Archive, Eye, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -54,6 +55,7 @@ const JUZ_PAGE_RANGES = {
 };
 
 const RecitationsNew = () => {
+  const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [recitations, setRecitations] = useState({});
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -75,8 +77,8 @@ const RecitationsNew = () => {
   const [formData, setFormData] = useState({
     has_new_memorization: true,
     juz_number: 1,
-    page_from: 1,
-    page_to: 1,
+    page_from: '',
+    page_to: '',
     error_count: 0,
     passed_minimum: false,
     has_review: false,
@@ -208,8 +210,8 @@ const RecitationsNew = () => {
     setFormData({
       has_new_memorization: true,
       juz_number: 1,
-      page_from: 1,
-      page_to: 1,
+      page_from: '',
+      page_to: '',
       error_count: 0,
       passed_minimum: false,
       has_review: false,
@@ -223,12 +225,12 @@ const RecitationsNew = () => {
   };
 
   const handleJuzChange = (newJuzNumber) => {
-    const juzRange = JUZ_PAGE_RANGES[newJuzNumber];
+    // لا قيم افتراضية للصفحات — تُترك فارغة ليُدخلها المعلم بنفسه (أبسط وبدون تعليق)
     setFormData(prev => ({
       ...prev,
       juz_number: newJuzNumber,
-      page_from: juzRange.start,
-      page_to: juzRange.start
+      page_from: '',
+      page_to: ''
     }));
   };
 
@@ -249,14 +251,23 @@ const RecitationsNew = () => {
     
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      // ضبط الصفحات مرة واحدة عند الحفظ فقط (بدل التعليق عند كل ضغطة)
+      let pageFrom = null, pageTo = null;
+      if (formData.has_new_memorization) {
+        const jr = JUZ_PAGE_RANGES[formData.juz_number] || JUZ_PAGE_RANGES[1];
+        const pf = parseInt(formData.page_from);
+        const pt = parseInt(formData.page_to);
+        pageFrom = isNaN(pf) ? jr.start : Math.max(jr.start, Math.min(jr.end, pf));
+        pageTo = isNaN(pt) ? pageFrom : Math.max(pageFrom, Math.min(jr.end, pt));
+      }
       const payload = {
         student_id: selectedStudent.id,
         recitation_type: 'combined',
         date: dateStr,
         has_new_memorization: formData.has_new_memorization,
         juz_number: formData.juz_number,
-        page_from: formData.page_from,
-        page_to: formData.page_to,
+        page_from: pageFrom,
+        page_to: pageTo,
         error_count: formData.error_count,
         passed_minimum: formData.passed_minimum,
         has_review: formData.has_review,
@@ -332,6 +343,9 @@ const RecitationsNew = () => {
   };
 
   const juzRange = JUZ_PAGE_RANGES[formData.juz_number] || JUZ_PAGE_RANGES[1];
+  // أجزاء الطالب الضعيفة (من التقييم) — للتنبيه أثناء التسميع
+  const weakJuz = selectedStudent?.weak_juz || [];
+  const strongJuz = selectedStudent?.strong_juz || [];
 
   // إحصائيات
   const stats = {
@@ -482,6 +496,15 @@ const RecitationsNew = () => {
                             <XCircle className="w-4 h-4 ml-1" />
                             لم يسمّع
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => navigate(`/initial-assessment?student=${student.id}`)}
+                            className="border-blue-500/30 text-blue-400 hover:bg-blue-500/20"
+                          >
+                            <RefreshCw className="w-4 h-4 ml-1" />
+                            إعادة تقييم
+                          </Button>
                         </div>
                       </div>
                       
@@ -588,12 +611,21 @@ const RecitationsNew = () => {
                       <SelectContent className="bg-slate-800 border-slate-700 max-h-60">
                         {Array.from({ length: 30 }, (_, i) => (
                           <SelectItem key={i + 1} value={String(i + 1)} className="text-white">
-                            الجزء {i + 1} (ص {JUZ_PAGE_RANGES[i + 1].start} - {JUZ_PAGE_RANGES[i + 1].end})
+                            {weakJuz.includes(i + 1) ? '⚠️ ' : ''}الجزء {i + 1} (ص {JUZ_PAGE_RANGES[i + 1].start} - {JUZ_PAGE_RANGES[i + 1].end})
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {weakJuz.includes(formData.juz_number) && (
+                    <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 flex items-center gap-2">
+                      <Info className="w-4 h-4 text-red-400 flex-shrink-0" />
+                      <p className="text-red-300 text-sm">
+                        ⚠️ هذا الجزء من الأجزاء الضعيفة للطالب — يحتاج إلى تركيز ومراجعة
+                      </p>
+                    </div>
+                  )}
 
                   <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2">
                     <Info className="w-4 h-4 text-emerald-400 flex-shrink-0" />
@@ -609,12 +641,9 @@ const RecitationsNew = () => {
                         type="number"
                         min={juzRange.start}
                         max={juzRange.end}
+                        placeholder={`${juzRange.start}`}
                         value={formData.page_from}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || juzRange.start;
-                          const bounded = Math.max(juzRange.start, Math.min(juzRange.end, val));
-                          setFormData({ ...formData, page_from: bounded });
-                        }}
+                        onChange={(e) => setFormData({ ...formData, page_from: e.target.value })}
                         className="bg-slate-800 border-slate-700 text-white"
                       />
                     </div>
@@ -622,14 +651,11 @@ const RecitationsNew = () => {
                       <Label className="text-slate-300">إلى صفحة</Label>
                       <Input
                         type="number"
-                        min={formData.page_from}
+                        min={juzRange.start}
                         max={juzRange.end}
+                        placeholder={`${juzRange.end}`}
                         value={formData.page_to}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || formData.page_from;
-                          const bounded = Math.max(formData.page_from, Math.min(juzRange.end, val));
-                          setFormData({ ...formData, page_to: bounded });
-                        }}
+                        onChange={(e) => setFormData({ ...formData, page_to: e.target.value })}
                         className="bg-slate-800 border-slate-700 text-white"
                       />
                     </div>
@@ -683,19 +709,30 @@ const RecitationsNew = () => {
                   <div className="space-y-2">
                     <Label className="text-slate-300">الأجزاء المراجعة كاملة</Label>
                     <div className="grid grid-cols-6 gap-2 max-h-40 overflow-y-auto p-2 bg-slate-800/50 rounded-lg">
-                      {Array.from({ length: 30 }, (_, i) => i + 1).map((juz) => (
-                        <div
-                          key={juz}
-                          onClick={() => handleJuzToggle(juz)}
-                          className={`p-2 text-center rounded-lg cursor-pointer transition-all text-sm ${
-                            formData.review_juz?.includes(juz)
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                          }`}
-                        >
-                          {juz}
-                        </div>
-                      ))}
+                      {Array.from({ length: 30 }, (_, i) => i + 1).map((juz) => {
+                        const isWeak = weakJuz.includes(juz);
+                        const isStrong = strongJuz.includes(juz);
+                        const selected = formData.review_juz?.includes(juz);
+                        return (
+                          <div
+                            key={juz}
+                            onClick={() => handleJuzToggle(juz)}
+                            title={isWeak ? 'جزء ضعيف — يحتاج تركيز' : (isStrong ? 'جزء قوي' : '')}
+                            className={`relative p-2 text-center rounded-lg cursor-pointer transition-all text-sm ${
+                              selected
+                                ? 'bg-blue-500 text-white'
+                                : isWeak
+                                  ? 'bg-slate-700 text-slate-200 ring-2 ring-red-500'
+                                  : isStrong
+                                    ? 'bg-slate-700 text-slate-200 ring-1 ring-emerald-500/60'
+                                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
+                          >
+                            {juz}
+                            {isWeak && <span className="absolute -top-1 -left-1 text-xs">⚠️</span>}
+                          </div>
+                        );
+                      })}
                     </div>
                     {formData.review_juz?.length > 0 && (
                       <p className="text-blue-400 text-sm">

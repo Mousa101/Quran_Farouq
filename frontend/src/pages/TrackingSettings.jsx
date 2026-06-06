@@ -34,11 +34,53 @@ const TrackingSettings = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [checkResult, setCheckResult] = useState(null);
+  const [customItems, setCustomItems] = useState([]);
+  const [newItem, setNewItem] = useState({ name: '', max_points: '' });
+  const [addingItem, setAddingItem] = useState(false);
 
   useEffect(() => {
     fetchSettings();
     checkSubmissionWindow();
+    fetchCustomItems();
   }, []);
+
+  const fetchCustomItems = async () => {
+    try {
+      const res = await axios.get(`${API}/tracking-items`);
+      setCustomItems(res.data || []);
+    } catch (error) {
+      console.error('Error fetching items:', error);
+    }
+  };
+
+  const handleAddItem = async () => {
+    const points = parseInt(newItem.max_points);
+    if (!newItem.name.trim() || !points || points <= 0) {
+      toast.error('أدخل اسم البند ونقاطه (أكبر من صفر)');
+      return;
+    }
+    setAddingItem(true);
+    try {
+      await axios.post(`${API}/tracking-items`, { name: newItem.name.trim(), max_points: points });
+      toast.success('تم إضافة البند');
+      setNewItem({ name: '', max_points: '' });
+      fetchCustomItems();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في إضافة البند');
+    } finally {
+      setAddingItem(false);
+    }
+  };
+
+  const handleDeleteItem = async (id) => {
+    try {
+      await axios.delete(`${API}/tracking-items/${id}`);
+      toast.success('تم حذف البند');
+      fetchCustomItems();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في حذف البند');
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -120,6 +162,59 @@ const TrackingSettings = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* بنود المتابعة المخصصة */}
+      <Card className={isDark ? 'glass-card' : 'bg-white'}>
+        <CardHeader>
+          <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <Settings className="w-5 h-5 text-purple-400" />
+            بنود متابعة إضافية (الأساس: الصلوات 35 + الجلوس 35 = 70)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-slate-400 text-sm">أضف بنوداً خاصة بك بنقاطها، وستظهر للطلاب في ورقة المتابعة وتُحتسب ضمن مجموعهم.</p>
+          {customItems.length > 0 && (
+            <div className="space-y-2">
+              {customItems.map((it) => (
+                <div key={it.id} className={`flex items-center justify-between p-3 rounded-lg ${isDark ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
+                  <span className={isDark ? 'text-white' : 'text-slate-900'}>{it.name}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-purple-400 font-bold">{it.max_points} نقطة</span>
+                    <Button size="sm" variant="ghost" onClick={() => handleDeleteItem(it.id)} className="text-red-400 hover:bg-red-500/20">
+                      <XCircle className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex-1 min-w-[160px]">
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>اسم البند</Label>
+              <Input
+                value={newItem.name}
+                onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                placeholder="مثال: قيام الليل"
+                className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+              />
+            </div>
+            <div className="w-28">
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>النقاط</Label>
+              <Input
+                type="number"
+                min="1"
+                value={newItem.max_points}
+                onChange={(e) => setNewItem({ ...newItem, max_points: e.target.value })}
+                placeholder="10"
+                className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+              />
+            </div>
+            <Button onClick={handleAddItem} disabled={addingItem} className="bg-purple-600 hover:bg-purple-700">
+              {addingItem ? <Loader2 className="w-4 h-4 animate-spin" /> : 'إضافة'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className={isDark ? 'glass-card' : 'bg-white'}>
         <CardHeader>

@@ -859,16 +859,50 @@ async def submit_initial_assessment(student_id: str, data: InitialAssessment, cu
     valid_levels = ["تلاوة عامة", "تمهيدية", "متوسطة", "متقدمة", "إجازة", "اتقان", "سند غيبي", "روايات أخرى"]
     if data.tajweed_level not in valid_levels:
         raise HTTPException(status_code=400, detail="مستوى التجويد غير صحيح")
-    
-    # Update student with initial assessment
+
+    # الاختبارات الإدارية تكون بمضاعفات 5 (عدد الأجزاء/الصفحات المختبَرة)
+    if len(data.administrative_test_juz) % 5 != 0:
+        raise HTTPException(status_code=400, detail="عدد الأجزاء المختبَرة إدارياً يجب أن يكون من مضاعفات 5 (5، 10، 15، ...)")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    active_term_id = await get_active_term_id()
+    prev_count = student.get("assessment_count") or 0
+
+    # Update student with the latest assessment snapshot
     update_data = {
         "previous_memorization_juz": data.previous_memorization_juz,
         "previous_memorization_pages": data.previous_memorization_pages,
         "tajweed_level": data.tajweed_level,
-        "initial_assessment_done": True
+        "weak_juz": data.weak_juz,
+        "strong_juz": data.strong_juz,
+        "mufassal_test_juz": data.mufassal_test_juz,
+        "administrative_test_juz": data.administrative_test_juz,
+        "initial_assessment_done": True,
+        "last_assessment_date": now_iso,
+        "assessment_count": prev_count + 1
     }
-    
+
     await db.users.update_one({"id": student_id}, {"$set": update_data})
+
+    # Keep a dated history record of every assessment (re-evaluation timeline)
+    assessment_record = {
+        "id": str(uuid.uuid4()),
+        "student_id": student_id,
+        "student_name": student.get("name"),
+        "sheikh_id": current_user["user_id"],
+        "term_id": active_term_id,
+        "date": now_iso,
+        "previous_memorization_juz": data.previous_memorization_juz,
+        "previous_memorization_pages": data.previous_memorization_pages,
+        "tajweed_level": data.tajweed_level,
+        "weak_juz": data.weak_juz,
+        "strong_juz": data.strong_juz,
+        "mufassal_test_juz": data.mufassal_test_juz,
+        "administrative_test_juz": data.administrative_test_juz,
+        "notes": data.notes,
+        "is_reassessment": prev_count > 0
+    }
+    await db.assessments.insert_one(assessment_record)
     
     # Calculate total pages from previous memorization
     # Each juz has 20 pages
@@ -939,6 +973,10 @@ async def get_student_progress(student_id: str, current_user: dict = Depends(get
         "student_name": student.get("name"),
         "tajweed_level": student.get("tajweed_level"),
         "initial_assessment_done": student.get("initial_assessment_done", False),
+        "weak_juz": student.get("weak_juz") or [],
+        "strong_juz": student.get("strong_juz") or [],
+        "mufassal_test_juz": student.get("mufassal_test_juz") or [],
+        "administrative_test_juz": student.get("administrative_test_juz") or [],
         "previous_memorization": {
             "juz": previous_juz,
             "juz_count": len(previous_juz),
@@ -978,52 +1016,64 @@ async def get_students_pending_assessment(current_user: dict = Depends(get_curre
         },
         {"_id": 0, "password_hash": 0}
     ).to_list(100)
-    
+
     return students
+
+@api_router.get("/students/{student_id}/assessments")
+async def get_student_assessments(student_id: str, current_user: dict = Depends(get_current_user)):
+    """Get the full assessment history (timeline) of a student.
+    Accessible by the student themselves, sheikhs, and admins."""
+    if current_user["role"] == "student" and current_user["user_id"] != student_id:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+
+    assessments = await db.assessments.find(
+        {"student_id": student_id},
+        {"_id": 0}
+    ).sort("date", -1).to_list(200)
+
+    return assessments
 
 # ============== TRACKING SHEET ROUTES ==============
 
-def calculate_tracking_points(data: dict) -> dict:
+TRACKING_PRAYERS_MAX = 35
+TRACKING_SITTING_MAX = 35
+TRACKING_BASE_MAX = TRACKING_PRAYERS_MAX + TRACKING_SITTING_MAX  # 70
+
+def calculate_tracking_points(data: dict, custom_items: list = None) -> dict:
     """
-    حساب نقاط ورقة المتابعة - المجموع 100 نقطة:
-    - الصلوات: 35 نقطة (5 صلوات × 7 أيام)
-    - أذكار بعد الصلاة: 7 نقاط
-    - الجلوس مع القرآن: 7 نقاط
-    - صلاة الضحى: 7 نقاط
-    - التسميع للأهل: 7 نقاط
-    - ساعات الدراسة: 7 نقاط
-    - الوتر: 7 نقاط
-    - السنن: 7 نقاط
-    - قيام الليل: 8 نقاط (إذا قام ليلة واحدة = 8 نقاط كاملة)
-    - الصيام: 8 نقاط (إذا صام يوم واحد = 8 نقاط كاملة)
-    المجموع: 35+7+7+7+7+7+7+7+8+8 = 100 نقطة
+    حساب نقاط ورقة المتابعة - الأساس 70 نقطة:
+    - الصلوات: 35 نقطة
+    - الجلوس مع القرآن: 35 نقطة
+    بالإضافة إلى بنود مخصصة يضيفها المعلم (كل بند بحده الأقصى من النقاط).
+    custom_items: [{"id", "name", "max_points"}], والقيم في data["custom_values"] = {item_id: value}
     """
-    prayers = min(data.get("prayers_count", 0), 35)  # Max 35
-    adhkar = min(data.get("adhkar_after_prayer", 0), 7)  # Max 7
-    quran = min(data.get("quran_sitting_days", 0), 7)  # Max 7
-    duha = min(data.get("duha_prayers", 0), 7)  # Max 7
-    family = min(data.get("family_recitation", 0), 7)  # Max 7
-    study = min(data.get("study_hours", 0), 7)  # Max 7
-    witr = min(data.get("witr_prayers_days", 0), 7)  # Max 7
-    sunnah = min(data.get("sunnah_prayers", 0), 7)  # Max 7
-    # قيام الليل: إذا قام ليلة واحدة = 8 نقاط كاملة
-    night = 8 if data.get("night_prayer", 0) >= 1 else 0
-    # الصيام: إذا صام يوم واحد = 8 نقاط كاملة
-    fasting = 8 if data.get("fasting", 0) >= 1 else 0
-    
-    total = min(prayers + adhkar + quran + duha + family + study + witr + sunnah + night + fasting, 100)
-    
+    prayers = min(data.get("prayers_count", 0), TRACKING_PRAYERS_MAX)
+    sitting = min(data.get("quran_sitting_days", 0), TRACKING_SITTING_MAX)
+
+    custom_total = 0
+    custom_points = {}
+    custom_values = data.get("custom_values") or {}
+    for item in (custom_items or []):
+        raw = custom_values.get(item["id"], 0) or 0
+        pts = min(max(int(raw), 0), int(item.get("max_points", 0)))
+        custom_points[item["id"]] = pts
+        custom_total += pts
+
+    total = prayers + sitting + custom_total
+
     return {
         "prayers_points": prayers,
-        "adhkar_points": adhkar,
-        "quran_points": quran,
-        "duha_points": duha,
-        "family_points": family,
-        "study_points": study,
-        "witr_points": witr,
-        "sunnah_points": sunnah,
-        "night_prayer_points": night,
-        "fasting_points": fasting,
+        "quran_points": sitting,
+        # بنود ملغاة (للتوافق مع البيانات القديمة)
+        "adhkar_points": 0,
+        "duha_points": 0,
+        "family_points": 0,
+        "study_points": 0,
+        "witr_points": 0,
+        "sunnah_points": 0,
+        "night_prayer_points": 0,
+        "fasting_points": 0,
+        "custom_points": custom_points,
         "total_points": total
     }
 
@@ -1090,9 +1140,9 @@ async def grant_badge_to_student(student_id: str, badge_id: str, granted_by: str
     
     return True
 
-async def check_worshipper_badge(student_id: str, tracking_points: int):
-    """فحص ومنح شارة العابد (90% أو أكثر من ورق المتابعة)"""
-    if tracking_points >= 90:  # 90% من 100 نقطة
+async def check_worshipper_badge(student_id: str, tracking_points: int, max_points: int = TRACKING_BASE_MAX):
+    """فحص ومنح شارة العابد (90% أو أكثر من ورقة المتابعة)"""
+    if max_points > 0 and tracking_points >= 0.9 * max_points:
         await grant_badge_to_student(student_id, "worshipper", "system")
 
 async def check_committed_badge(student_id: str):
@@ -1157,7 +1207,7 @@ async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_
     sheet_data = TrackingSheetData(
         prayers_count=min(data.prayers_count, 35),
         adhkar_after_prayer=min(data.adhkar_after_prayer, 7),
-        quran_sitting_days=min(data.quran_sitting_days, 7),
+        quran_sitting_days=min(data.quran_sitting_days, 35),
         duha_prayers=min(data.duha_prayers, 7),
         family_recitation=min(data.family_recitation, 7),
         study_hours=min(data.study_hours, 7),
@@ -1299,8 +1349,8 @@ class StudentTrackingCreate(BaseModel):
     """ورقة المتابعة للطالب - الأسبوع يبدأ وينتهي السبت"""
     week_start: str  # تاريخ بداية الأسبوع (السبت)
     prayers_count: int = 0  # الصلوات (0-35)
-    adhkar_after_prayer: int = 0  # أذكار بعد الصلاة (0-7)
-    quran_sitting_days: int = 0  # الجلوس مع القرآن (0-7)
+    adhkar_after_prayer: int = 0  # أذكار بعد الصلاة (0-7) [ملغى]
+    quran_sitting_days: int = 0  # الجلوس مع القرآن (0-35)
     duha_prayers: int = 0  # صلاة الضحى (0-7)
     family_recitation: int = 0  # التسميع للأهل (0-7)
     study_hours: int = 0  # ساعات الدراسة (0-7)
@@ -1309,6 +1359,70 @@ class StudentTrackingCreate(BaseModel):
     night_prayer: int = 0  # قيام الليل (0-1) = 8 نقاط
     fasting: int = 0  # الصيام (0-1) = 8 نقاط
     notes: Optional[str] = None
+    custom_values: Optional[dict] = None  # {item_id: value} للبنود المخصصة من المعلم
+
+
+# ============== CUSTOM TRACKING ITEMS (بنود المعلم المخصصة) ==============
+
+class TrackingItemCreate(BaseModel):
+    name: str
+    max_points: int
+
+async def get_sheikh_id_for_student(student_id: str) -> Optional[str]:
+    """إيجاد معلم الطالب عبر مجموعته"""
+    student = await db.users.find_one({"id": student_id}, {"group_id": 1, "_id": 0})
+    if not student or not student.get("group_id"):
+        return None
+    group = await db.groups.find_one({"id": student["group_id"]}, {"sheikh_id": 1, "_id": 0})
+    return group.get("sheikh_id") if group else None
+
+async def get_tracking_items_for_sheikh(sheikh_id: str) -> list:
+    if not sheikh_id:
+        return []
+    return await db.tracking_items.find(
+        {"sheikh_id": sheikh_id, "active": {"$ne": False}}, {"_id": 0}
+    ).sort("created_at", 1).to_list(100)
+
+@api_router.post("/tracking-items")
+async def create_tracking_item(data: TrackingItemCreate, current_user: dict = Depends(get_current_user)):
+    """إضافة بند متابعة مخصص (للمعلم فقط)"""
+    if current_user["role"] != "sheikh":
+        raise HTTPException(status_code=403, detail="فقط المعلم يمكنه إضافة بنود المتابعة")
+    if not data.name.strip():
+        raise HTTPException(status_code=400, detail="اسم البند مطلوب")
+    if data.max_points <= 0:
+        raise HTTPException(status_code=400, detail="نقاط البند يجب أن تكون أكبر من صفر")
+    item = {
+        "id": str(uuid.uuid4()),
+        "sheikh_id": current_user["user_id"],
+        "name": data.name.strip(),
+        "max_points": int(data.max_points),
+        "active": True,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.tracking_items.insert_one(dict(item))
+    return item
+
+@api_router.get("/tracking-items")
+async def list_tracking_items(current_user: dict = Depends(get_current_user)):
+    """بنود المتابعة المخصصة — المعلم يرى بنوده، الطالب يرى بنود معلمه"""
+    if current_user["role"] == "sheikh":
+        sheikh_id = current_user["user_id"]
+    elif current_user["role"] == "student":
+        sheikh_id = await get_sheikh_id_for_student(current_user["user_id"])
+    else:
+        sheikh_id = None
+    return await get_tracking_items_for_sheikh(sheikh_id)
+
+@api_router.delete("/tracking-items/{item_id}")
+async def delete_tracking_item(item_id: str, current_user: dict = Depends(get_current_user)):
+    """حذف بند متابعة مخصص (للمعلم صاحبه فقط)"""
+    if current_user["role"] != "sheikh":
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    res = await db.tracking_items.delete_one({"id": item_id, "sheikh_id": current_user["user_id"]})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="البند غير موجود")
+    return {"message": "تم حذف البند"}
 
 @api_router.post("/tracking-sheets/student")
 async def create_tracking_sheet_student(data: StudentTrackingCreate, current_user: dict = Depends(get_current_user)):
@@ -1389,34 +1503,25 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
         "week_start": week_start_to_use
     })
     
+    # البنود المخصصة من معلم الطالب
+    sheikh_id = await get_sheikh_id_for_student(current_user["user_id"])
+    custom_items = await get_tracking_items_for_sheikh(sheikh_id)
+    custom_values = data.custom_values or {}
+
     # حساب النقاط - صفر إذا كان خارج وقت التسليم
     points_breakdown = calculate_tracking_points({
         "prayers_count": data.prayers_count,
-        "adhkar_after_prayer": data.adhkar_after_prayer,
         "quran_sitting_days": data.quran_sitting_days,
-        "duha_prayers": data.duha_prayers,
-        "family_recitation": data.family_recitation,
-        "study_hours": data.study_hours,
-        "witr_prayers_days": data.witr_prayers_days,
-        "sunnah_prayers": data.sunnah_prayers,
-        "night_prayer": data.night_prayer,
-        "fasting": data.fasting
-    })
-    
+        "custom_values": custom_values
+    }, custom_items)
+
     # إذا كان خارج وقت التسليم، لا تُمنح نقاط
     actual_points = points_breakdown["total_points"] if is_within_submission_window else 0
-    
+
     sheet_data_dict = {
         "prayers_count": min(data.prayers_count, 35),
-        "adhkar_after_prayer": min(data.adhkar_after_prayer, 7),
-        "quran_sitting_days": min(data.quran_sitting_days, 7),
-        "duha_prayers": min(data.duha_prayers, 7),
-        "family_recitation": min(data.family_recitation, 7),
-        "study_hours": min(data.study_hours, 7),
-        "witr_prayers_days": min(data.witr_prayers_days, 7),
-        "sunnah_prayers": min(data.sunnah_prayers, 7),
-        "night_prayer": min(data.night_prayer, 1),
-        "fasting": min(data.fasting, 1),
+        "quran_sitting_days": min(data.quran_sitting_days, 35),
+        "custom_values": points_breakdown.get("custom_points", {}),
         "notes": data.notes
     }
     
@@ -1446,15 +1551,8 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
     # إنشاء ورقة جديدة
     sheet_data = TrackingSheetData(
         prayers_count=min(data.prayers_count, 35),
-        adhkar_after_prayer=min(data.adhkar_after_prayer, 7),
-        quran_sitting_days=min(data.quran_sitting_days, 7),
-        duha_prayers=min(data.duha_prayers, 7),
-        family_recitation=min(data.family_recitation, 7),
-        study_hours=min(data.study_hours, 7),
-        witr_prayers_days=min(data.witr_prayers_days, 7),
-        sunnah_prayers=min(data.sunnah_prayers, 7),
-        night_prayer=min(data.night_prayer, 1),
-        fasting=min(data.fasting, 1),
+        quran_sitting_days=min(data.quran_sitting_days, 35),
+        custom_values=points_breakdown.get("custom_points", {}),
         notes=data.notes
     )
     
@@ -1557,7 +1655,7 @@ async def update_tracking_sheet(sheet_id: str, data: TrackingSheetUpdate, curren
     if data.adhkar_after_prayer is not None:
         sheet_data["adhkar_after_prayer"] = min(data.adhkar_after_prayer, 7)
     if data.quran_sitting_days is not None:
-        sheet_data["quran_sitting_days"] = min(data.quran_sitting_days, 7)
+        sheet_data["quran_sitting_days"] = min(data.quran_sitting_days, 35)
     if data.duha_prayers is not None:
         sheet_data["duha_prayers"] = min(data.duha_prayers, 7)
     if data.family_recitation is not None:
@@ -1575,8 +1673,12 @@ async def update_tracking_sheet(sheet_id: str, data: TrackingSheetUpdate, curren
     if data.notes is not None:
         sheet_data["notes"] = data.notes
     
-    # Calculate new points
-    points_breakdown = calculate_tracking_points(sheet_data)
+    # Calculate new points (with the student's custom items so they're not dropped)
+    edit_student_id = sheet.get("student_id")
+    edit_sheikh_id = await get_sheikh_id_for_student(edit_student_id) if edit_student_id else None
+    edit_custom_items = await get_tracking_items_for_sheikh(edit_sheikh_id)
+    points_breakdown = calculate_tracking_points(sheet_data, edit_custom_items)
+    sheet_data["custom_values"] = points_breakdown.get("custom_points", sheet_data.get("custom_values", {}))
     new_points = points_breakdown["total_points"]
     
     # Update sheet
@@ -3276,7 +3378,7 @@ async def add_points(student_id: str, points: int, category: str, description: s
     category_field = f"{category}_points" if category in ["attendance", "recitation", "tracking"] else "total_points"
     
     update_dict = {
-        "total_points": student_points["total_points"] + points,
+        "total_points": student_points.get("total_points", 0) + points,
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     
@@ -4519,7 +4621,29 @@ async def grant_interaction_badge(data: InteractionGrantCreate, current_user: di
     
     if existing:
         raise HTTPException(status_code=400, detail="تم منح نقاط التفاعل لهذا الطالب هذا الأسبوع مسبقاً")
-    
+
+    # الحد الأعلى: لا يتجاوز عدد المتفاعلين 50% من عدد طلاب المجموعة في الأسبوع
+    student = await db.users.find_one({"id": data.student_id, "role": "student"})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    group_id = student.get("group_id")
+    if group_id:
+        group_students = await db.users.find(
+            {"group_id": group_id, "role": "student"}, {"id": 1, "_id": 0}
+        ).to_list(1000)
+        group_ids = [s["id"] for s in group_students]
+        group_size = len(group_ids)
+        max_allowed = max(1, group_size // 2)  # نصف المجموعة (بحد أدنى طالب واحد)
+        granted_this_week = await db.interaction_grants.count_documents({
+            "student_id": {"$in": group_ids},
+            "week_start": week_start
+        })
+        if granted_this_week >= max_allowed:
+            raise HTTPException(
+                status_code=400,
+                detail=f"تم الوصول للحد الأعلى لنقاط التفاعل هذا الأسبوع (50% من المجموعة = {max_allowed} طالب)"
+            )
+
     # إنشاء سجل التفاعل
     interaction = {
         "id": str(uuid.uuid4()),

@@ -145,6 +145,13 @@ class User(UserBase):
     previous_memorization_pages: Optional[int] = None
     tajweed_level: Optional[str] = None  # تمهيدية, متوسطة, متقدمة
     initial_assessment_done: bool = False  # هل تم التقييم الأولي
+    # آخر تقييم (snapshot)
+    weak_juz: Optional[List[int]] = None
+    strong_juz: Optional[List[int]] = None
+    mufassal_test_juz: Optional[List[int]] = None
+    administrative_test_juz: Optional[List[int]] = None
+    last_assessment_date: Optional[str] = None
+    assessment_count: Optional[int] = None
 
 class UserResponse(BaseModel):
     id: str
@@ -167,6 +174,12 @@ class UserResponse(BaseModel):
     previous_memorization_pages: Optional[int] = None
     tajweed_level: Optional[str] = None
     initial_assessment_done: bool = False
+    weak_juz: Optional[List[int]] = None
+    strong_juz: Optional[List[int]] = None
+    mufassal_test_juz: Optional[List[int]] = None
+    administrative_test_juz: Optional[List[int]] = None
+    last_assessment_date: Optional[str] = None
+    assessment_count: Optional[int] = None
 
 # Student Profile Update (Admin only)
 class StudentProfileUpdate(BaseModel):
@@ -188,6 +201,11 @@ class InitialAssessment(BaseModel):
     previous_memorization_pages: int = 0  # صفحات إضافية
     tajweed_level: str  # تمهيدية, متوسطة, متقدمة
     notes: Optional[str] = None
+    # تصنيف الأجزاء وحالة الاختبارات (إعادة التقييم)
+    weak_juz: List[int] = []  # الأجزاء الضعيفة في الحفظ
+    strong_juz: List[int] = []  # الأجزاء القوية في الحفظ
+    mufassal_test_juz: List[int] = []  # الأجزاء المختبَرة في المفصل
+    administrative_test_juz: List[int] = []  # الأجزاء المختبَرة إدارياً (مضاعفات 5)
 
 # Group Models
 class GroupCreate(BaseModel):
@@ -240,6 +258,8 @@ class TrackingSheetData(BaseModel):
     fasting: int = 0  # صيام في الأسبوع (0-1)
     # ملاحظات
     notes: Optional[str] = None
+    # بنود المعلم المخصصة: {item_id: نقاط} (محسوبة)
+    custom_values: Optional[dict] = None
     # Legacy fields (للتوافق مع البيانات القديمة)
     adhkar_count: int = 0
     sunnah_prayers_days: int = 0
