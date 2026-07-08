@@ -218,6 +218,8 @@ class Group(BaseModel):
     name: str
     description: Optional[str] = None
     sheikh_id: str
+    # A4: مدة التنبيه (بالأيام) للطالب المنقطع عن التسميع — يعدّلها المعلم لمجموعاته (الافتراضي 2)
+    recitation_alert_days: Optional[int] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Tracking Sheet Models - Updated with detailed tracking
@@ -703,6 +705,10 @@ class Fee(BaseModel):
     year: Optional[int] = None
     is_paid: bool = False
     paid_date: Optional[str] = None
+    # حالة الدفع: "pending" (قائم) افتراضياً، "due" (مستحق) للأشهر السابقة، "paid" (مدفوع)
+    status: str = "pending"
+    # هل غيّر المدير الحالة يدوياً (يمنع التحديث التلقائي)
+    status_overridden: bool = False
     created_by: str  # Admin ID
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 

@@ -30,7 +30,14 @@ import {
   Menu,
   FileQuestion,
   X,
-  Settings
+  Settings,
+  BarChart3,
+  AlertTriangle,
+  Shield,
+  Table2,
+  Megaphone,
+  Layers,
+  MessageSquare
 } from 'lucide-react';
 import { Button } from './ui/button';
 
@@ -87,14 +94,21 @@ const Sidebar = () => {
         { to: '/group-management', icon: UsersRound, label: 'إدارة المجموعات' },
         { to: '/student-management', icon: GraduationCap, label: 'إدارة الطلاب' },
         { to: '/admin-rankings', icon: TrendingUp, label: 'الترتيب والإحصائيات' },
+        { to: '/admin-analytics', icon: BarChart3, label: 'التحليلات والتقارير' },
+        { to: '/student-stats', icon: Table2, label: 'إحصائيات الطلاب' },
+        { to: '/struggling-students', icon: AlertTriangle, label: 'الطلاب المتعثّرون' },
+        { to: '/competitions', icon: Trophy, label: 'مرشّحو المسابقات' },
         { to: '/fees', icon: DollarSign, label: 'الرسوم المالية' },
         { to: '/homework', icon: BookText, label: 'الواجبات' },
         { to: '/exams', icon: Award, label: 'الامتحانات' },
         { to: '/curriculum', icon: BookMarked, label: 'إدارة المنهج' },
         { to: '/schedule', icon: CalendarDays, label: 'إدارة الجداول' },
         { to: '/tracking-settings', icon: Settings, label: 'إعدادات ورق المتابعة' },
+        { to: '/announcements', icon: Megaphone, label: 'الإعلانات' },
+        { to: '/bulk-operations', icon: Layers, label: 'العمليات الجماعية' },
         { to: '/activities', icon: Calendar, label: 'الأنشطة' },
         { to: '/users', icon: Users, label: 'المستخدمين' },
+        { to: '/audit-log', icon: Shield, label: 'سجل العمليات' },
         { to: '/notifications', icon: Bell, label: 'الإشعارات' },
       ];
     }
@@ -110,6 +124,10 @@ const Sidebar = () => {
         { to: '/homework', icon: BookText, label: 'الواجبات' },
         { to: '/exams', icon: Award, label: 'الامتحانات' },
         { to: '/sheikh-rankings', icon: TrendingUp, label: 'ترتيب طلابي' },
+        { to: '/sheikh-analytics', icon: BarChart3, label: 'تحليلاتي' },
+        { to: '/sheikh-message', icon: MessageSquare, label: 'مراسلة الطلاب' },
+        { to: '/student-stats', icon: Table2, label: 'إحصائيات الطلاب' },
+        { to: '/struggling-students', icon: AlertTriangle, label: 'الطلاب المتعثّرون' },
         { to: '/tracking-settings', icon: Settings, label: 'إعدادات ورق المتابعة' },
         { to: '/curriculum', icon: BookMarked, label: 'عرض المنهج' },
         { to: '/schedule', icon: CalendarDays, label: 'الجدول الدراسي' },

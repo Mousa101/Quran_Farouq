@@ -49,6 +49,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     payload = decode_token(token)
     return payload
 
+def ensure_role(current_user: dict, roles, detail: str = "غير مصرح لك بهذا الإجراء"):
+    """فحص صلاحية موحّد (F3): يرفع 403 إذا لم يكن دور المستخدم ضمن roles.
+    يحافظ على رسالة الخطأ الأصلية لكل نقطة نهاية (بلا تغيير في السلوك)."""
+    if isinstance(roles, str):
+        roles = (roles,)
+    if current_user.get("role") not in roles:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+
+
 async def require_role(required_roles: list):
     async def role_checker(current_user: dict = Depends(get_current_user)):
         if current_user.get("role") not in required_roles:

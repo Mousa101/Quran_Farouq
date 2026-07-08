@@ -8,7 +8,7 @@ import logging
 import uuid
 import io
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
 import xlsxwriter
 
@@ -41,9 +41,10 @@ class BaseModel(PydanticBaseModel):
     pass
 from auth import (
     get_password_hash, verify_password, create_access_token,
-    get_current_user, security
+    get_current_user, security, ensure_role
 )
 from image_analysis import analyze_tracking_sheet
+from analytics import build_center_timeseries
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -112,8 +113,7 @@ class RegistrationCodeResponse(BaseModel):
 @api_router.post("/auth/generate-code")
 async def generate_registration_code(data: RegistrationCodeCreate, current_user: dict = Depends(get_current_user)):
     """Generate registration code for sheikh/admin/student (admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إنشاء أكواد التسجيل")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إنشاء أكواد التسجيل")
     
     if data.role not in ["sheikh", "admin", "student"]:
         raise HTTPException(status_code=400, detail="الدور يجب أن يكون sheikh أو admin أو student")
@@ -140,8 +140,7 @@ async def generate_registration_code(data: RegistrationCodeCreate, current_user:
 @api_router.get("/auth/codes")
 async def get_registration_codes(current_user: dict = Depends(get_current_user)):
     """Get all registration codes (admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, "admin", "غير مصرح لك")
     
     codes = await db.registration_codes.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return codes
@@ -149,8 +148,7 @@ async def get_registration_codes(current_user: dict = Depends(get_current_user))
 @api_router.delete("/auth/codes/{code}")
 async def delete_registration_code(code: str, current_user: dict = Depends(get_current_user)):
     """Delete a registration code (admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, "admin", "غير مصرح لك")
     
     result = await db.registration_codes.delete_one({"code": code, "used": False})
     if result.deleted_count == 0:
@@ -399,8 +397,7 @@ async def activate_account(data: ActivationRequest):
 @api_router.get("/admin/pending-students")
 async def get_pending_students(current_user: dict = Depends(get_current_user)):
     """Get students pending activation (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
     
     pending = await db.users.find(
         {"role": "student", "is_activated": False},
@@ -418,8 +415,7 @@ class PasswordResetRequest(BaseModel):
 @api_router.post("/admin/reset-password")
 async def admin_reset_password(data: PasswordResetRequest, current_user: dict = Depends(get_current_user)):
     """Reset user password - Admin only"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إعادة تعيين كلمة المرور")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إعادة تعيين كلمة المرور")
     
     # Find user
     user = await db.users.find_one({"email": data.email})
@@ -444,7 +440,10 @@ async def admin_reset_password(data: PasswordResetRequest, current_user: dict = 
         "تم إعادة تعيين كلمة المرور الخاصة بك من قبل الإدارة. يرجى تسجيل الدخول بكلمة المرور الجديدة.",
         "warning"
     )
-    
+
+    await log_admin_action(current_user, "password_reset", "user", user["id"], user.get("name"),
+                           f"إعادة تعيين كلمة المرور ({user.get('role')})")
+
     return {"message": f"تم إعادة تعيين كلمة المرور للمستخدم {user['name']} بنجاح"}
 
 # ============== ADMIN: SHEIKH MANAGEMENT ==============
@@ -452,8 +451,7 @@ async def admin_reset_password(data: PasswordResetRequest, current_user: dict = 
 @api_router.get("/admin/sheikhs")
 async def get_all_sheikhs(current_user: dict = Depends(get_current_user)):
     """Get all sheikhs with their details - Admin only"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
     
     # Get all sheikhs
     sheikhs = await db.users.find(
@@ -477,8 +475,7 @@ async def get_all_sheikhs(current_user: dict = Depends(get_current_user)):
 @api_router.get("/admin/sheikh/{sheikh_id}")
 async def get_sheikh_details(sheikh_id: str, current_user: dict = Depends(get_current_user)):
     """Get detailed info about a specific sheikh - Admin only"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
     
     # Get sheikh
     sheikh = await db.users.find_one(
@@ -502,14 +499,21 @@ async def get_sheikh_details(sheikh_id: str, current_user: dict = Depends(get_cu
             {"role": "student", "group_id": group["id"]},
             {"_id": 0, "password_hash": 0, "activation_code": 0}
         ).to_list(50)
-        
+
+        # النقاط من المصدر الموثوق student_points (وليس حقل users.points القديم)
+        sids = [s["id"] for s in students]
+        pts_docs = await db.student_points.find(
+            {"student_id": {"$in": sids}}, {"_id": 0, "student_id": 1, "total_points": 1}
+        ).to_list(500)
+        pts_map = {p["student_id"]: p.get("total_points", 0) for p in pts_docs}
+        for student in students:
+            student["points"] = pts_map.get(student["id"], 0)
+
         group["students"] = students
         group["students_count"] = len(students)
         total_students += len(students)
-        
-        for student in students:
-            total_points += student.get("points", 0)
-        
+        total_points += sum(pts_map.values())
+
         groups_with_students.append(group)
     
     # Get sheikh's activity stats
@@ -531,8 +535,7 @@ async def get_sheikh_details(sheikh_id: str, current_user: dict = Depends(get_cu
 @api_router.delete("/admin/sheikh/{sheikh_id}")
 async def delete_sheikh(sheikh_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a sheikh - Admin only"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف المعلم")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف المعلم")
     
     # Get sheikh
     sheikh = await db.users.find_one({"id": sheikh_id, "role": "sheikh"})
@@ -551,7 +554,10 @@ async def delete_sheikh(sheikh_id: str, current_user: dict = Depends(get_current
     
     # Delete sheikh
     await db.users.delete_one({"id": sheikh_id})
-    
+
+    await log_admin_action(current_user, "user_delete", "sheikh", sheikh_id, sheikh.get("name"),
+                           f"حذف معلم — مجموعات متأثرة: {len(groups)}")
+
     return {
         "message": f"تم حذف المعلم {sheikh['name']} بنجاح",
         "groups_affected": len(groups)
@@ -560,8 +566,7 @@ async def delete_sheikh(sheikh_id: str, current_user: dict = Depends(get_current
 @api_router.get("/admin/pending-registrations")
 async def get_pending_registrations(current_user: dict = Depends(get_current_user)):
     """Get all pending registrations (students, sheikhs, admins) - Admin only"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
     
     pending = await db.users.find(
         {"is_activated": False},
@@ -680,8 +685,7 @@ class GroupUpdateAdmin(BaseModel):
 @api_router.post("/groups")
 async def create_group(group_data: GroupCreateAdmin, current_user: dict = Depends(get_current_user)):
     """Create a new group (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إنشاء مجموعة")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إنشاء مجموعة")
     
     # Verify sheikh exists
     sheikh = await db.users.find_one({"id": group_data.sheikh_id, "role": "sheikh"})
@@ -728,8 +732,7 @@ async def get_groups(current_user: dict = Depends(get_current_user)):
 @api_router.put("/groups/{group_id}")
 async def update_group(group_id: str, data: GroupUpdateAdmin, current_user: dict = Depends(get_current_user)):
     """Update a group (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تعديل المجموعة")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل المجموعة")
     
     group = await db.groups.find_one({"id": group_id})
     if not group:
@@ -755,8 +758,7 @@ async def update_group(group_id: str, data: GroupUpdateAdmin, current_user: dict
 @api_router.delete("/groups/{group_id}")
 async def delete_group(group_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a group (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف المجموعة")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف المجموعة")
     
     group = await db.groups.find_one({"id": group_id})
     if not group:
@@ -780,8 +782,7 @@ class AddStudentRequest(BaseModel):
 async def add_student_to_group(group_id: str, request: AddStudentRequest, current_user: dict = Depends(get_current_user)):
     """Add student to group (Admin only)"""
     student_id = request.student_id
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إضافة طالب للمجموعة")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إضافة طالب للمجموعة")
     
     # Verify group exists
     group = await db.groups.find_one({"id": group_id}, {"_id": 0})
@@ -803,8 +804,7 @@ async def add_student_to_group(group_id: str, request: AddStudentRequest, curren
 async def remove_student_from_group(group_id: str, request: AddStudentRequest, current_user: dict = Depends(get_current_user)):
     """Remove student from group (Admin only)"""
     student_id = request.student_id
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إزالة طالب من المجموعة")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إزالة طالب من المجموعة")
     
     # Update student
     result = await db.users.update_one(
@@ -828,8 +828,7 @@ async def get_group_students(group_id: str, current_user: dict = Depends(get_cur
 @api_router.get("/sheikhs")
 async def get_all_sheikhs(current_user: dict = Depends(get_current_user)):
     """Get all sheikhs (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, "admin", "غير مصرح لك")
     
     sheikhs = await db.users.find(
         {"role": "sheikh"},
@@ -842,8 +841,7 @@ async def get_all_sheikhs(current_user: dict = Depends(get_current_user)):
 @api_router.post("/students/{student_id}/initial-assessment")
 async def submit_initial_assessment(student_id: str, data: InitialAssessment, current_user: dict = Depends(get_current_user)):
     """Submit initial assessment for a new student (Sheikh only)"""
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تقييم الطالب")
+    ensure_role(current_user, "sheikh", "فقط الشيخ يمكنه تقييم الطالب")
     
     # Get student
     student = await db.users.find_one({"id": student_id, "role": "student"})
@@ -999,8 +997,7 @@ async def get_student_progress(student_id: str, current_user: dict = Depends(get
 @api_router.get("/students/pending-assessment")
 async def get_students_pending_assessment(current_user: dict = Depends(get_current_user)):
     """Get students in sheikh's group who haven't been assessed yet"""
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, "sheikh", "غير مصرح لك")
     
     # Get sheikh's group
     group = await db.groups.find_one({"sheikh_id": current_user["user_id"]})
@@ -1033,11 +1030,863 @@ async def get_student_assessments(student_id: str, current_user: dict = Depends(
 
     return assessments
 
-# ============== TRACKING SHEET ROUTES ==============
+# ============== POINTS CONFIG (F2 - مصدر واحد لقيم النقاط) ==============
+# المصدر الوحيد لقيم النقاط في النظام. أي منطق يمنح نقاطًا يجب أن يقرأ من هنا،
+# وواجهة "نظام النقاط" في لوحة المدير تعرض هذه القيم عبر /api/config/points.
+ATTENDANCE_POINTS = 10          # نقاط كل يوم حضور
+RECITATION_PASS_POINTS = 20     # نقاط كل تسميع ناجح (اجتاز الحد الأدنى)
+TRACKING_PRAYERS_MAX = 35       # الحد الأقصى لنقاط الصلوات في ورقة المتابعة
+TRACKING_SITTING_MAX = 35       # الحد الأقصى لنقاط الجلوس مع القرآن
+TRACKING_BASE_MAX = TRACKING_PRAYERS_MAX + TRACKING_SITTING_MAX  # 70 - الأساس الأسبوعي لورقة المتابعة
+WEEKLY_TRACKING_MAX = TRACKING_BASE_MAX  # الإجمالي الأسبوعي الأساسي لورقة المتابعة (قبل بنود المعلم المخصصة)
 
-TRACKING_PRAYERS_MAX = 35
-TRACKING_SITTING_MAX = 35
-TRACKING_BASE_MAX = TRACKING_PRAYERS_MAX + TRACKING_SITTING_MAX  # 70
+
+@api_router.get("/config/points")
+async def get_points_config(current_user: dict = Depends(get_current_user)):
+    """قيم نظام النقاط من مصدر واحد (F2) — تستهلكها لوحة المدير وأي تحليلات لاحقة."""
+    return {
+        "attendance_points": ATTENDANCE_POINTS,
+        "recitation_pass_points": RECITATION_PASS_POINTS,
+        "tracking_prayers_max": TRACKING_PRAYERS_MAX,
+        "tracking_sitting_max": TRACKING_SITTING_MAX,
+        "tracking_base_max": TRACKING_BASE_MAX,
+        "weekly_tracking_max": WEEKLY_TRACKING_MAX,
+    }
+
+
+# N2 - لوحة تعديل النقاط والقواعد: تعديل قيم F2 وحفظها دون تغيير الكود
+def apply_points_config(cfg: dict):
+    """يطبّق قيم النقاط على متغيّرات F2 (تُقرأ عند كل عملية) ويعيد حساب المشتقّات."""
+    global ATTENDANCE_POINTS, RECITATION_PASS_POINTS, TRACKING_PRAYERS_MAX
+    global TRACKING_SITTING_MAX, TRACKING_BASE_MAX, WEEKLY_TRACKING_MAX
+    if cfg.get("attendance_points") is not None:
+        ATTENDANCE_POINTS = int(cfg["attendance_points"])
+    if cfg.get("recitation_pass_points") is not None:
+        RECITATION_PASS_POINTS = int(cfg["recitation_pass_points"])
+    if cfg.get("tracking_prayers_max") is not None:
+        TRACKING_PRAYERS_MAX = int(cfg["tracking_prayers_max"])
+    if cfg.get("tracking_sitting_max") is not None:
+        TRACKING_SITTING_MAX = int(cfg["tracking_sitting_max"])
+    TRACKING_BASE_MAX = TRACKING_PRAYERS_MAX + TRACKING_SITTING_MAX
+    WEEKLY_TRACKING_MAX = TRACKING_BASE_MAX
+
+
+@app.on_event("startup")
+async def _load_points_config():
+    """تحميل قيم النقاط المخصّصة من قاعدة البيانات عند الإقلاع (N2)."""
+    try:
+        doc = await db.settings.find_one({"key": "points_config"}, {"_id": 0})
+        if doc and doc.get("value"):
+            apply_points_config(doc["value"])
+    except Exception as e:
+        logger.error(f"load points config failed: {e}")
+
+
+class PointsConfigUpdate(BaseModel):
+    attendance_points: Optional[int] = None
+    recitation_pass_points: Optional[int] = None
+    tracking_prayers_max: Optional[int] = None
+    tracking_sitting_max: Optional[int] = None
+
+
+@api_router.put("/admin/config/points")
+async def update_points_config(data: PointsConfigUpdate, current_user: dict = Depends(get_current_user)):
+    """N2 — تعديل قيم نظام النقاط وحفظها (المدير)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل نظام النقاط")
+    cfg = {k: v for k, v in data.model_dump().items() if v is not None}
+    for k, v in cfg.items():
+        if v < 0:
+            raise HTTPException(status_code=400, detail="القيم يجب أن تكون صفرًا أو أكثر")
+    apply_points_config(cfg)
+    # القيم الفعّالة الكاملة بعد التطبيق
+    effective = {
+        "attendance_points": ATTENDANCE_POINTS,
+        "recitation_pass_points": RECITATION_PASS_POINTS,
+        "tracking_prayers_max": TRACKING_PRAYERS_MAX,
+        "tracking_sitting_max": TRACKING_SITTING_MAX,
+    }
+    await db.settings.update_one({"key": "points_config"}, {"$set": {"value": effective}}, upsert=True)
+    return {"message": "تم تحديث نظام النقاط", "config": {**effective,
+            "tracking_base_max": TRACKING_BASE_MAX, "weekly_tracking_max": WEEKLY_TRACKING_MAX}}
+
+
+@api_router.get("/analytics/timeseries")
+async def analytics_timeseries(term_id: Optional[str] = None, group_id: Optional[str] = None,
+                               current_user: dict = Depends(get_current_user)):
+    """F4 — سلسلة زمنية أسبوعية موحّدة (حضور/تسميع/صفحات/نقاط) للمدير والمعلم.
+    أساس رسوم المرحلة الأولى (A1/A3). المعلم يقتصر على مجموعاته."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك بعرض التحليلات")
+    # T1: المعلم مقصور على مجموعاته (لا يرى بيانات المركز كاملةً)
+    if current_user["role"] == "sheikh":
+        gids = await _sheikh_group_ids(current_user["user_id"])
+        if group_id:
+            if group_id not in gids:
+                raise HTTPException(status_code=403, detail="لا يمكنك عرض تحليلات مجموعة ليست لك")
+            return await build_center_timeseries(db, term_id=term_id, group_ids=[group_id], attendance_points=ATTENDANCE_POINTS)
+        return await build_center_timeseries(db, term_id=term_id, group_ids=gids, attendance_points=ATTENDANCE_POINTS)
+    return await build_center_timeseries(
+        db, term_id=term_id, group_id=group_id, attendance_points=ATTENDANCE_POINTS
+    )
+
+
+# ============== A4 - تقرير الطلاب المتعثّرين (انقطاع عن التسميع) ==============
+STRUGGLING_DEFAULT_DAYS = 2  # المدة الافتراضية قبل اعتبار الطالب متعثّرًا
+
+
+async def _sheikh_group_ids(sheikh_id):
+    groups = await db.groups.find({"sheikh_id": sheikh_id}, {"_id": 0, "id": 1}).to_list(1000)
+    return [g["id"] for g in groups]
+
+
+@api_router.get("/reports/struggling-students")
+async def struggling_students_report(days: Optional[int] = None, group_id: Optional[str] = None,
+                                     term_id: Optional[str] = None,
+                                     current_user: dict = Depends(get_current_user)):
+    """A4 — الطلاب الذين مرّ عليهم (days) دون تسميع. المدير يرى الجميع، والمعلم مجموعاته فقط.
+    إن لم يُمرّر days تُستخدم مدة كل مجموعة (recitation_alert_days) أو الافتراضي."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك بعرض هذا التقرير")
+
+    user_query = {"role": "student"}
+    if current_user["role"] == "sheikh":
+        gids = await _sheikh_group_ids(current_user["user_id"])
+        if group_id and group_id in gids:
+            user_query["group_id"] = group_id
+        else:
+            user_query["group_id"] = {"$in": gids}
+    elif group_id:
+        user_query["group_id"] = group_id
+
+    students = await db.users.find(
+        user_query, {"_id": 0, "id": 1, "name": 1, "group_id": 1}
+    ).to_list(3000)
+
+    today = datetime.now(timezone.utc).date()
+    group_cache = {}
+    results = []
+    for s in students:
+        gid = s.get("group_id")
+        if gid not in group_cache:
+            g = await db.groups.find_one(
+                {"id": gid}, {"_id": 0, "name": 1, "recitation_alert_days": 1}
+            ) if gid else None
+            group_cache[gid] = {
+                "name": g["name"] if g else "بدون مجموعة",
+                "days": (g or {}).get("recitation_alert_days") or STRUGGLING_DEFAULT_DAYS,
+            }
+        threshold = days if days is not None else group_cache[gid]["days"]
+
+        rq = {"student_id": s["id"], "did_not_recite": {"$ne": True}}
+        if term_id:
+            rq["term_id"] = term_id
+        last = await db.recitations.find(
+            rq, {"_id": 0, "record_date": 1}
+        ).sort("record_date", -1).limit(1).to_list(1)
+
+        last_date, days_since = None, None
+        if last:
+            last_date = last[0].get("record_date")
+            try:
+                d = datetime.strptime(str(last_date)[:10], "%Y-%m-%d").date()
+                days_since = (today - d).days
+            except (ValueError, TypeError):
+                last_date, days_since = None, None
+
+        if days_since is None or days_since >= threshold:
+            results.append({
+                "student_id": s["id"],
+                "name": s["name"],
+                "group_id": gid,
+                "group_name": group_cache[gid]["name"],
+                "last_recitation": last_date,
+                "days_since": days_since,
+                "threshold": threshold,
+            })
+
+    # الأكثر انقطاعًا أولًا (ومن لم يسمّع مطلقًا في القمة)
+    results.sort(key=lambda r: (10 ** 9 if r["days_since"] is None else r["days_since"]), reverse=True)
+    return {"default_days": STRUGGLING_DEFAULT_DAYS, "count": len(results), "students": results}
+
+
+class GroupAlertDays(BaseModel):
+    days: int
+
+
+@api_router.put("/groups/{group_id}/alert-days")
+async def set_group_alert_days(group_id: str, data: GroupAlertDays,
+                               current_user: dict = Depends(get_current_user)):
+    """A4 — تعديل مدة تنبيه الانقطاع لمجموعة. المعلم لمجموعاته فقط، والمدير لأي مجموعة."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    if data.days < 1:
+        raise HTTPException(status_code=400, detail="المدة يجب أن تكون يومًا واحدًا على الأقل")
+    group = await db.groups.find_one({"id": group_id}, {"_id": 0})
+    if not group:
+        raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
+    if current_user["role"] == "sheikh" and group.get("sheikh_id") != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="لا يمكنك تعديل مجموعة ليست لك")
+    await db.groups.update_one({"id": group_id}, {"$set": {"recitation_alert_days": data.days}})
+    return {"message": f"تم ضبط مدة التنبيه على {data.days} يوم"}
+
+
+class StrugglingAlertRequest(BaseModel):
+    student_ids: List[str]
+    message: Optional[str] = None
+
+
+@api_router.post("/reports/struggling-students/alert")
+async def send_struggling_alerts(data: StrugglingAlertRequest,
+                                 current_user: dict = Depends(get_current_user)):
+    """A4 — إرسال تنبيه للطلاب المنقطعين عن التسميع."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك بإرسال التنبيهات")
+    allowed = None
+    if current_user["role"] == "sheikh":
+        gids = await _sheikh_group_ids(current_user["user_id"])
+        allowed_docs = await db.users.find(
+            {"role": "student", "group_id": {"$in": gids}}, {"_id": 0, "id": 1}
+        ).to_list(3000)
+        allowed = {d["id"] for d in allowed_docs}
+    sent = 0
+    for sid in data.student_ids:
+        if allowed is not None and sid not in allowed:
+            continue
+        await create_notification_internal(
+            sid,
+            "تنبيه: انقطاع عن التسميع",
+            data.message or "لم يُسجَّل لك تسميع منذ عدة أيام. يرجى الحضور والتسميع لمعلمك.",
+            "warning",
+        )
+        sent += 1
+    return {"message": f"تم إرسال {sent} تنبيه", "count": sent}
+
+
+# ============== A8 - تحليل مرشّحي المسابقات القرآنية ==============
+# المدير يعرّف مسابقة بمعايير قابلة للتخصيص (حدود + أوزان)، والنظام يرتّب المرشّحين
+# بنسبة تطابق لكل طالب مع تفصيل "لماذا هذا الطالب".
+
+class CompetitionCreate(BaseModel):
+    name: str
+    type: str = "custom"          # young_hafiz | annual | custom
+    category: Optional[str] = None  # للمسابقة السنوية: مثل "5 أجزاء"
+    criteria: Dict[str, Any] = {}   # {age|memorized|weak|accuracy|attendance|points|tests: {enabled, required, weight, ...}}
+
+
+CRITERION_LABELS = {
+    "age": "الفئة العمرية",
+    "memorized": "الأجزاء المحفوظة",
+    "weak": "الأجزاء الضعيفة",
+    "accuracy": "دقة التسميع",
+    "attendance": "نسبة الحضور",
+    "points": "مجموع النقاط",
+    "tests": "اجتياز الاختبارات",
+}
+
+
+def _age_from_birthdate(bd):
+    if not bd:
+        return None
+    try:
+        d = datetime.strptime(str(bd)[:10], "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        return None
+    today = datetime.now(timezone.utc).date()
+    return today.year - d.year - ((today.month, today.day) < (d.month, d.day))
+
+
+def compute_student_metrics(student, recitations, attendance, points):
+    """يحسب مقاييس الطالب المستخدمة في معايير المسابقة."""
+    prev_juz = student.get("previous_memorization_juz") or []
+    prev_pages = student.get("previous_memorization_pages") or 0
+    previous_total = len(prev_juz) * PAGES_PER_JUZ + prev_pages
+
+    new_pages = 0
+    errors, err_count = 0, 0
+    for r in recitations:
+        if r.get("did_not_recite"):
+            continue
+        np_ = r.get("new_pages") or 0
+        if not np_ and r.get("recitation_type") == "new_memorization":
+            np_ = r.get("pages_count") or 0
+        new_pages += np_ or 0
+        ec = r.get("error_count")
+        if ec is not None:
+            errors += ec
+            err_count += 1
+
+    memorized_pages = previous_total + new_pages
+    memorized_juz = round(memorized_pages / PAGES_PER_JUZ, 1)
+    avg_errors = round(errors / err_count, 2) if err_count else None
+
+    present = sum(1 for a in attendance if a.get("status") == "present")
+    total_att = len(attendance)
+    attendance_rate = round(present / total_att * 100, 1) if total_att else 0.0
+
+    weak_count = len(student.get("weak_juz") or [])
+    tests_passed = bool(student.get("mufassal_test_juz") or student.get("administrative_test_juz"))
+
+    return {
+        "age": _age_from_birthdate(student.get("birth_date")),
+        "memorized_juz": memorized_juz,
+        "memorized_pages": memorized_pages,
+        "weak_count": weak_count,
+        "avg_errors": avg_errors,
+        "attendance_rate": attendance_rate,
+        "points": points or 0,
+        "tests_passed": tests_passed,
+    }
+
+
+def score_student(criteria, m):
+    """يرجع (match%, eligible, breakdown) وفق معايير المسابقة."""
+    total_w = 0.0
+    earned = 0.0
+    eligible = True
+    breakdown = []
+
+    def add(key, sub, value, target, cfg):
+        nonlocal total_w, earned, eligible
+        w = float(cfg.get("weight", 1) or 0)
+        if w <= 0:
+            w = 1.0
+        sub = max(0.0, min(1.0, sub))
+        total_w += w
+        earned += w * sub
+        met = sub >= 0.999
+        if cfg.get("required") and not met:
+            eligible = False
+        breakdown.append({
+            "key": key, "label": CRITERION_LABELS.get(key, key),
+            "value": value, "target": target, "met": met,
+            "weight": w, "sub": round(sub, 2),
+        })
+
+    c = criteria.get("age")
+    if c and c.get("enabled"):
+        age = m["age"]
+        lo, hi = c.get("min_age"), c.get("max_age")
+        ok = age is not None and (lo is None or age >= lo) and (hi is None or age <= hi)
+        add("age", 1.0 if ok else 0.0, age, f"{lo or '-'}–{hi or '-'} سنة", c)
+
+    c = criteria.get("memorized")
+    if c and c.get("enabled"):
+        target = c.get("min_juz") or 0
+        val = m["memorized_juz"]
+        sub = 1.0 if (not target or val >= target) else (val / target if target else 1.0)
+        add("memorized", sub, f"{val} جزء", f"{target} جزء فأكثر", c)
+
+    c = criteria.get("weak")
+    if c and c.get("enabled"):
+        mx = c.get("max_weak", 0) or 0
+        val = m["weak_count"]
+        sub = 1.0 if val <= mx else max(0.0, 1 - (val - mx) * 0.2)
+        add("weak", sub, f"{val} جزء", f"{mx} كحد أقصى", c)
+
+    c = criteria.get("accuracy")
+    if c and c.get("enabled"):
+        mx = c.get("max_avg_errors")
+        val = m["avg_errors"]
+        if val is None:
+            sub = 0.0
+        elif mx is None or mx <= 0:
+            sub = 1.0 if val == 0 else max(0.0, 1 - val * 0.2)
+        else:
+            sub = 1.0 if val <= mx else max(0.0, 1 - (val - mx) * 0.2)
+        add("accuracy", sub, "لا بيانات" if val is None else f"{val} خطأ/تسميع", f"{mx if mx is not None else 0} كحد أقصى", c)
+
+    c = criteria.get("attendance")
+    if c and c.get("enabled"):
+        mn = c.get("min_rate") or 0
+        val = m["attendance_rate"]
+        sub = 1.0 if (not mn or val >= mn) else val / mn
+        add("attendance", sub, f"{val}%", f"{mn}% فأكثر", c)
+
+    c = criteria.get("points")
+    if c and c.get("enabled"):
+        mn = c.get("min_points") or 0
+        val = m["points"]
+        sub = 1.0 if (not mn or val >= mn) else val / mn
+        add("points", sub, f"{val} نقطة", f"{mn} نقطة فأكثر", c)
+
+    c = criteria.get("tests")
+    if c and c.get("enabled"):
+        val = m["tests_passed"]
+        add("tests", 1.0 if val else 0.0, "اجتاز" if val else "لم يجتز", "مطلوب", c)
+
+    match = round(100 * earned / total_w, 1) if total_w > 0 else 0.0
+    return match, eligible, breakdown
+
+
+async def compute_candidates(competition, group_id=None, term_id=None):
+    criteria = competition.get("criteria", {})
+    uq = {"role": "student"}
+    if group_id:
+        uq["group_id"] = group_id
+    students = await db.users.find(uq, {"_id": 0, "password_hash": 0}).to_list(3000)
+    sids = [s["id"] for s in students]
+    if not sids:
+        return []
+
+    rq = {"student_id": {"$in": sids}}
+    if term_id:
+        rq["term_id"] = term_id
+    recs = await db.recitations.find(rq, {
+        "_id": 0, "student_id": 1, "pages_count": 1, "recitation_type": 1,
+        "error_count": 1, "did_not_recite": 1, "new_pages": 1,
+    }).to_list(200000)
+
+    aq = {"student_id": {"$in": sids}}
+    if term_id:
+        aq["term_id"] = term_id
+    atts = await db.attendance.find(aq, {"_id": 0, "student_id": 1, "status": 1}).to_list(200000)
+    pts = await db.student_points.find({"student_id": {"$in": sids}}, {"_id": 0, "student_id": 1, "total_points": 1}).to_list(200000)
+
+    rec_by, att_by, pts_by = {}, {}, {}
+    for r in recs:
+        rec_by.setdefault(r["student_id"], []).append(r)
+    for a in atts:
+        att_by.setdefault(a["student_id"], []).append(a)
+    for p in pts:
+        pts_by[p["student_id"]] = p.get("total_points", 0)
+
+    group_names = {}
+    candidates = []
+    for s in students:
+        m = compute_student_metrics(s, rec_by.get(s["id"], []), att_by.get(s["id"], []), pts_by.get(s["id"], 0))
+        match, eligible, breakdown = score_student(criteria, m)
+        gid = s.get("group_id")
+        if gid and gid not in group_names:
+            g = await db.groups.find_one({"id": gid}, {"_id": 0, "name": 1})
+            group_names[gid] = g["name"] if g else ""
+        candidates.append({
+            "student_id": s["id"], "name": s.get("name"),
+            "group_id": gid, "group_name": group_names.get(gid, ""),
+            "match": match, "eligible": eligible,
+            "metrics": m, "breakdown": breakdown,
+        })
+
+    candidates.sort(key=lambda c: (c["eligible"], c["match"]), reverse=True)
+    return candidates
+
+
+@api_router.post("/competitions")
+async def create_competition(data: CompetitionCreate, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إنشاء مسابقة")
+    comp = {
+        "id": str(uuid.uuid4()),
+        "name": data.name,
+        "type": data.type,
+        "category": data.category,
+        "criteria": data.criteria or {},
+        "created_by": current_user["user_id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.competitions.insert_one(comp)
+    return {"message": "تم إنشاء المسابقة", "id": comp["id"]}
+
+
+@api_router.get("/competitions")
+async def list_competitions(current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    return await db.competitions.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+
+
+@api_router.get("/competitions/{comp_id}")
+async def get_competition(comp_id: str, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    comp = await db.competitions.find_one({"id": comp_id}, {"_id": 0})
+    if not comp:
+        raise HTTPException(status_code=404, detail="المسابقة غير موجودة")
+    return comp
+
+
+@api_router.put("/competitions/{comp_id}")
+async def update_competition(comp_id: str, data: CompetitionCreate, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل المسابقة")
+    result = await db.competitions.update_one(
+        {"id": comp_id},
+        {"$set": {"name": data.name, "type": data.type, "category": data.category, "criteria": data.criteria or {}}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="المسابقة غير موجودة")
+    return {"message": "تم تحديث المسابقة"}
+
+
+@api_router.delete("/competitions/{comp_id}")
+async def delete_competition(comp_id: str, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف المسابقة")
+    result = await db.competitions.delete_one({"id": comp_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="المسابقة غير موجودة")
+    return {"message": "تم حذف المسابقة"}
+
+
+@api_router.get("/competitions/{comp_id}/candidates")
+async def competition_candidates(comp_id: str, group_id: Optional[str] = None,
+                                 term_id: Optional[str] = None,
+                                 current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    comp = await db.competitions.find_one({"id": comp_id}, {"_id": 0})
+    if not comp:
+        raise HTTPException(status_code=404, detail="المسابقة غير موجودة")
+    candidates = await compute_candidates(comp, group_id=group_id, term_id=term_id)
+    return {
+        "competition": {"id": comp["id"], "name": comp["name"], "type": comp["type"], "category": comp.get("category")},
+        "count": len(candidates),
+        "eligible_count": sum(1 for c in candidates if c["eligible"]),
+        "candidates": candidates,
+    }
+
+
+# ============== A2 - مقارنة أداء المعلمين ==============
+def _new_pages_of(r):
+    np_ = r.get("new_pages") or 0
+    if not np_ and r.get("recitation_type") == "new_memorization":
+        np_ = r.get("pages_count") or 0
+    return np_ or 0
+
+
+@api_router.get("/reports/teachers")
+async def teachers_report(term_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """A2 — مؤشرات أداء لكل معلم: عدد طلابه، نسبة الحضور، التسميعات، الصفحات، متوسط النقاط، نسبة تسليم المتابعة."""
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    sheikhs = await db.users.find({"role": "sheikh"}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)
+    groups = await db.groups.find({}, {"_id": 0, "id": 1, "sheikh_id": 1}).to_list(3000)
+    students = await db.users.find({"role": "student"}, {"_id": 0, "id": 1, "group_id": 1}).to_list(5000)
+    sids = [s["id"] for s in students]
+
+    group_sheikh = {g["id"]: g.get("sheikh_id") for g in groups}
+    student_sheikh = {s["id"]: group_sheikh.get(s.get("group_id")) for s in students}
+
+    att_q = {"student_id": {"$in": sids}}
+    rec_q = {"student_id": {"$in": sids}, "did_not_recite": {"$ne": True}}
+    track_q = {"student_id": {"$in": sids}}
+    if term_id:
+        att_q["term_id"] = rec_q["term_id"] = track_q["term_id"] = term_id
+    atts = await db.attendance.find(att_q, {"_id": 0, "student_id": 1, "status": 1}).to_list(200000)
+    recs = await db.recitations.find(rec_q, {"_id": 0, "student_id": 1, "new_pages": 1, "pages_count": 1, "recitation_type": 1}).to_list(200000)
+    pts = await db.student_points.find({"student_id": {"$in": sids}}, {"_id": 0, "student_id": 1, "total_points": 1}).to_list(200000)
+    tracks = await db.tracking_sheets.find(track_q, {"_id": 0, "student_id": 1}).to_list(200000)
+
+    agg = {sh["id"]: {"id": sh["id"], "name": sh["name"], "students": 0, "present": 0, "att_total": 0,
+                      "recitations": 0, "pages": 0, "points_sum": 0, "points_n": 0, "tracked": set()} for sh in sheikhs}
+    for s in students:
+        sh = student_sheikh.get(s["id"])
+        if sh in agg:
+            agg[sh]["students"] += 1
+    for a in atts:
+        sh = student_sheikh.get(a["student_id"])
+        if sh in agg:
+            agg[sh]["att_total"] += 1
+            if a.get("status") == "present":
+                agg[sh]["present"] += 1
+    for r in recs:
+        sh = student_sheikh.get(r["student_id"])
+        if sh in agg:
+            agg[sh]["recitations"] += 1
+            agg[sh]["pages"] += _new_pages_of(r)
+    for p in pts:
+        sh = student_sheikh.get(p["student_id"])
+        if sh in agg:
+            agg[sh]["points_sum"] += p.get("total_points", 0)
+            agg[sh]["points_n"] += 1
+    for t in tracks:
+        sh = student_sheikh.get(t["student_id"])
+        if sh in agg:
+            agg[sh]["tracked"].add(t["student_id"])
+
+    result = []
+    for a in agg.values():
+        result.append({
+            "id": a["id"], "name": a["name"], "students": a["students"],
+            "attendance_rate": round(a["present"] / a["att_total"] * 100, 1) if a["att_total"] else 0,
+            "recitations": a["recitations"], "pages": a["pages"],
+            "avg_points": round(a["points_sum"] / a["points_n"], 1) if a["points_n"] else 0,
+            "tracking_rate": round(len(a["tracked"]) / a["students"] * 100, 1) if a["students"] else 0,
+        })
+    result.sort(key=lambda x: x["avg_points"], reverse=True)
+    return {"teachers": result}
+
+
+# ============== A5 - التحليلات المالية ==============
+@api_router.get("/reports/financial")
+async def financial_report(current_user: dict = Depends(get_current_user)):
+    """A5 — المحصّل مقابل المتبقّي إجمالًا ولكل مجموعة، مع نسبة التحصيل."""
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    fees = await db.fees.find({}, {"_id": 0}).to_list(50000)
+    students = await db.users.find({"role": "student"}, {"_id": 0, "id": 1, "group_id": 1}).to_list(5000)
+    student_group = {s["id"]: s.get("group_id") for s in students}
+    groups = await db.groups.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(3000)
+    group_name = {g["id"]: g["name"] for g in groups}
+
+    total = paid = due = pending = 0.0
+    per_group = {}
+    for f in fees:
+        st = compute_fee_status(f)
+        amt = f.get("amount") or 0
+        total += amt
+        if st == "paid":
+            paid += amt
+        elif st == "due":
+            due += amt
+        else:
+            pending += amt
+        gid = student_group.get(f["student_id"])
+        g = per_group.setdefault(gid, {"group_id": gid, "group_name": group_name.get(gid, "بدون مجموعة"),
+                                        "total": 0.0, "paid": 0.0, "outstanding": 0.0})
+        g["total"] += amt
+        if st == "paid":
+            g["paid"] += amt
+        else:
+            g["outstanding"] += amt
+
+    by_group = list(per_group.values())
+    for g in by_group:
+        g["collection_rate"] = round(g["paid"] / g["total"] * 100, 1) if g["total"] else 0
+    by_group.sort(key=lambda x: x["collection_rate"])
+    return {
+        "totals": {"total": total, "paid": paid, "due": due, "pending": pending,
+                   "collection_rate": round(paid / total * 100, 1) if total else 0},
+        "by_group": by_group,
+    }
+
+
+# ============== A3 - تصنيف الأجزاء (القوية/الضعيفة/الاختبارات) ==============
+@api_router.get("/reports/juz-classification")
+async def juz_classification_report(group_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """A3 — تجميع تصنيف الأجزاء المسجّل في التقييم المبدئي على مستوى المركز/المجموعة."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    uq = {"role": "student"}
+    if current_user["role"] == "sheikh":
+        gids = await _sheikh_group_ids(current_user["user_id"])
+        uq["group_id"] = group_id if (group_id and group_id in gids) else {"$in": gids}
+    elif group_id:
+        uq["group_id"] = group_id
+    students = await db.users.find(
+        uq, {"_id": 0, "weak_juz": 1, "strong_juz": 1, "mufassal_test_juz": 1, "administrative_test_juz": 1}
+    ).to_list(5000)
+
+    totals = {"strong": 0, "weak": 0, "mufassal": 0, "administrative": 0}
+    weak_by_juz = {j: 0 for j in range(1, 31)}
+    strong_by_juz = {j: 0 for j in range(1, 31)}
+    assessed = 0
+    for s in students:
+        wk = s.get("weak_juz") or []
+        stg = s.get("strong_juz") or []
+        if wk or stg or s.get("mufassal_test_juz") or s.get("administrative_test_juz"):
+            assessed += 1
+        totals["weak"] += len(wk)
+        totals["strong"] += len(stg)
+        totals["mufassal"] += len(s.get("mufassal_test_juz") or [])
+        totals["administrative"] += len(s.get("administrative_test_juz") or [])
+        for j in wk:
+            if isinstance(j, int) and 1 <= j <= 30:
+                weak_by_juz[j] += 1
+        for j in stg:
+            if isinstance(j, int) and 1 <= j <= 30:
+                strong_by_juz[j] += 1
+
+    return {
+        "assessed_students": assessed,
+        "total_students": len(students),
+        "totals": totals,
+        "by_juz": [{"juz": j, "weak": weak_by_juz[j], "strong": strong_by_juz[j]} for j in range(1, 31)],
+    }
+
+
+# ============== جدول إحصائيات الطلاب (فلاتر + ترتيب + تصدير) ==============
+STUDENT_STATS_NUMERIC = {"total_memorization", "new_memorization", "review", "attendance", "tracking", "age"}
+
+
+async def _build_student_stats(current_user, group_id=None, student_id=None,
+                               term_id=None, sort_by="name", order="asc"):
+    uq = {"role": "student"}
+    if current_user["role"] == "sheikh":
+        gids = await _sheikh_group_ids(current_user["user_id"])
+        uq["group_id"] = group_id if (group_id and group_id in gids) else {"$in": gids}
+    elif group_id:
+        uq["group_id"] = group_id
+    if student_id:
+        uq["id"] = student_id
+
+    students = await db.users.find(uq, {
+        "_id": 0, "id": 1, "name": 1, "group_id": 1, "birth_date": 1, "school_grade": 1,
+        "previous_memorization_juz": 1, "previous_memorization_pages": 1,
+    }).to_list(5000)
+    sids = [s["id"] for s in students]
+
+    recs = await db.recitations.find(
+        {"student_id": {"$in": sids}, "did_not_recite": {"$ne": True}},
+        {"_id": 0, "student_id": 1, "new_pages": 1, "pages_count": 1, "recitation_type": 1, "review_pages": 1, "term_id": 1},
+    ).to_list(200000)
+    att_q = {"student_id": {"$in": sids}}
+    track_q = {"student_id": {"$in": sids}}
+    if term_id:
+        att_q["term_id"] = track_q["term_id"] = term_id
+    atts = await db.attendance.find(att_q, {"_id": 0, "student_id": 1, "status": 1}).to_list(200000)
+    tracks = await db.tracking_sheets.find(track_q, {"_id": 0, "student_id": 1}).to_list(200000)
+
+    rec_by, att_by, track_by = {}, {}, {}
+    for r in recs:
+        rec_by.setdefault(r["student_id"], []).append(r)
+    for a in atts:
+        att_by.setdefault(a["student_id"], []).append(a)
+    for t in tracks:
+        track_by[t["student_id"]] = track_by.get(t["student_id"], 0) + 1
+
+    group_names = {}
+    rows = []
+    for s in students:
+        gid = s.get("group_id")
+        if gid and gid not in group_names:
+            g = await db.groups.find_one({"id": gid}, {"_id": 0, "name": 1})
+            group_names[gid] = g["name"] if g else ""
+        prev = len(s.get("previous_memorization_juz") or []) * PAGES_PER_JUZ + (s.get("previous_memorization_pages") or 0)
+        srecs = rec_by.get(s["id"], [])
+        total_new_all = sum(_new_pages_of(r) for r in srecs)
+        scoped = srecs if not term_id else [r for r in srecs if r.get("term_id") == term_id]
+        new_pages = sum(_new_pages_of(r) for r in scoped)
+        review_pages = sum((r.get("review_pages") or 0) for r in scoped)
+        satts = att_by.get(s["id"], [])
+        present = sum(1 for a in satts if a.get("status") == "present")
+        att_rate = round(present / len(satts) * 100, 1) if satts else 0
+        age = _age_from_birthdate(s.get("birth_date"))
+        rows.append({
+            "student_id": s["id"], "name": s.get("name") or "", "group_name": group_names.get(gid, ""),
+            "total_memorization": prev + total_new_all,
+            "new_memorization": new_pages,
+            "review": review_pages,
+            "attendance": att_rate,
+            "tracking": track_by.get(s["id"], 0),
+            "age": age,
+            "grade": s.get("school_grade") or "",
+        })
+
+    sort_by = sort_by if sort_by in (STUDENT_STATS_NUMERIC | {"name", "grade"}) else "name"
+    reverse = (order == "desc")
+    if sort_by in STUDENT_STATS_NUMERIC:
+        rows.sort(key=lambda r: (r[sort_by] is None, r[sort_by] if r[sort_by] is not None else 0), reverse=reverse)
+    else:
+        rows.sort(key=lambda r: (r.get(sort_by) or "").strip(), reverse=reverse)
+    return rows
+
+
+@api_router.get("/reports/student-stats")
+async def student_stats_report(group_id: Optional[str] = None, student_id: Optional[str] = None,
+                               term_id: Optional[str] = None, sort_by: str = "name", order: str = "asc",
+                               current_user: dict = Depends(get_current_user)):
+    """جدول إحصائيات الطلاب: الحفظ الكلي/الجديد/المراجعة، الحضور، تسليم المتابعة، العمر، الصف — مع ترتيب."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    rows = await _build_student_stats(current_user, group_id, student_id, term_id, sort_by, order)
+    return {"count": len(rows), "sort_by": sort_by, "order": order, "rows": rows}
+
+
+@api_router.get("/export/student-stats")
+async def export_student_stats_excel(group_id: Optional[str] = None, student_id: Optional[str] = None,
+                                     term_id: Optional[str] = None, sort_by: str = "name", order: str = "asc",
+                                     current_user: dict = Depends(get_current_user)):
+    """تصدير جدول إحصائيات الطلاب إلى Excel (بنفس الفلاتر والترتيب)."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    rows = await _build_student_stats(current_user, group_id, student_id, term_id, sort_by, order)
+    output = io.BytesIO()
+    wb = xlsxwriter.Workbook(output, {'in_memory': True})
+    title_f = wb.add_format({'bold': True, 'font_size': 15, 'align': 'center', 'bg_color': '#0d9488', 'font_color': 'white'})
+    head_f = wb.add_format({'bold': True, 'bg_color': '#1e3a5f', 'font_color': 'white', 'border': 1, 'align': 'center', 'valign': 'vcenter'})
+    cell_f = wb.add_format({'border': 1, 'align': 'center'})
+    sh = wb.add_worksheet('إحصائيات الطلاب')
+    sh.right_to_left()
+    sh.merge_range('A1:J1', 'جدول إحصائيات الطلاب', title_f)
+    headers = ['#', 'الطالب', 'المجموعة', 'الحفظ الكلي (ص)', 'الحفظ الجديد (ص)', 'المراجعة (ص)',
+               'الحضور %', 'تسليم المتابعة', 'العمر', 'الصف']
+    for c, h in enumerate(headers):
+        sh.write(2, c, h, head_f)
+    sh.set_column('A:A', 5); sh.set_column('B:B', 22); sh.set_column('C:C', 16); sh.set_column('D:J', 13)
+    for i, r in enumerate(rows, 1):
+        row = i + 2
+        sh.write(row, 0, i, cell_f)
+        sh.write(row, 1, r["name"], cell_f)
+        sh.write(row, 2, r["group_name"], cell_f)
+        sh.write(row, 3, r["total_memorization"], cell_f)
+        sh.write(row, 4, r["new_memorization"], cell_f)
+        sh.write(row, 5, r["review"], cell_f)
+        sh.write(row, 6, r["attendance"], cell_f)
+        sh.write(row, 7, r["tracking"], cell_f)
+        sh.write(row, 8, r["age"] if r["age"] is not None else "", cell_f)
+        sh.write(row, 9, r["grade"], cell_f)
+    wb.close()
+    return _xlsx_response(output, f"student_stats_{datetime.now().strftime('%Y%m%d')}.xlsx")
+
+
+# ============== A6 - تصدير تقارير المعلمين والمجموعات ==============
+def _xlsx_response(output, filename):
+    output.seek(0)
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@api_router.get("/export/teachers")
+async def export_teachers_excel(term_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """A6 — تصدير مقارنة أداء المعلمين إلى Excel."""
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    data = await teachers_report(term_id=term_id, current_user=current_user)
+    output = io.BytesIO()
+    wb = xlsxwriter.Workbook(output, {'in_memory': True})
+    title_f = wb.add_format({'bold': True, 'font_size': 15, 'align': 'center', 'bg_color': '#0d9488', 'font_color': 'white'})
+    head_f = wb.add_format({'bold': True, 'bg_color': '#1e3a5f', 'font_color': 'white', 'border': 1, 'align': 'center'})
+    cell_f = wb.add_format({'border': 1, 'align': 'center'})
+    sh = wb.add_worksheet('مقارنة المعلمين')
+    sh.right_to_left()
+    sh.merge_range('A1:G1', 'مقارنة أداء المعلمين', title_f)
+    headers = ['#', 'المعلم', 'عدد الطلاب', 'نسبة الحضور %', 'التسميعات', 'الصفحات', 'متوسط النقاط']
+    for c, h in enumerate(headers):
+        sh.write(2, c, h, head_f)
+    sh.set_column('A:A', 5); sh.set_column('B:B', 24); sh.set_column('C:G', 14)
+    for i, t in enumerate(data["teachers"], 1):
+        r = i + 2
+        sh.write(r, 0, i, cell_f)
+        sh.write(r, 1, t["name"], cell_f)
+        sh.write(r, 2, t["students"], cell_f)
+        sh.write(r, 3, t["attendance_rate"], cell_f)
+        sh.write(r, 4, t["recitations"], cell_f)
+        sh.write(r, 5, t["pages"], cell_f)
+        sh.write(r, 6, t["avg_points"], cell_f)
+    wb.close()
+    return _xlsx_response(output, f"teachers_report_{datetime.now().strftime('%Y%m%d')}.xlsx")
+
+
+@api_router.get("/export/groups-financial")
+async def export_groups_financial_excel(current_user: dict = Depends(get_current_user)):
+    """A6 — تصدير التحليل المالي لكل مجموعة إلى Excel."""
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    data = await financial_report(current_user=current_user)
+    output = io.BytesIO()
+    wb = xlsxwriter.Workbook(output, {'in_memory': True})
+    title_f = wb.add_format({'bold': True, 'font_size': 15, 'align': 'center', 'bg_color': '#0d9488', 'font_color': 'white'})
+    head_f = wb.add_format({'bold': True, 'bg_color': '#1e3a5f', 'font_color': 'white', 'border': 1, 'align': 'center'})
+    cell_f = wb.add_format({'border': 1, 'align': 'center'})
+    money_f = wb.add_format({'border': 1, 'align': 'center', 'num_format': '#,##0.00'})
+    sh = wb.add_worksheet('التحليل المالي')
+    sh.right_to_left()
+    sh.merge_range('A1:F1', 'التحليل المالي لكل مجموعة', title_f)
+    t = data["totals"]
+    sh.merge_range('A2:F2', f"الإجمالي: {t['total']:.2f}  |  المحصّل: {t['paid']:.2f}  |  المتبقّي: {t['due'] + t['pending']:.2f}  |  نسبة التحصيل: {t['collection_rate']}%", cell_f)
+    headers = ['#', 'المجموعة', 'الإجمالي', 'المحصّل', 'المتبقّي', 'نسبة التحصيل %']
+    for c, h in enumerate(headers):
+        sh.write(3, c, h, head_f)
+    sh.set_column('A:A', 5); sh.set_column('B:B', 24); sh.set_column('C:F', 15)
+    for i, g in enumerate(data["by_group"], 1):
+        r = i + 3
+        sh.write(r, 0, i, cell_f)
+        sh.write(r, 1, g["group_name"], cell_f)
+        sh.write_number(r, 2, g["total"], money_f)
+        sh.write_number(r, 3, g["paid"], money_f)
+        sh.write_number(r, 4, g["outstanding"], money_f)
+        sh.write(r, 5, g["collection_rate"], cell_f)
+    wb.close()
+    return _xlsx_response(output, f"groups_financial_{datetime.now().strftime('%Y%m%d')}.xlsx")
+
+
+# ============== TRACKING SHEET ROUTES ==============
 
 def calculate_tracking_points(data: dict, custom_items: list = None) -> dict:
     """
@@ -1187,8 +2036,7 @@ async def check_memorizer_badge(student_id: str):
 @api_router.post("/tracking-sheets/manual")
 async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_user: dict = Depends(get_current_user)):
     """إدخال ورقة متابعة يدوياً (للشيخ)"""
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه إدخال ورقة المتابعة")
+    ensure_role(current_user, "sheikh", "فقط الشيخ يمكنه إدخال ورقة المتابعة")
     
     # Calculate points - تضمين جميع الحقول بما فيها صلاة الضحى
     points_breakdown = calculate_tracking_points({
@@ -1263,8 +2111,7 @@ async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_
 
 @api_router.post("/tracking-sheets")
 async def create_tracking_sheet(sheet_data: TrackingSheetCreate, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه رفع ورقة المتابعة")
+    ensure_role(current_user, "sheikh", "فقط الشيخ يمكنه رفع ورقة المتابعة")
     
     # If image provided, analyze it using AI to count checkmarks
     if sheet_data.image_base64:
@@ -1386,8 +2233,7 @@ async def get_tracking_items_for_sheikh(sheikh_id: str) -> list:
 @api_router.post("/tracking-items")
 async def create_tracking_item(data: TrackingItemCreate, current_user: dict = Depends(get_current_user)):
     """إضافة بند متابعة مخصص (للمعلم فقط)"""
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="فقط المعلم يمكنه إضافة بنود المتابعة")
+    ensure_role(current_user, "sheikh", "فقط المعلم يمكنه إضافة بنود المتابعة")
     if not data.name.strip():
         raise HTTPException(status_code=400, detail="اسم البند مطلوب")
     if data.max_points <= 0:
@@ -1417,8 +2263,7 @@ async def list_tracking_items(current_user: dict = Depends(get_current_user)):
 @api_router.delete("/tracking-items/{item_id}")
 async def delete_tracking_item(item_id: str, current_user: dict = Depends(get_current_user)):
     """حذف بند متابعة مخصص (للمعلم صاحبه فقط)"""
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, "sheikh", "غير مصرح لك")
     res = await db.tracking_items.delete_one({"id": item_id, "sheikh_id": current_user["user_id"]})
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="البند غير موجود")
@@ -1427,8 +2272,7 @@ async def delete_tracking_item(item_id: str, current_user: dict = Depends(get_cu
 @api_router.post("/tracking-sheets/student")
 async def create_tracking_sheet_student(data: StudentTrackingCreate, current_user: dict = Depends(get_current_user)):
     """تعبئة ورقة المتابعة من حساب الطالب - مرة واحدة في الأسبوع"""
-    if current_user["role"] != "student":
-        raise HTTPException(status_code=403, detail="هذا الخيار متاح للطلاب فقط")
+    ensure_role(current_user, "student", "هذا الخيار متاح للطلاب فقط")
     
     # التحقق من وقت التسليم
     submission_settings = await db.settings.find_one({"key": "tracking_submission"}, {"_id": 0})
@@ -1632,8 +2476,7 @@ class TrackingSheetUpdate(BaseModel):
 @api_router.put("/tracking-sheets/{sheet_id}")
 async def update_tracking_sheet(sheet_id: str, data: TrackingSheetUpdate, current_user: dict = Depends(get_current_user)):
     """تعديل ورقة متابعة (للشيخ فقط)"""
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تعديل ورقة المتابعة")
+    ensure_role(current_user, "sheikh", "فقط الشيخ يمكنه تعديل ورقة المتابعة")
     
     # Get existing sheet
     sheet = await db.tracking_sheets.find_one({"id": sheet_id})
@@ -1814,8 +2657,7 @@ async def get_tracking_stats(student_id: str, current_user: dict = Depends(get_c
 
 @api_router.post("/recitations")
 async def create_recitation(recitation_data: RecitationCreate, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تسجيل التسميع")
+    ensure_role(current_user, "sheikh", "فقط الشيخ يمكنه تسجيل التسميع")
     
     # الحصول على الفصل النشط
     active_term_id = await get_active_term_id()
@@ -1872,9 +2714,9 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
         
         return {"message": "تم تسجيل عدم التسميع", "recitation_id": recitation.id, "points_earned": 0}
     
-    # النقاط فقط إذا اجتاز الحد الأدنى - 20 نقطة
+    # النقاط فقط إذا اجتاز الحد الأدنى (RECITATION_PASS_POINTS)
     passed = recitation_data.passed_minimum or recitation_data.passed_review_minimum
-    points = 20 if passed else 0
+    points = RECITATION_PASS_POINTS if passed else 0
     
     description_parts = []
     
@@ -1999,8 +2841,7 @@ class RecitationUpdate(BaseModel):
 @api_router.put("/recitations/{recitation_id}")
 async def update_recitation(recitation_id: str, data: RecitationUpdate, current_user: dict = Depends(get_current_user)):
     """Update a recitation (Sheikh only - must be the one who recorded it)"""
-    if current_user["role"] not in ["sheikh", "admin"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["sheikh", "admin"], "غير مصرح لك")
     
     # Get existing recitation
     recitation = await db.recitations.find_one({"id": recitation_id})
@@ -2087,8 +2928,7 @@ async def update_recitation(recitation_id: str, data: RecitationUpdate, current_
 @api_router.delete("/recitations/{recitation_id}")
 async def delete_recitation(recitation_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a recitation (Sheikh only - must be the one who recorded it)"""
-    if current_user["role"] not in ["sheikh", "admin"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["sheikh", "admin"], "غير مصرح لك")
     
     # Get existing recitation
     recitation = await db.recitations.find_one({"id": recitation_id})
@@ -2167,8 +3007,7 @@ async def get_recitations(
 @api_router.delete("/recitations/{recitation_id}")
 async def delete_recitation(recitation_id: str, current_user: dict = Depends(get_current_user)):
     """حذف تسميع - للمعلم فقط"""
-    if current_user["role"] not in ["sheikh", "admin"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك بحذف التسميع")
+    ensure_role(current_user, ["sheikh", "admin"], "غير مصرح لك بحذف التسميع")
     
     # البحث عن التسميع
     recitation = await db.recitations.find_one({"id": recitation_id})
@@ -2202,8 +3041,7 @@ async def get_quran_juz(current_user: dict = Depends(get_current_user)):
 
 @api_router.post("/attendance")
 async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تسجيل الحضور")
+    ensure_role(current_user, "sheikh", "فقط الشيخ يمكنه تسجيل الحضور")
     
     # الحصول على الفصل النشط
     active_term_id = await get_active_term_id()
@@ -2247,7 +3085,7 @@ async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict 
     
     # Award points for attendance
     if attendance_data.status == "present":
-        points = 10
+        points = ATTENDANCE_POINTS
         await add_points(
             attendance_data.student_id,
             points,
@@ -2326,6 +3164,57 @@ async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict 
     
     return {"message": "تم تسجيل الحضور بنجاح", "attendance_id": attendance.id}
 
+
+# ============== T2 - تسجيل حضور جماعي بنقرة واحدة ==============
+class BulkAttendanceRecord(BaseModel):
+    student_id: str
+    status: str
+    excuse_reason: Optional[str] = None
+
+
+class BulkAttendanceRequest(BaseModel):
+    date: str
+    records: List[BulkAttendanceRecord]
+
+
+@api_router.post("/attendance/bulk")
+async def bulk_attendance(data: BulkAttendanceRequest, current_user: dict = Depends(get_current_user)):
+    """T2 — تسجيل حضور مجموعة كاملة دفعةً واحدة (حاضر افتراضيًا مع استثناء الغائبين)."""
+    ensure_role(current_user, "sheikh", "فقط الشيخ يمكنه تسجيل الحضور")
+    count = 0
+    for rec in data.records:
+        if rec.status not in ("present", "absent", "excused"):
+            continue
+        await mark_attendance(
+            AttendanceCreate(student_id=rec.student_id, date=data.date, status=rec.status, excuse_reason=rec.excuse_reason),
+            current_user,
+        )
+        count += 1
+    return {"message": f"تم تسجيل حضور {count} طالب", "count": count}
+
+
+# T3 - قيم ذكية للتسميع من آخر جلسة
+@api_router.get("/students/{student_id}/last-recitation")
+async def last_recitation_hint(student_id: str, current_user: dict = Depends(get_current_user)):
+    """T3 — يرجع آخر تسميع للطالب لاقتراح صفحة البداية تلقائيًا."""
+    ensure_role(current_user, ["sheikh", "admin"], "غير مصرح لك")
+    last = await db.recitations.find(
+        {"student_id": student_id, "did_not_recite": {"$ne": True}},
+        {"_id": 0, "page_to": 1, "juz_number": 1, "record_date": 1, "new_pages": 1},
+    ).sort("record_date", -1).limit(1).to_list(1)
+    if not last:
+        return {"has_previous": False, "suggested_from_page": None, "last_juz": None}
+    l = last[0]
+    pt = l.get("page_to")
+    return {
+        "has_previous": True,
+        "last_page_to": pt,
+        "last_juz": l.get("juz_number"),
+        "last_date": l.get("record_date"),
+        "suggested_from_page": (pt + 1) if isinstance(pt, int) else None,
+    }
+
+
 @api_router.get("/attendance")
 async def get_attendance(
     student_id: Optional[str] = None,
@@ -2366,8 +3255,7 @@ async def get_attendance(
 
 @api_router.post("/activities")
 async def create_activity(activity_data: ActivityCreate, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إنشاء الأنشطة")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إنشاء الأنشطة")
     
     activity = Activity(
         title=activity_data.title,
@@ -2402,8 +3290,7 @@ async def get_activities(current_user: dict = Depends(get_current_user)):
 
 @api_router.delete("/activities/{activity_id}")
 async def delete_activity(activity_id: str, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف الأنشطة")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف الأنشطة")
     
     result = await db.activities.delete_one({"id": activity_id})
     if result.deleted_count == 0:
@@ -2423,8 +3310,98 @@ async def create_notification_internal(user_id: str, title: str, message: str, t
     
     notification_dict = notification.model_dump()
     notification_dict["created_at"] = notification_dict["created_at"].isoformat()
-    
+
     await db.notifications.insert_one(notification_dict)
+
+
+# ============== N3 - سجل عمليات المدير (Audit Log) ==============
+async def log_admin_action(admin: dict, action: str, target_type: str = None,
+                           target_id: str = None, target_name: str = None, details: str = None):
+    """تسجيل عملية حساسة قام بها المدير (تصفير فصل، إعادة تعيين كلمة مرور، حذف، إنذار...)."""
+    try:
+        await db.audit_logs.insert_one({
+            "id": str(uuid.uuid4()),
+            "admin_id": admin.get("user_id"),
+            "admin_name": admin.get("name"),
+            "action": action,
+            "target_type": target_type,
+            "target_id": target_id,
+            "target_name": target_name,
+            "details": details,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as e:
+        logger.error(f"audit log failed: {e}")
+
+
+@api_router.get("/admin/audit-logs")
+async def get_audit_logs(action: Optional[str] = None, limit: int = 200,
+                         current_user: dict = Depends(get_current_user)):
+    """N3 — عرض سجل عمليات المدير مع إمكانية التصفية حسب نوع العملية."""
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    query = {}
+    if action:
+        query["action"] = action
+    logs = await db.audit_logs.find(query, {"_id": 0}).sort("created_at", -1).to_list(min(limit, 1000))
+    return {"count": len(logs), "logs": logs}
+
+
+# ============== N1 - الإعلانات (المدير -> المعلمون) ==============
+class AnnouncementCreate(BaseModel):
+    title: str
+    message: str
+    audience: str = "sheikhs"  # "sheikhs" (النسخة الأولى) أو "all"
+
+
+@api_router.post("/announcements")
+async def create_announcement(data: AnnouncementCreate, current_user: dict = Depends(get_current_user)):
+    """N1 — المدير يبثّ إعلانًا للمعلمين (أو الكل): يُحفظ للشريط ويُرسَل كإشعار."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه بثّ الإعلانات")
+    if not data.title.strip() or not data.message.strip():
+        raise HTTPException(status_code=400, detail="العنوان والنص مطلوبان")
+    audience = data.audience if data.audience in ("sheikhs", "all") else "sheikhs"
+    ann = {
+        "id": str(uuid.uuid4()),
+        "title": data.title.strip(),
+        "message": data.message.strip(),
+        "audience": audience,
+        "created_by": current_user["user_id"],
+        "created_by_name": current_user.get("name"),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.announcements.insert_one(ann)
+
+    # إرسال إشعار للجمهور المستهدف
+    role_filter = {"role": "sheikh"} if audience == "sheikhs" else {"role": {"$in": ["sheikh", "student"]}}
+    targets = await db.users.find(role_filter, {"_id": 0, "id": 1}).to_list(5000)
+    for u in targets:
+        await create_notification_internal(u["id"], f"📢 {data.title.strip()}", data.message.strip(), "info")
+
+    return {"message": "تم بثّ الإعلان", "id": ann["id"], "recipients": len(targets)}
+
+
+@api_router.get("/announcements")
+async def get_announcements(current_user: dict = Depends(get_current_user)):
+    """قائمة الإعلانات: المدير يرى الكل، والمعلم/الطالب يرى ما يخصّه (للشريط)."""
+    role = current_user["role"]
+    if role == "admin":
+        query = {}
+    elif role == "sheikh":
+        query = {"audience": {"$in": ["sheikhs", "all"]}}
+    else:
+        query = {"audience": "all"}
+    anns = await db.announcements.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return anns
+
+
+@api_router.delete("/announcements/{ann_id}")
+async def delete_announcement(ann_id: str, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف الإعلان")
+    result = await db.announcements.delete_one({"id": ann_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="الإعلان غير موجود")
+    return {"message": "تم حذف الإعلان"}
+
 
 @api_router.get("/notifications")
 async def get_notifications(current_user: dict = Depends(get_current_user)):
@@ -2534,8 +3511,7 @@ async def get_group_rankings(
     current_user: dict = Depends(get_current_user)
 ):
     """Get rankings for current student within their group only"""
-    if current_user["role"] != "student":
-        raise HTTPException(status_code=403, detail="هذا الترتيب للطلاب فقط")
+    ensure_role(current_user, "student", "هذا الترتيب للطلاب فقط")
     
     # Get current student's group
     student = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0})
@@ -2815,8 +3791,7 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
 
 @api_router.get("/statistics/overview")
 async def get_overview_statistics(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     total_students = await db.users.count_documents({"role": "student"})
     total_sheikhs = await db.users.count_documents({"role": "sheikh"})
@@ -2834,8 +3809,7 @@ async def get_overview_statistics(current_user: dict = Depends(get_current_user)
 
 @api_router.get("/users")
 async def get_users(role: Optional[str] = None, current_user: dict = Depends(get_current_user)):
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     query = {}
     if role:
@@ -2861,8 +3835,7 @@ async def get_users(role: Optional[str] = None, current_user: dict = Depends(get
 @api_router.get("/students/me/profile")
 async def get_my_profile(current_user: dict = Depends(get_current_user)):
     """Get own profile data (Student only)"""
-    if current_user["role"] != "student":
-        raise HTTPException(status_code=403, detail="هذه الخدمة للطلاب فقط")
+    ensure_role(current_user, "student", "هذه الخدمة للطلاب فقط")
     
     student_id = current_user["user_id"]
     
@@ -2876,8 +3849,7 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
 @api_router.put("/students/me/profile")
 async def update_my_profile(data: StudentSelfUpdate, current_user: dict = Depends(get_current_user)):
     """Update own profile (Student only - limited fields)"""
-    if current_user["role"] != "student":
-        raise HTTPException(status_code=403, detail="هذه الخدمة للطلاب فقط")
+    ensure_role(current_user, "student", "هذه الخدمة للطلاب فقط")
     
     student_id = current_user["user_id"]
     
@@ -3034,8 +4006,7 @@ async def get_student_profile(student_id: str, current_user: dict = Depends(get_
 @api_router.put("/students/{student_id}")
 async def update_student(student_id: str, data: StudentProfileUpdate, current_user: dict = Depends(get_current_user)):
     """Update student profile (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تعديل بيانات الطالب")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل بيانات الطالب")
     
     # Check if student exists
     student = await db.users.find_one({"id": student_id, "role": "student"})
@@ -3067,8 +4038,7 @@ async def update_student(student_id: str, data: StudentProfileUpdate, current_us
 @api_router.delete("/students/{student_id}")
 async def delete_student(student_id: str, current_user: dict = Depends(get_current_user)):
     """Delete student (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف الطالب")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف الطالب")
     
     # Check if student exists
     student = await db.users.find_one({"id": student_id, "role": "student"})
@@ -3083,14 +4053,16 @@ async def delete_student(student_id: str, current_user: dict = Depends(get_curre
     await db.student_points.delete_many({"student_id": student_id})
     await db.points_transactions.delete_many({"student_id": student_id})
     await db.notifications.delete_many({"user_id": student_id})
-    
+
+    await log_admin_action(current_user, "user_delete", "student", student_id, student.get("name"),
+                           "حذف طالب وجميع بياناته")
+
     return {"message": "تم حذف الطالب وجميع بياناته بنجاح"}
 
 @api_router.post("/students/{student_id}/change-group")
 async def change_student_group(student_id: str, group_id: str, current_user: dict = Depends(get_current_user)):
     """Change student's group (Admin only) - البيانات تنتقل تلقائياً مع الطالب"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه نقل الطالب")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه نقل الطالب")
     
     # Check if student exists
     student = await db.users.find_one({"id": student_id, "role": "student"})
@@ -3131,8 +4103,139 @@ async def change_student_group(student_id: str, group_id: str, current_user: dic
         "تم نقلك إلى مجموعة أخرى. جميع بياناتك السابقة (التسميعات، ورق المتابعة، الحضور) محفوظة.",
         "info"
     )
-    
+
     return {"message": "تم نقل الطالب مع جميع بياناته بنجاح"}
+
+
+# ============== N4 - العمليات الجماعية ==============
+class BulkIdsRequest(BaseModel):
+    user_ids: List[str]
+
+
+class BulkGroupRequest(BaseModel):
+    student_ids: List[str]
+    group_id: Optional[str] = None
+
+
+class BulkNotifyRequest(BaseModel):
+    user_ids: List[str]
+    title: str
+    message: str
+
+
+@api_router.post("/admin/bulk/activate")
+async def bulk_activate(data: BulkIdsRequest, current_user: dict = Depends(get_current_user)):
+    """N4 — اعتماد/تفعيل عدة حسابات معلّقة دفعةً واحدة."""
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    result = await db.users.update_many(
+        {"id": {"$in": data.user_ids}},
+        {"$set": {"is_activated": True, "is_active": True, "activation_code": None}},
+    )
+    for uid in data.user_ids:
+        await create_notification_internal(uid, "تم تفعيل حسابك", "تم اعتماد حسابك من الإدارة. يمكنك استخدام النظام الآن.", "success")
+    return {"message": f"تم تفعيل {result.modified_count} حساب", "count": result.modified_count}
+
+
+@api_router.post("/admin/bulk/change-group")
+async def bulk_change_group(data: BulkGroupRequest, current_user: dict = Depends(get_current_user)):
+    """N4 — نقل عدة طلاب إلى مجموعة واحدة دفعةً واحدة."""
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    new_sheikh_id = None
+    if data.group_id:
+        group = await db.groups.find_one({"id": data.group_id}, {"_id": 0, "sheikh_id": 1})
+        if not group:
+            raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
+        new_sheikh_id = group.get("sheikh_id")
+    result = await db.users.update_many(
+        {"id": {"$in": data.student_ids}, "role": "student"},
+        {"$set": {"group_id": data.group_id}},
+    )
+    if new_sheikh_id:
+        await db.tracking_sheets.update_many({"student_id": {"$in": data.student_ids}}, {"$set": {"sheikh_id": new_sheikh_id}})
+        await db.recitations.update_many({"student_id": {"$in": data.student_ids}}, {"$set": {"sheikh_id": new_sheikh_id}})
+    for sid in data.student_ids:
+        await create_notification_internal(sid, "تم نقلك إلى مجموعة جديدة", "تم نقلك إلى مجموعة أخرى مع الحفاظ على جميع بياناتك.", "info")
+    return {"message": f"تم نقل {result.modified_count} طالب", "count": result.modified_count}
+
+
+@api_router.post("/admin/bulk/notify")
+async def bulk_notify(data: BulkNotifyRequest, current_user: dict = Depends(get_current_user)):
+    """N4 — إرسال إشعار جماعي لعدة مستخدمين."""
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    if not data.title.strip() or not data.message.strip():
+        raise HTTPException(status_code=400, detail="العنوان والنص مطلوبان")
+    for uid in data.user_ids:
+        await create_notification_internal(uid, data.title.strip(), data.message.strip(), "info")
+    return {"message": f"تم إرسال {len(data.user_ids)} إشعار", "count": len(data.user_ids)}
+
+
+# ============== T4 - مراسلة المعلم لطلابه ==============
+class SheikhMessageRequest(BaseModel):
+    title: str
+    message: str
+    group_id: Optional[str] = None  # مجموعة محددة، أو كل طلاب المعلم
+
+
+@api_router.post("/sheikh/message")
+async def sheikh_message_students(data: SheikhMessageRequest, current_user: dict = Depends(get_current_user)):
+    """T4 — المعلم يرسل رسالة (إشعار) لطلابه (مجموعة محددة أو كل مجموعاته)."""
+    ensure_role(current_user, "sheikh", "هذه الخدمة للمعلمين")
+    if not data.title.strip() or not data.message.strip():
+        raise HTTPException(status_code=400, detail="العنوان والنص مطلوبان")
+    gids = await _sheikh_group_ids(current_user["user_id"])
+    if data.group_id:
+        if data.group_id not in gids:
+            raise HTTPException(status_code=403, detail="هذه المجموعة ليست لك")
+        target_gids = [data.group_id]
+    else:
+        target_gids = gids
+    students = await db.users.find({"role": "student", "group_id": {"$in": target_gids}}, {"_id": 0, "id": 1}).to_list(5000)
+    title = f"رسالة من معلمك: {data.title.strip()}"
+    for s in students:
+        await create_notification_internal(s["id"], title, data.message.strip(), "info")
+    return {"message": f"تم إرسال الرسالة إلى {len(students)} طالب", "count": len(students)}
+
+
+# ============== T5 - مؤشرات الواجبات والامتحانات للمعلم ==============
+@api_router.get("/sheikh/assignment-stats")
+async def sheikh_assignment_stats(current_user: dict = Depends(get_current_user)):
+    """T5 — نِسَب تسليم الواجبات والامتحانات ومتوسط الدرجات لمجموعات المعلم."""
+    ensure_role(current_user, ["sheikh", "admin"], "غير مصرح لك")
+
+    hw_query = {} if current_user["role"] == "admin" else {"created_by": current_user["user_id"]}
+    homeworks = await db.homework.find(hw_query, {"_id": 0, "id": 1, "title": 1}).to_list(1000)
+    hw_ids = [h["id"] for h in homeworks]
+    subs = await db.homework_submissions.find({"homework_id": {"$in": hw_ids}}, {"_id": 0, "status": 1, "grade": 1}).to_list(100000)
+    total_sub = len(subs)
+    submitted = sum(1 for s in subs if s.get("status") in ("submitted", "graded"))
+    graded = [s for s in subs if s.get("status") == "graded" and s.get("grade") is not None]
+    hw_avg = round(sum(s["grade"] for s in graded) / len(graded), 1) if graded else 0
+
+    ex_query = {} if current_user["role"] == "admin" else {"created_by": current_user["user_id"]}
+    exams = await db.online_exams.find(ex_query, {"_id": 0, "id": 1}).to_list(1000)
+    ex_ids = [e["id"] for e in exams]
+    ex_subs = await db.exam_submissions.find({"exam_id": {"$in": ex_ids}}, {"_id": 0, "score": 1, "passed": 1}).to_list(100000)
+    ex_count = len(ex_subs)
+    ex_avg = round(sum(s.get("score", 0) for s in ex_subs) / ex_count, 1) if ex_count else 0
+    ex_pass = round(sum(1 for s in ex_subs if s.get("passed")) / ex_count * 100, 1) if ex_count else 0
+
+    return {
+        "homework": {
+            "count": len(homeworks),
+            "total_assigned": total_sub,
+            "submitted": submitted,
+            "submission_rate": round(submitted / total_sub * 100, 1) if total_sub else 0,
+            "graded": len(graded),
+            "avg_grade": hw_avg,
+        },
+        "exams": {
+            "count": len(exams),
+            "attempts": ex_count,
+            "avg_score": ex_avg,
+            "pass_rate": ex_pass,
+        },
+    }
+
 
 # نموذج لإضافة طالب من المدير أو المعلم (بدون كود التسجيل)
 class AdminCreateStudent(BaseModel):
@@ -3155,8 +4258,7 @@ class AdminCreateStudent(BaseModel):
 @api_router.post("/admin/students")
 async def admin_create_student(data: AdminCreateStudent, current_user: dict = Depends(get_current_user)):
     """Create a new student (Admin or Sheikh)"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك بإضافة طالب")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك بإضافة طالب")
     
     # Validate data
     if not data.email or not data.name or not data.password:
@@ -3233,8 +4335,7 @@ class WarningCreate(BaseModel):
 @api_router.post("/admin/warnings")
 async def issue_warning(data: WarningCreate, current_user: dict = Depends(get_current_user)):
     """Issue a warning to a student (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إصدار الإنذارات")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إصدار الإنذارات")
     
     # Check if student exists
     student = await db.users.find_one({"id": data.student_id, "role": "student"})
@@ -3265,7 +4366,10 @@ async def issue_warning(data: WarningCreate, current_user: dict = Depends(get_cu
         data.message,
         "warning"
     )
-    
+
+    await log_admin_action(current_user, "warning", "student", data.student_id, student.get("name"),
+                           f"إنذار: {warning_type_names.get(data.type, data.type)}")
+
     return {"message": "تم إصدار الإنذار بنجاح", "warning_id": warning["id"]}
 
 @api_router.get("/admin/warnings")
@@ -3274,8 +4378,7 @@ async def get_all_warnings(
     current_user: dict = Depends(get_current_user)
 ):
     """Get all warnings (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, "admin", "غير مصرح لك")
     
     query = {}
     if student_id:
@@ -3300,8 +4403,7 @@ async def get_student_warnings(student_id: str, current_user: dict = Depends(get
 @api_router.delete("/admin/warnings/{warning_id}")
 async def delete_warning(warning_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a warning (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف الإنذارات")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف الإنذارات")
     
     result = await db.warnings.delete_one({"id": warning_id})
     if result.deleted_count == 0:
@@ -3418,6 +4520,60 @@ async def add_points(student_id: str, points: int, category: str, description: s
         )
     
     return {"points_added": points, "total_points": update_dict["total_points"], "level": new_level, "new_badges": new_badges}
+
+
+async def recompute_student_points(student_id: str) -> dict:
+    """يعيد بناء نقاط الطالب من البيانات الخام (حضور + تسميع + متابعة) — مصدر موثوق واحد.
+    يحافظ على نقاط التفاعل والإداري (غير مشتقّة من الخام)."""
+    present = await db.attendance.count_documents({"student_id": student_id, "status": "present"})
+    attendance_points = present * ATTENDANCE_POINTS
+
+    recs = await db.recitations.find(
+        {"student_id": student_id, "did_not_recite": {"$ne": True}}, {"_id": 0, "points_earned": 1}
+    ).to_list(100000)
+    recitation_points = sum(r.get("points_earned", 0) or 0 for r in recs)
+
+    tracks = await db.tracking_sheets.find({"student_id": student_id}, {"_id": 0, "points_earned": 1}).to_list(100000)
+    tracking_points = sum(t.get("points_earned", 0) or 0 for t in tracks)
+
+    existing = await db.student_points.find_one({"student_id": student_id}, {"_id": 0}) or {}
+    interaction = existing.get("interaction_points", 0) or 0
+    admin_bonus = existing.get("admin_bonus_points", 0) or 0
+    total = attendance_points + recitation_points + tracking_points + interaction + admin_bonus
+
+    await db.student_points.update_one(
+        {"student_id": student_id},
+        {"$set": {
+            "student_id": student_id,
+            "total_points": total,
+            "attendance_points": attendance_points,
+            "recitation_points": recitation_points,
+            "tracking_points": tracking_points,
+            "interaction_points": interaction,
+            "admin_bonus_points": admin_bonus,
+            "level": calculate_level(total),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }, "$setOnInsert": {"id": str(uuid.uuid4()), "badges": []}},
+        upsert=True,
+    )
+    return {"student_id": student_id, "total_points": total,
+            "attendance_points": attendance_points, "recitation_points": recitation_points,
+            "tracking_points": tracking_points}
+
+
+@api_router.post("/admin/recompute-points")
+async def recompute_all_points(current_user: dict = Depends(get_current_user)):
+    """أرقام موثوقة (F2): إعادة احتساب نقاط جميع الطلاب من البيانات الخام لتوحيد كل اللوحات والتقارير."""
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    students = await db.users.find({"role": "student"}, {"_id": 0, "id": 1}).to_list(10000)
+    total = 0
+    for s in students:
+        r = await recompute_student_points(s["id"])
+        total += r["total_points"]
+    await log_admin_action(current_user, "recompute_points", "system", None, None,
+                           f"إعادة احتساب نقاط {len(students)} طالب")
+    return {"message": f"تم إعادة احتساب نقاط {len(students)} طالب", "students": len(students), "grand_total": total}
+
 
 async def check_and_award_badges(student_id: str, total_points: int) -> list:
     """Check and award badges based on points and achievements"""
@@ -3585,8 +4741,7 @@ async def award_bonus_points(
     current_user: dict = Depends(get_current_user)
 ):
     """Award bonus points to a student (admin/sheikh only)"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     result = await add_points(student_id, points, "bonus", reason)
     
@@ -3604,8 +4759,7 @@ async def award_bonus_points(
 @api_router.post("/curriculum")
 async def create_curriculum(data: CurriculumCreate, current_user: dict = Depends(get_current_user)):
     """Create a new curriculum (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إدارة المنهج")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إدارة المنهج")
     
     curriculum = Curriculum(
         name=data.name,
@@ -3626,8 +4780,7 @@ async def create_curriculum(data: CurriculumCreate, current_user: dict = Depends
 @api_router.get("/curriculum")
 async def get_all_curriculum(current_user: dict = Depends(get_current_user)):
     """Get all curriculum (Admin, Sheikh)"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     curricula = await db.curriculum.find({}, {"_id": 0}).sort("created_at", -1).to_list(50)
     
@@ -3641,8 +4794,7 @@ async def get_all_curriculum(current_user: dict = Depends(get_current_user)):
 @api_router.get("/curriculum/{curriculum_id}")
 async def get_curriculum(curriculum_id: str, current_user: dict = Depends(get_current_user)):
     """Get curriculum with entries"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     curriculum = await db.curriculum.find_one({"id": curriculum_id}, {"_id": 0})
     if not curriculum:
@@ -3660,8 +4812,7 @@ async def get_curriculum(curriculum_id: str, current_user: dict = Depends(get_cu
 @api_router.put("/curriculum/{curriculum_id}")
 async def update_curriculum(curriculum_id: str, data: CurriculumCreate, current_user: dict = Depends(get_current_user)):
     """Update curriculum (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تعديل المنهج")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل المنهج")
     
     curriculum = await db.curriculum.find_one({"id": curriculum_id})
     if not curriculum:
@@ -3681,8 +4832,7 @@ async def update_curriculum(curriculum_id: str, data: CurriculumCreate, current_
 @api_router.delete("/curriculum/{curriculum_id}")
 async def delete_curriculum(curriculum_id: str, current_user: dict = Depends(get_current_user)):
     """Delete curriculum (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف المنهج")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف المنهج")
     
     result = await db.curriculum.delete_one({"id": curriculum_id})
     if result.deleted_count == 0:
@@ -3697,8 +4847,7 @@ async def delete_curriculum(curriculum_id: str, current_user: dict = Depends(get
 @api_router.post("/curriculum/{curriculum_id}/entries")
 async def add_curriculum_entry(curriculum_id: str, data: CurriculumEntryCreate, current_user: dict = Depends(get_current_user)):
     """Add entry to curriculum (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إضافة خطط للمنهج")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إضافة خطط للمنهج")
     
     # Verify curriculum exists
     curriculum = await db.curriculum.find_one({"id": curriculum_id})
@@ -3733,8 +4882,7 @@ async def add_curriculum_entry(curriculum_id: str, data: CurriculumEntryCreate, 
 @api_router.put("/curriculum/entries/{entry_id}")
 async def update_curriculum_entry(entry_id: str, data: CurriculumEntryCreate, current_user: dict = Depends(get_current_user)):
     """Update curriculum entry (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تعديل الخطط")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل الخطط")
     
     result = await db.curriculum_entries.update_one(
         {"id": entry_id},
@@ -3756,8 +4904,7 @@ async def update_curriculum_entry(entry_id: str, data: CurriculumEntryCreate, cu
 @api_router.delete("/curriculum/entries/{entry_id}")
 async def delete_curriculum_entry(entry_id: str, current_user: dict = Depends(get_current_user)):
     """Delete curriculum entry (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف الخطط")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف الخطط")
     
     result = await db.curriculum_entries.delete_one({"id": entry_id})
     if result.deleted_count == 0:
@@ -3770,8 +4917,7 @@ async def delete_curriculum_entry(entry_id: str, current_user: dict = Depends(ge
 @api_router.post("/schedule")
 async def create_schedule(data: ScheduleCreate, current_user: dict = Depends(get_current_user)):
     """Create a new schedule (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إدارة الجداول")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إدارة الجداول")
     
     schedule = Schedule(
         name=data.name,
@@ -3792,8 +4938,7 @@ async def create_schedule(data: ScheduleCreate, current_user: dict = Depends(get
 @api_router.get("/schedule")
 async def get_all_schedules(current_user: dict = Depends(get_current_user)):
     """Get all schedules (Admin, Sheikh)"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     schedules = await db.schedules.find({}, {"_id": 0}).sort("created_at", -1).to_list(50)
     
@@ -3807,8 +4952,7 @@ async def get_all_schedules(current_user: dict = Depends(get_current_user)):
 @api_router.get("/schedule/active")
 async def get_active_schedule(current_user: dict = Depends(get_current_user)):
     """Get the active schedule with all slots"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     schedule = await db.schedules.find_one({"is_active": True}, {"_id": 0})
     if not schedule:
@@ -3826,8 +4970,7 @@ async def get_active_schedule(current_user: dict = Depends(get_current_user)):
 @api_router.get("/schedule/{schedule_id}")
 async def get_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
     """Get schedule with slots"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     schedule = await db.schedules.find_one({"id": schedule_id}, {"_id": 0})
     if not schedule:
@@ -3845,8 +4988,7 @@ async def get_schedule(schedule_id: str, current_user: dict = Depends(get_curren
 @api_router.put("/schedule/{schedule_id}")
 async def update_schedule(schedule_id: str, data: ScheduleCreate, current_user: dict = Depends(get_current_user)):
     """Update schedule (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تعديل الجدول")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل الجدول")
     
     schedule = await db.schedules.find_one({"id": schedule_id})
     if not schedule:
@@ -3866,8 +5008,7 @@ async def update_schedule(schedule_id: str, data: ScheduleCreate, current_user: 
 @api_router.put("/schedule/{schedule_id}/activate")
 async def activate_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
     """Set schedule as active (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تفعيل الجدول")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تفعيل الجدول")
     
     # Deactivate all schedules
     await db.schedules.update_many({}, {"$set": {"is_active": False}})
@@ -3886,8 +5027,7 @@ async def activate_schedule(schedule_id: str, current_user: dict = Depends(get_c
 @api_router.delete("/schedule/{schedule_id}")
 async def delete_schedule(schedule_id: str, current_user: dict = Depends(get_current_user)):
     """Delete schedule (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف الجدول")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف الجدول")
     
     result = await db.schedules.delete_one({"id": schedule_id})
     if result.deleted_count == 0:
@@ -3906,8 +5046,7 @@ class ActiveStudentBonus(BaseModel):
 @api_router.post("/students/active-bonus")
 async def grant_active_student_bonus(data: ActiveStudentBonus, current_user: dict = Depends(get_current_user)):
     """منح نقاط الطالب المتفاعل (للشيخ فقط) - 10 نقاط"""
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="فقط المعلم يمكنه منح هذه النقاط")
+    ensure_role(current_user, "sheikh", "فقط المعلم يمكنه منح هذه النقاط")
     
     # Verify student exists
     student = await db.users.find_one({"id": data.student_id, "role": "student"})
@@ -3962,8 +5101,7 @@ async def grant_active_student_bonus(data: ActiveStudentBonus, current_user: dic
 @api_router.post("/schedule/{schedule_id}/slots")
 async def add_schedule_slot(schedule_id: str, data: ScheduleSlotCreate, current_user: dict = Depends(get_current_user)):
     """Add slot to schedule (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إضافة حصص للجدول")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إضافة حصص للجدول")
     
     # Verify schedule exists
     schedule = await db.schedules.find_one({"id": schedule_id})
@@ -3990,8 +5128,7 @@ async def add_schedule_slot(schedule_id: str, data: ScheduleSlotCreate, current_
 @api_router.put("/schedule/slots/{slot_id}")
 async def update_schedule_slot(slot_id: str, data: ScheduleSlotCreate, current_user: dict = Depends(get_current_user)):
     """Update schedule slot (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تعديل الحصص")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل الحصص")
     
     result = await db.schedule_slots.update_one(
         {"id": slot_id},
@@ -4013,8 +5150,7 @@ async def update_schedule_slot(slot_id: str, data: ScheduleSlotCreate, current_u
 @api_router.delete("/schedule/slots/{slot_id}")
 async def delete_schedule_slot(slot_id: str, current_user: dict = Depends(get_current_user)):
     """Delete schedule slot (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف الحصص")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف الحصص")
     
     result = await db.schedule_slots.delete_one({"id": slot_id})
     if result.deleted_count == 0:
@@ -4027,8 +5163,7 @@ async def delete_schedule_slot(slot_id: str, current_user: dict = Depends(get_cu
 @api_router.get("/rankings/sheikh-students")
 async def get_sheikh_students_ranking(current_user: dict = Depends(get_current_user)):
     """Get ranking of students in sheikh's groups"""
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="فقط للمشايخ")
+    ensure_role(current_user, "sheikh", "فقط للمشايخ")
     
     # Get sheikh's groups
     groups = await db.groups.find({"sheikh_id": current_user["user_id"]}, {"_id": 0}).to_list(20)
@@ -4122,8 +5257,7 @@ async def get_admin_rankings(
     current_user: dict = Depends(get_current_user)
 ):
     """Get rankings for admin with different filters"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
     
     if filter_type == "groups":
         # Get all groups with their stats
@@ -4289,8 +5423,7 @@ import base64
 @api_router.get("/admin/dashboard-stats")
 async def get_admin_dashboard_stats(current_user: dict = Depends(get_current_user)):
     """Get comprehensive statistics for admin dashboard"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
     
     # Basic counts
     total_students = await db.users.count_documents({"role": "student", "is_active": True})
@@ -4405,8 +5538,7 @@ async def get_admin_dashboard_stats(current_user: dict = Depends(get_current_use
 @api_router.get("/admin/sheikh/{sheikh_id}")
 async def get_sheikh_details(sheikh_id: str, current_user: dict = Depends(get_current_user)):
     """Get detailed information about a sheikh (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
     
     sheikh = await db.users.find_one({"id": sheikh_id, "role": "sheikh"}, {"_id": 0, "password_hash": 0})
     if not sheikh:
@@ -4441,8 +5573,7 @@ async def get_sheikh_details(sheikh_id: str, current_user: dict = Depends(get_cu
 @api_router.get("/admin/student/{student_id}")
 async def get_student_full_details(student_id: str, current_user: dict = Depends(get_current_user)):
     """Get full details about a student (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
     
     student = await db.users.find_one({"id": student_id, "role": "student"}, {"_id": 0, "password_hash": 0})
     if not student:
@@ -4482,11 +5613,35 @@ async def get_student_full_details(student_id: str, current_user: dict = Depends
 
 # ============== FINANCIAL FEES ==============
 
+def compute_fee_status(fee: dict) -> str:
+    """تحديد حالة الرسوم:
+    - مدفوع (paid): إذا تم الدفع
+    - يحترم تغيير المدير اليدوي إن وُجد (status_overridden)
+    - تلقائياً: الأشهر السابقة = مستحق (due)، الشهر الحالي/القادم = قائم (pending)
+    """
+    if fee.get("is_paid") or fee.get("status") == "paid":
+        return "paid"
+    if fee.get("status_overridden"):
+        return fee.get("status") or "pending"
+    now = datetime.now(timezone.utc)
+    fy, fm = fee.get("year"), fee.get("month")
+    if fy and fm:
+        return "due" if (fy, fm) < (now.year, now.month) else "pending"
+    # احتياطي: الاعتماد على تاريخ الاستحقاق عند غياب الشهر/السنة
+    due = fee.get("due_date")
+    if due:
+        try:
+            if datetime.fromisoformat(str(due)).date() < now.date():
+                return "due"
+        except (ValueError, TypeError):
+            pass
+    return "pending"
+
+
 @api_router.post("/fees")
 async def create_fee(data: FeeCreate, current_user: dict = Depends(get_current_user)):
     """Create a fee for a student (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إضافة الرسوم")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إضافة الرسوم")
     
     # Validation
     if not data.student_id:
@@ -4539,12 +5694,13 @@ async def get_fees(student_id: Optional[str] = None, current_user: dict = Depend
         query["student_id"] = student_id
     
     fees = await db.fees.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
-    
-    # Add student names
+
+    # Add student names + computed status (قائم/مستحق/مدفوع)
     for fee in fees:
         student = await db.users.find_one({"id": fee["student_id"]}, {"_id": 0, "name": 1})
         fee["student_name"] = student["name"] if student else "غير معروف"
-    
+        fee["status"] = compute_fee_status(fee)
+
     return fees
 
 @api_router.get("/fees/student/{student_id}")
@@ -4554,49 +5710,182 @@ async def get_student_fees(student_id: str, current_user: dict = Depends(get_cur
         raise HTTPException(status_code=403, detail="غير مصرح لك")
     
     fees = await db.fees.find({"student_id": student_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
-    
-    total_due = sum(f["amount"] for f in fees if not f.get("is_paid"))
-    total_paid = sum(f["amount"] for f in fees if f.get("is_paid"))
-    
+
+    for f in fees:
+        f["status"] = compute_fee_status(f)
+
+    total_due = sum(f["amount"] for f in fees if f["status"] == "due")
+    total_paid = sum(f["amount"] for f in fees if f["status"] == "paid")
+    total_pending = sum(f["amount"] for f in fees if f["status"] == "pending")
+
     return {
         "fees": fees,
         "summary": {
             "total_due": total_due,
             "total_paid": total_paid,
-            "pending_count": len([f for f in fees if not f.get("is_paid")])
+            "total_pending": total_pending,
+            "pending_count": len([f for f in fees if f["status"] != "paid"])
         }
     }
 
 @api_router.put("/fees/{fee_id}/pay")
 async def mark_fee_paid(fee_id: str, current_user: dict = Depends(get_current_user)):
     """Mark a fee as paid (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه تأكيد الدفع")
-    
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تأكيد الدفع")
+
     result = await db.fees.update_one(
         {"id": fee_id},
         {"$set": {
             "is_paid": True,
-            "paid_date": datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            "paid_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "status": "paid",
+            "status_overridden": True
         }}
     )
-    
+
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="الرسوم غير موجودة")
-    
+
     return {"message": "تم تأكيد الدفع بنجاح"}
+
+
+class FeeStatusUpdate(BaseModel):
+    status: str  # "pending" (قائم), "due" (مستحق), "paid" (مدفوع)
+
+
+@api_router.put("/fees/{fee_id}/status")
+async def update_fee_status(fee_id: str, data: FeeStatusUpdate, current_user: dict = Depends(get_current_user)):
+    """تغيير حالة الرسوم يدوياً من قبل المدير (قائم / مستحق / مدفوع)"""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تغيير حالة الرسوم")
+
+    valid = {"pending", "due", "paid"}
+    if data.status not in valid:
+        raise HTTPException(status_code=400, detail="حالة غير صحيحة")
+
+    update = {"status": data.status, "status_overridden": True}
+    if data.status == "paid":
+        update["is_paid"] = True
+        update["paid_date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    else:
+        update["is_paid"] = False
+        update["paid_date"] = None
+
+    result = await db.fees.update_one({"id": fee_id}, {"$set": update})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="الرسوم غير موجودة")
+
+    status_labels = {"pending": "قائم", "due": "مستحق", "paid": "مدفوع"}
+    return {"message": f"تم تحديث الحالة إلى: {status_labels[data.status]}"}
 
 @api_router.delete("/fees/{fee_id}")
 async def delete_fee(fee_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a fee (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه حذف الرسوم")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف الرسوم")
     
     result = await db.fees.delete_one({"id": fee_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="الرسوم غير موجودة")
-    
+
     return {"message": "تم حذف الرسوم بنجاح"}
+
+
+@api_router.get("/export/fees")
+async def export_fees_excel(year: Optional[int] = None, current_user: dict = Depends(get_current_user)):
+    """تحميل تقرير الرسوم المالية على شكل ملف Excel (المدير فقط)"""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تحميل التقرير المالي")
+
+    arabic_months = ['', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+                     'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر']
+    fee_type_labels = {"subscription": "رسوم اشتراك", "umrah": "عمرة", "activity": "نشاط"}
+    status_labels = {"pending": "قائم", "due": "مستحق", "paid": "مدفوع"}
+
+    fees = await db.fees.find({}, {"_id": 0}).to_list(2000)
+    if year:
+        fees = [f for f in fees if (f.get("year") or 0) == year]
+    # ترتيب حسب الشهر ثم تاريخ الإنشاء
+    fees.sort(key=lambda f: (f.get("month") or 0, f.get("created_at") or ""))
+
+    # أسماء الطلاب والمجموعات
+    student_cache = {}
+    for f in fees:
+        f["status"] = compute_fee_status(f)
+        sid = f["student_id"]
+        if sid not in student_cache:
+            stu = await db.users.find_one({"id": sid}, {"_id": 0, "name": 1, "group_id": 1})
+            gname = ""
+            if stu and stu.get("group_id"):
+                g = await db.groups.find_one({"id": stu["group_id"]}, {"_id": 0, "name": 1})
+                gname = g["name"] if g else ""
+            student_cache[sid] = {"name": stu["name"] if stu else "غير معروف", "group": gname}
+
+    output = io.BytesIO()
+    workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+    title_format = workbook.add_format({'bold': True, 'font_size': 16, 'align': 'center',
+                                        'valign': 'vcenter', 'bg_color': '#0d9488', 'font_color': 'white'})
+    header_format = workbook.add_format({'bold': True, 'bg_color': '#1e3a5f', 'font_color': 'white',
+                                         'border': 1, 'align': 'center', 'valign': 'vcenter', 'font_size': 12})
+    cell_format = workbook.add_format({'border': 1, 'align': 'center', 'valign': 'vcenter', 'font_size': 11})
+    money_format = workbook.add_format({'border': 1, 'align': 'center', 'valign': 'vcenter',
+                                        'font_size': 11, 'num_format': '#,##0.00'})
+    paid_format = workbook.add_format({'border': 1, 'align': 'center', 'bg_color': '#d1fae5', 'font_color': '#065f46'})
+    due_format = workbook.add_format({'border': 1, 'align': 'center', 'bg_color': '#fef3c7', 'font_color': '#92400e'})
+    pending_format = workbook.add_format({'border': 1, 'align': 'center', 'bg_color': '#e2e8f0', 'font_color': '#334155'})
+    status_fmt = {"paid": paid_format, "due": due_format, "pending": pending_format}
+
+    sheet = workbook.add_worksheet('الرسوم المالية')
+    sheet.right_to_left()
+    title_year = f" - {year}" if year else ""
+    sheet.merge_range('A1:I1', f'التقرير المالي{title_year}', title_format)
+    sheet.merge_range('A2:I2', f'تاريخ التصدير: {datetime.now().strftime("%Y-%m-%d")}', cell_format)
+
+    headers = ['#', 'اسم الطالب', 'المجموعة', 'الشهر', 'السنة', 'نوع الرسوم', 'المبلغ', 'الحالة', 'تاريخ الدفع']
+    for col, h in enumerate(headers):
+        sheet.write(3, col, h, header_format)
+    sheet.set_column('A:A', 5)
+    sheet.set_column('B:B', 25)
+    sheet.set_column('C:C', 18)
+    sheet.set_column('D:I', 13)
+
+    total = paid_total = due_total = pending_total = 0.0
+    row = 4
+    for idx, f in enumerate(fees, 1):
+        amount = f.get("amount") or 0
+        st = f["status"]
+        total += amount
+        if st == "paid":
+            paid_total += amount
+        elif st == "due":
+            due_total += amount
+        else:
+            pending_total += amount
+        info = student_cache.get(f["student_id"], {"name": "غير معروف", "group": ""})
+        sheet.write(row, 0, idx, cell_format)
+        sheet.write(row, 1, info["name"], cell_format)
+        sheet.write(row, 2, info["group"], cell_format)
+        sheet.write(row, 3, arabic_months[f["month"]] if f.get("month") else "", cell_format)
+        sheet.write(row, 4, f.get("year") or "", cell_format)
+        sheet.write(row, 5, fee_type_labels.get(f.get("fee_type"), f.get("fee_type") or ""), cell_format)
+        sheet.write_number(row, 6, amount, money_format)
+        sheet.write(row, 7, status_labels.get(st, st), status_fmt.get(st, cell_format))
+        sheet.write(row, 8, f.get("paid_date") or "", cell_format)
+        row += 1
+
+    # ملخص
+    row += 1
+    summary_label = workbook.add_format({'bold': True, 'align': 'center', 'border': 1, 'bg_color': '#f1f5f9'})
+    sheet.write(row, 5, 'الإجمالي', summary_label); sheet.write_number(row, 6, total, money_format); row += 1
+    sheet.write(row, 5, 'مدفوع', summary_label); sheet.write_number(row, 6, paid_total, paid_format); row += 1
+    sheet.write(row, 5, 'مستحق', summary_label); sheet.write_number(row, 6, due_total, due_format); row += 1
+    sheet.write(row, 5, 'قائم', summary_label); sheet.write_number(row, 6, pending_total, pending_format)
+
+    workbook.close()
+    output.seek(0)
+    filename = f"financial_report_{year or 'all'}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 # ============== BADGES & INTERACTION SYSTEM ==============
 
@@ -4607,8 +5896,7 @@ class InteractionGrantCreate(BaseModel):
 @api_router.post("/badges/interaction")
 async def grant_interaction_badge(data: InteractionGrantCreate, current_user: dict = Depends(get_current_user)):
     """منح شارة المتفاعل ونقاط التفاعل - للمعلم فقط"""
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="فقط المعلم يمكنه منح شارة التفاعل")
+    ensure_role(current_user, "sheikh", "فقط المعلم يمكنه منح شارة التفاعل")
     
     week_start = get_current_week_start()
     
@@ -4690,8 +5978,7 @@ class AdminBonusCreate(BaseModel):
 @api_router.post("/badges/admin-bonus")
 async def grant_admin_bonus(data: AdminBonusCreate, current_user: dict = Depends(get_current_user)):
     """منح النقاط الإدارية للتميز - للمدير فقط (50 نقطة مرة واحدة في الأسبوع)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه منح النقاط الإدارية")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه منح النقاط الإدارية")
     
     week_start = get_current_week_start()
     
@@ -4771,8 +6058,7 @@ async def get_available_badges():
 @api_router.post("/homework")
 async def create_homework(data: HomeworkCreate, current_user: dict = Depends(get_current_user)):
     """Create homework (Admin or Sheikh)"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     homework = Homework(
         title=data.title,
@@ -4858,8 +6144,7 @@ async def get_homework(current_user: dict = Depends(get_current_user)):
 @api_router.get("/homework/{homework_id}/submissions")
 async def get_homework_submissions(homework_id: str, current_user: dict = Depends(get_current_user)):
     """Get submissions for a homework (Admin/Sheikh)"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     submissions = await db.homework_submissions.find({"homework_id": homework_id}, {"_id": 0}).to_list(500)
     
@@ -4880,8 +6165,7 @@ class HomeworkSubmitRequest(BaseModel):
 @api_router.post("/homework/{homework_id}/submit")
 async def submit_homework(homework_id: str, data: HomeworkSubmitRequest, current_user: dict = Depends(get_current_user)):
     """Submit homework with optional file attachment (Student)"""
-    if current_user["role"] != "student":
-        raise HTTPException(status_code=403, detail="فقط الطلاب يمكنهم تسليم الواجبات")
+    ensure_role(current_user, "student", "فقط الطلاب يمكنهم تسليم الواجبات")
     
     # Check if homework exists
     homework = await db.homework.find_one({"id": homework_id}, {"_id": 0})
@@ -4923,8 +6207,7 @@ async def submit_homework(homework_id: str, data: HomeworkSubmitRequest, current
 @api_router.put("/homework/submissions/{submission_id}/grade")
 async def grade_homework(submission_id: str, grade: int, feedback: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Grade a homework submission"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     result = await db.homework_submissions.update_one(
         {"id": submission_id},
@@ -4945,8 +6228,7 @@ async def grade_homework(submission_id: str, grade: int, feedback: Optional[str]
 @api_router.delete("/homework/{homework_id}")
 async def delete_homework(homework_id: str, current_user: dict = Depends(get_current_user)):
     """Delete homework"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     # Check ownership for sheikh
     if current_user["role"] == "sheikh":
@@ -4964,8 +6246,7 @@ async def delete_homework(homework_id: str, current_user: dict = Depends(get_cur
 @api_router.post("/admin-exams")
 async def create_admin_exam(data: AdminExamCreate, current_user: dict = Depends(get_current_user)):
     """Create an administrative exam (Admin/Sheikh)"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     # Verify student
     student = await db.users.find_one({"id": data.student_id, "role": "student"})
@@ -5076,8 +6357,7 @@ async def get_student_exams(student_id: str, current_user: dict = Depends(get_cu
 @api_router.put("/admin-exams/{exam_id}")
 async def update_admin_exam(exam_id: str, data: AdminExamCreate, current_user: dict = Depends(get_current_user)):
     """Update an exam"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     update_data = {
         "error_count": data.error_count,
@@ -5100,8 +6380,7 @@ async def update_admin_exam(exam_id: str, data: AdminExamCreate, current_user: d
 @api_router.delete("/admin-exams/{exam_id}")
 async def delete_admin_exam(exam_id: str, current_user: dict = Depends(get_current_user)):
     """Delete an exam"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     result = await db.admin_exams.delete_one({"id": exam_id})
     if result.deleted_count == 0:
@@ -5114,8 +6393,7 @@ async def delete_admin_exam(exam_id: str, current_user: dict = Depends(get_curre
 @api_router.post("/tajweed-exams")
 async def create_tajweed_exam(data: TajweedExamCreate, current_user: dict = Depends(get_current_user)):
     """Create a tajweed exam"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     # Calculate final score
     final_score = (data.practical_score + data.theoretical_score) // 2
@@ -5171,8 +6449,7 @@ async def get_tajweed_exams(student_id: Optional[str] = None, current_user: dict
 @api_router.delete("/tajweed-exams/{exam_id}")
 async def delete_tajweed_exam(exam_id: str, current_user: dict = Depends(get_current_user)):
     """Delete a tajweed exam"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     result = await db.tajweed_exams.delete_one({"id": exam_id})
     if result.deleted_count == 0:
@@ -5185,8 +6462,7 @@ async def delete_tajweed_exam(exam_id: str, current_user: dict = Depends(get_cur
 @api_router.post("/online-exams")
 async def create_online_exam(data: OnlineExamCreate, current_user: dict = Depends(get_current_user)):
     """إنشاء امتحان إلكتروني جديد (للمعلم/المدير)"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك بإنشاء امتحانات")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك بإنشاء امتحانات")
     
     if len(data.questions) == 0:
         raise HTTPException(status_code=400, detail="يجب إضافة سؤال واحد على الأقل")
@@ -5296,8 +6572,7 @@ async def get_online_exam(exam_id: str, current_user: dict = Depends(get_current
 @api_router.post("/online-exams/{exam_id}/submit")
 async def submit_online_exam(exam_id: str, data: ExamSubmissionCreate, current_user: dict = Depends(get_current_user)):
     """تقديم إجابات الامتحان (للطالب)"""
-    if current_user["role"] != "student":
-        raise HTTPException(status_code=403, detail="فقط الطلاب يمكنهم تقديم الامتحانات")
+    ensure_role(current_user, "student", "فقط الطلاب يمكنهم تقديم الامتحانات")
     
     # التحقق من وجود الامتحان
     exam = await db.online_exams.find_one({"id": exam_id}, {"_id": 0})
@@ -5376,8 +6651,7 @@ async def submit_online_exam(exam_id: str, data: ExamSubmissionCreate, current_u
 @api_router.get("/online-exams/{exam_id}/results")
 async def get_exam_results(exam_id: str, current_user: dict = Depends(get_current_user)):
     """الحصول على نتائج الامتحان (للمعلم/المدير)"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     # التحقق من وجود الامتحان
     exam = await db.online_exams.find_one({"id": exam_id}, {"_id": 0})
@@ -5417,8 +6691,7 @@ async def get_exam_results(exam_id: str, current_user: dict = Depends(get_curren
 @api_router.delete("/online-exams/{exam_id}")
 async def delete_online_exam(exam_id: str, current_user: dict = Depends(get_current_user)):
     """حذف امتحان إلكتروني"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     result = await db.online_exams.delete_one({"id": exam_id})
     if result.deleted_count == 0:
@@ -5432,8 +6705,7 @@ async def delete_online_exam(exam_id: str, current_user: dict = Depends(get_curr
 @api_router.put("/online-exams/{exam_id}/toggle-active")
 async def toggle_exam_active(exam_id: str, current_user: dict = Depends(get_current_user)):
     """تفعيل/إلغاء تفعيل امتحان"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     exam = await db.online_exams.find_one({"id": exam_id})
     if not exam:
@@ -5447,8 +6719,7 @@ async def toggle_exam_active(exam_id: str, current_user: dict = Depends(get_curr
 @api_router.post("/curriculum/{curriculum_id}/upload-pdf")
 async def upload_curriculum_pdf(curriculum_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     """Upload PDF file for curriculum (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه رفع الملفات")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه رفع الملفات")
     
     # Verify curriculum exists
     curriculum = await db.curriculum.find_one({"id": curriculum_id})
@@ -5489,8 +6760,7 @@ class TrackingSettingsUpdate(BaseModel):
 @api_router.get("/settings/tracking-submission")
 async def get_tracking_submission_settings(current_user: dict = Depends(get_current_user)):
     """الحصول على إعدادات مواعيد تسليم ورق المتابعة"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     settings = await db.settings.find_one({"key": "tracking_submission"}, {"_id": 0})
     
@@ -5513,8 +6783,7 @@ async def get_tracking_submission_settings(current_user: dict = Depends(get_curr
 @api_router.put("/settings/tracking-submission")
 async def update_tracking_submission_settings(data: TrackingSettingsUpdate, current_user: dict = Depends(get_current_user)):
     """تحديث إعدادات مواعيد تسليم ورق المتابعة (المدير والمعلم)"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     # الأيام المسموحة
     valid_days = ["saturday", "sunday", "monday", "tuesday", "wednesday", "thursday", "friday"]
@@ -5667,13 +6936,13 @@ async def check_tracking_submission_window(current_user: dict = Depends(get_curr
 # ============== TERM MANAGEMENT SYSTEM ==============
 
 class TermCreateRequest(BaseModel):
-    name: str  # اسم الفصل
+    name: str  # اسم الفصل الجديد
+    confirm_name: Optional[str] = None  # N5: تأكيد بكتابة اسم الفصل الحالي قبل التصفير
 
 @api_router.get("/terms")
 async def get_terms(current_user: dict = Depends(get_current_user)):
     """Get all terms (Admin and Sheikh can view)"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك بالوصول للفصول الدراسية")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك بالوصول للفصول الدراسية")
     
     terms = await db.terms.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
     return terms
@@ -5705,8 +6974,7 @@ async def close_term_and_start_new(data: TermCreateRequest, current_user: dict =
     2. تصفير بيانات الفصل الحالي
     3. إنشاء فصل جديد
     """
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إغلاق الفصل")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إغلاق الفصل")
     
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=400, detail="يجب إدخال اسم الفصل الجديد")
@@ -5724,10 +6992,15 @@ async def close_term_and_start_new(data: TermCreateRequest, current_user: dict =
         
         term_id = current_term.get("id", str(uuid.uuid4()))
         term_name = current_term.get("name", "فصل سابق")
-        
+
+        # N5: تأكيد بكتابة اسم الفصل الحالي بالضبط قبل التصفير (حماية من الخطأ)
+        if current_term.get("name") and (data.confirm_name or "").strip() != current_term["name"].strip():
+            raise HTTPException(status_code=400,
+                                detail=f"للتأكيد، اكتب اسم الفصل الحالي بالضبط: «{current_term['name']}»")
+
         # 2. جلب جميع الطلاب
         students = await db.users.find({"role": "student"}, {"_id": 0}).to_list(10000)
-        
+
         # 3. أرشفة بيانات كل طالب
         archives = []
         for student in students:
@@ -5848,6 +7121,9 @@ async def close_term_and_start_new(data: TermCreateRequest, current_user: dict =
                 "info"
             )
         
+        await log_admin_action(current_user, "term_reset", "term", term_id, term_name,
+                               f"إغلاق الفصل وبدء «{data.name}» — أُرشِف {len(archives)} طالب")
+
         return {
             "message": f"تم إغلاق الفصل السابق وبدء الفصل الجديد: {data.name}",
             "new_term_id": new_term.id,
@@ -5856,7 +7132,9 @@ async def close_term_and_start_new(data: TermCreateRequest, current_user: dict =
             "archived_recitations_count": len(all_recitations),
             "previous_term_name": term_name
         }
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"فشل في إغلاق الفصل: {str(e)}")
 
@@ -5871,8 +7149,7 @@ async def admin_reset_term(data: TermCreateRequest, current_user: dict = Depends
     3. إنشاء فصل جديد
     البيانات القديمة تبقى محفوظة ويمكن الاستعلام عنها
     """
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إعادة تعيين الفصل")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إعادة تعيين الفصل")
     
     if not data.name or not data.name.strip():
         raise HTTPException(status_code=400, detail="يرجى إدخال اسم الفصل الجديد")
@@ -5882,10 +7159,15 @@ async def admin_reset_term(data: TermCreateRequest, current_user: dict = Depends
         current_term = await db.terms.find_one({"is_active": True}, {"_id": 0})
         term_id = current_term["id"] if current_term else "no_term"
         term_name = current_term["name"] if current_term else "بدون فصل"
-        
+
+        # N5: تأكيد بكتابة اسم الفصل الحالي بالضبط قبل التصفير (حماية من الخطأ)
+        if current_term and current_term.get("name") and (data.confirm_name or "").strip() != current_term["name"].strip():
+            raise HTTPException(status_code=400,
+                                detail=f"للتأكيد، اكتب اسم الفصل الحالي بالضبط: «{current_term['name']}»")
+
         # 2. جلب جميع الطلاب
         students = await db.users.find({"role": "student"}, {"_id": 0, "id": 1, "name": 1}).to_list(10000)
-        
+
         # 3. أرشفة بيانات كل طالب للفصل الحالي فقط (حسب term_id)
         archives = []
         for student in students:
@@ -5985,21 +7267,25 @@ async def admin_reset_term(data: TermCreateRequest, current_user: dict = Depends
                 "info"
             )
         
+        await log_admin_action(current_user, "term_reset", "term", term_id, term_name,
+                               f"إعادة تعيين الفصل وبدء «{data.name}» — أُرشِف {len(archives)} طالب")
+
         return {
             "message": f"تم إعادة تعيين الفصل بنجاح. الفصل الجديد: {data.name}",
             "new_term_id": new_term.id,
             "archived_students_count": len(archives),
             "previous_term_name": term_name
         }
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"فشل في إعادة تعيين الفصل: {str(e)}")
 
 @api_router.get("/terms/archive")
 async def get_term_archives(term_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """Get archived term data (Admin only)"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول للأرشيف")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول للأرشيف")
     
     query = {}
     if term_id:
@@ -6069,8 +7355,7 @@ async def get_term_records(term_id: str, student_id: Optional[str] = None, curre
 @api_router.post("/terms/{term_id}/view")
 async def set_viewing_term(term_id: str, current_user: dict = Depends(get_current_user)):
     """تحديد فصل للعرض - هذا لا يغير الفصل النشط الفعلي"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     # التحقق من وجود الفصل
     term = await db.terms.find_one({"id": term_id}, {"_id": 0})
@@ -6088,8 +7373,7 @@ async def set_viewing_term(term_id: str, current_user: dict = Depends(get_curren
 @api_router.post("/badges/types")
 async def create_badge_type(data: BadgeTypeCreate, current_user: dict = Depends(get_current_user)):
     """إنشاء نوع شارة جديد - المدير فقط"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه إنشاء أنواع الشارات")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إنشاء أنواع الشارات")
     
     # التحقق من عدم وجود شارة بنفس المعرف
     existing = await db.badge_types.find_one({"id": data.id})
@@ -6118,8 +7402,7 @@ async def get_badge_types(current_user: dict = Depends(get_current_user)):
 @api_router.post("/badges/assign")
 async def assign_badge(data: BadgeAssign, current_user: dict = Depends(get_current_user)):
     """تعيين شارة لطالب - الشيخ فقط"""
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تعيين الشارات للطلاب")
+    ensure_role(current_user, "sheikh", "فقط الشيخ يمكنه تعيين الشارات للطلاب")
     
     # التحقق من وجود الطالب
     student = await db.users.find_one({"id": data.student_id, "role": "student"})
@@ -6187,8 +7470,7 @@ async def assign_badge(data: BadgeAssign, current_user: dict = Depends(get_curre
 @api_router.delete("/badges/remove")
 async def remove_badge(data: BadgeRemove, current_user: dict = Depends(get_current_user)):
     """إزالة شارة من طالب - الشيخ فقط"""
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه إزالة الشارات من الطلاب")
+    ensure_role(current_user, "sheikh", "فقط الشيخ يمكنه إزالة الشارات من الطلاب")
     
     # البحث عن الشارة وحذفها
     result = await db.weekly_badges.delete_one({
@@ -6225,8 +7507,7 @@ async def remove_badge(data: BadgeRemove, current_user: dict = Depends(get_curre
 @api_router.put("/sheikh/students/{student_id}")
 async def sheikh_update_student(student_id: str, data: SheikhUpdateStudent, current_user: dict = Depends(get_current_user)):
     """تعديل بيانات الطالب - الشيخ فقط"""
-    if current_user["role"] != "sheikh":
-        raise HTTPException(status_code=403, detail="فقط الشيخ يمكنه تعديل بيانات الطلاب")
+    ensure_role(current_user, "sheikh", "فقط الشيخ يمكنه تعديل بيانات الطلاب")
     
     # التحقق من وجود الطالب
     student = await db.users.find_one({"id": student_id, "role": "student"}, {"_id": 0})
@@ -6261,8 +7542,7 @@ async def sheikh_update_student(student_id: str, data: SheikhUpdateStudent, curr
 @api_router.get("/audit-logs")
 async def get_audit_logs(student_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """جلب سجلات التدقيق - المدير فقط"""
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="فقط المدير يمكنه الوصول لسجلات التدقيق")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول لسجلات التدقيق")
     
     query = {}
     if student_id:
@@ -6319,8 +7599,7 @@ async def get_student_tasmee_history(student_id: str, term_id: Optional[str] = N
 @api_router.get("/export/students")
 async def export_all_students_excel(term_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """تحميل بيانات جميع الطلاب على شكل ملف Excel"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك بتحميل البيانات")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك بتحميل البيانات")
     
     # جلب الفصل
     if term_id:
@@ -6565,8 +7844,7 @@ async def export_all_students_excel(term_id: Optional[str] = None, current_user:
 @api_router.get("/export/term/{term_id}")
 async def export_term_archive_excel(term_id: str, current_user: dict = Depends(get_current_user)):
     """تحميل أرشيف فصل معين على شكل ملف Excel"""
-    if current_user["role"] not in ["admin", "sheikh"]:
-        raise HTTPException(status_code=403, detail="غير مصرح لك بتحميل البيانات")
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك بتحميل البيانات")
     
     # جلب الفصل
     term = await db.terms.find_one({"id": term_id}, {"_id": 0})

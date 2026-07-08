@@ -9,6 +9,7 @@ import {
   User, Mail, Phone, Home, Calendar, Briefcase, Star, Edit
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import AnnouncementBanner from '../components/AnnouncementBanner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -73,6 +74,8 @@ const SheikhDashboard = () => {
 
   return (
     <div className="space-y-4 md:space-y-6 animate-fadeIn" data-testid="sheikh-dashboard">
+      {/* N1: شريط إعلانات المدير */}
+      <AnnouncementBanner />
       {/* Welcome & Profile Header */}
       <div className="glass-card p-4 md:p-6 border border-white/10">
         <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">

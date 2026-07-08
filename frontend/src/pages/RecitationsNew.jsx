@@ -200,7 +200,7 @@ const RecitationsNew = () => {
     }
   };
 
-  const openRecitationDialog = (student) => {
+  const openRecitationDialog = async (student) => {
     if (isViewingOldTerm) {
       toast.error('لا يمكن التعديل على سجلات الفصول السابقة');
       return;
@@ -222,6 +222,19 @@ const RecitationsNew = () => {
       notes: ''
     });
     setDialogOpen(true);
+
+    // T3: اقتراح صفحة البداية والجزء من آخر جلسة (قيم ذكية)
+    try {
+      const res = await axios.get(`${API}/students/${student.id}/last-recitation`);
+      if (res.data?.has_previous && res.data?.suggested_from_page) {
+        setFormData(prev => ({
+          ...prev,
+          juz_number: res.data.last_juz || prev.juz_number,
+          page_from: String(res.data.suggested_from_page),
+        }));
+        toast.info(`آخر تسميع انتهى عند صفحة ${res.data.last_page_to} — اقتُرحت البداية تلقائيًا`);
+      }
+    } catch (e) { /* تجاهل: لا اقتراح */ }
   };
 
   const handleJuzChange = (newJuzNumber) => {

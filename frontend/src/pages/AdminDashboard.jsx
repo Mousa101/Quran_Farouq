@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { 
   Users, BookOpen, Calendar, Trophy, TrendingUp, 
   GraduationCap, UserCheck, Target, Eye, Medal,
-  ArrowUpRight, UserPlus, Clock, Archive, RefreshCw, Download, FileSpreadsheet
+  ArrowUpRight, UserPlus, Clock, Archive, RefreshCw, Download, FileSpreadsheet, Edit
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -23,6 +23,7 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [termDialogOpen, setTermDialogOpen] = useState(false);
   const [newTermName, setNewTermName] = useState('');
+  const [confirmTermName, setConfirmTermName] = useState(''); // N5: تأكيد اسم الفصل الحالي
   const [closingTerm, setClosingTerm] = useState(false);
   const [activeTerm, setActiveTerm] = useState(null);
   const [allTerms, setAllTerms] = useState([]);
@@ -31,12 +32,77 @@ const AdminDashboard = () => {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [selectedExportTermId, setSelectedExportTermId] = useState('');
   const [exporting, setExporting] = useState(false);
+  // F2: قيم نظام النقاط من مصدر واحد بالخادم (مع قيم احتياطية صحيحة)
+  const [pointsConfig, setPointsConfig] = useState({
+    attendance_points: 10,
+    recitation_pass_points: 20,
+    tracking_base_max: 70,
+    weekly_tracking_max: 70,
+  });
 
   useEffect(() => {
     fetchData();
     fetchActiveTerm();
     fetchAllTerms();
+    fetchPointsConfig();
   }, []);
+
+  const fetchPointsConfig = async () => {
+    try {
+      const res = await axios.get(`${API}/config/points`);
+      setPointsConfig(res.data);
+    } catch (error) {
+      console.error('Error fetching points config:', error);
+    }
+  };
+
+  // N2: محرّر قواعد النقاط
+  const [pointsEditorOpen, setPointsEditorOpen] = useState(false);
+  const [pointsForm, setPointsForm] = useState({ attendance_points: 10, recitation_pass_points: 20, tracking_prayers_max: 35, tracking_sitting_max: 35 });
+  const [savingPoints, setSavingPoints] = useState(false);
+
+  const [recomputing, setRecomputing] = useState(false);
+  const recomputePoints = async () => {
+    setRecomputing(true);
+    try {
+      const res = await axios.post(`${API}/admin/recompute-points`);
+      toast.success(res.data.message);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في إعادة الاحتساب');
+    } finally {
+      setRecomputing(false);
+    }
+  };
+
+  const openPointsEditor = () => {
+    setPointsForm({
+      attendance_points: pointsConfig.attendance_points ?? 10,
+      recitation_pass_points: pointsConfig.recitation_pass_points ?? 20,
+      tracking_prayers_max: pointsConfig.tracking_prayers_max ?? 35,
+      tracking_sitting_max: pointsConfig.tracking_sitting_max ?? 35,
+    });
+    setPointsEditorOpen(true);
+  };
+
+  const savePointsConfig = async () => {
+    setSavingPoints(true);
+    try {
+      const res = await axios.put(`${API}/admin/config/points`, {
+        attendance_points: parseInt(pointsForm.attendance_points),
+        recitation_pass_points: parseInt(pointsForm.recitation_pass_points),
+        tracking_prayers_max: parseInt(pointsForm.tracking_prayers_max),
+        tracking_sitting_max: parseInt(pointsForm.tracking_sitting_max),
+      });
+      setPointsConfig(res.data.config);
+      toast.success(res.data.message);
+      setPointsEditorOpen(false);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في الحفظ');
+    } finally {
+      setSavingPoints(false);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -89,15 +155,23 @@ const AdminDashboard = () => {
       return;
     }
 
+    // N5: تأكيد بكتابة اسم الفصل الحالي بالضبط قبل التصفير
+    if (activeTerm?.name && confirmTermName.trim() !== activeTerm.name.trim()) {
+      toast.error(`للتأكيد، اكتب اسم الفصل الحالي بالضبط: «${activeTerm.name}»`);
+      return;
+    }
+
     setClosingTerm(true);
     try {
       const res = await axios.post(`${API}/terms/close-and-start-new`, {
-        name: termName
+        name: termName,
+        confirm_name: confirmTermName.trim()
       });
       
       toast.success(res.data.message);
       setTermDialogOpen(false);
       setNewTermName('');
+      setConfirmTermName('');
       setSelectedTermId('new');
       
       // تحديث البيانات
@@ -571,40 +645,88 @@ const AdminDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Points System Info */}
+      {/* Points System Info (F2) + N2 editor */}
       <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
         <CardHeader>
-          <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            <Target className="w-5 h-5 text-emerald-400" />
-            نظام النقاط
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <Target className="w-5 h-5 text-emerald-400" />
+              نظام النقاط
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={recomputePoints} disabled={recomputing} className={isDark ? 'border-white/10 text-white hover:bg-white/5' : ''}>
+                <RefreshCw className={`w-4 h-4 ml-1 ${recomputing ? 'animate-spin' : ''}`} /> إعادة احتساب النقاط
+              </Button>
+              <Button size="sm" variant="outline" onClick={openPointsEditor} className={isDark ? 'border-white/10 text-white hover:bg-white/5' : ''}>
+                <Edit className="w-4 h-4 ml-1" /> تعديل القواعد
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
               <UserCheck className="w-8 h-8 mx-auto mb-2 text-emerald-400" />
               <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الحضور</p>
-              <p className="text-2xl font-bold text-emerald-400">10 نقاط</p>
+              <p className="text-2xl font-bold text-emerald-400">{pointsConfig.attendance_points} نقاط</p>
+              <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>لكل يوم</p>
             </div>
             <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-blue-50 border border-blue-200'}`}>
               <BookOpen className="w-8 h-8 mx-auto mb-2 text-blue-400" />
-              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الحد الأدنى</p>
-              <p className="text-2xl font-bold text-blue-400">20 نقطة</p>
+              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>التسميع</p>
+              <p className="text-2xl font-bold text-blue-400">{pointsConfig.recitation_pass_points} نقطة</p>
+              <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>لكل تسميع ناجح</p>
             </div>
             <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-purple-500/10 border border-purple-500/30' : 'bg-purple-50 border border-purple-200'}`}>
               <Calendar className="w-8 h-8 mx-auto mb-2 text-purple-400" />
               <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>ورقة المتابعة</p>
-              <p className="text-2xl font-bold text-purple-400">63 نقطة</p>
-              <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>الحد الأقصى</p>
+              <p className="text-2xl font-bold text-purple-400">{pointsConfig.tracking_base_max} نقطة</p>
+              <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>الأساس الأسبوعي (+ بنود المعلم)</p>
             </div>
             <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
               <Trophy className="w-8 h-8 mx-auto mb-2 text-amber-400" />
               <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الإجمالي الأسبوعي</p>
-              <p className="text-2xl font-bold text-amber-400">93+ نقطة</p>
+              <p className="text-2xl font-bold text-amber-400">{pointsConfig.weekly_tracking_max} نقطة</p>
+              <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>ورقة المتابعة الأساسية</p>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* N2: Points rules editor dialog */}
+      <Dialog open={pointsEditorOpen} onOpenChange={setPointsEditorOpen}>
+        <DialogContent className={isDark ? 'bg-slate-900 border-white/10' : 'bg-white'}>
+          <DialogHeader>
+            <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>تعديل قواعد النقاط</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {[
+              { key: 'attendance_points', label: 'نقاط الحضور (لكل يوم)' },
+              { key: 'recitation_pass_points', label: 'نقاط التسميع الناجح' },
+              { key: 'tracking_prayers_max', label: 'حد نقاط الصلوات (ورقة المتابعة)' },
+              { key: 'tracking_sitting_max', label: 'حد نقاط الجلوس مع القرآن' },
+            ].map((f) => (
+              <div key={f.key}>
+                <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>{f.label}</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={pointsForm[f.key]}
+                  onChange={(e) => setPointsForm({ ...pointsForm, [f.key]: e.target.value })}
+                  className={isDark ? 'bg-slate-800 border-white/10 text-white' : ''}
+                />
+              </div>
+            ))}
+            <div className={`p-3 rounded-lg text-sm ${isDark ? 'bg-blue-500/10 text-blue-300' : 'bg-blue-50 text-blue-700'}`}>
+              الإجمالي الأسبوعي لورقة المتابعة (الأساس): {(parseInt(pointsForm.tracking_prayers_max) || 0) + (parseInt(pointsForm.tracking_sitting_max) || 0)} نقطة
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPointsEditorOpen(false)} className={isDark ? 'border-white/10' : ''}>إلغاء</Button>
+            <Button onClick={savePointsConfig} disabled={savingPoints} className="bg-emerald-600 hover:bg-emerald-700">حفظ</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Term Management Dialog */}
       <Dialog open={termDialogOpen} onOpenChange={setTermDialogOpen}>
@@ -719,25 +841,40 @@ const AdminDashboard = () => {
             {/* ملخص الاختيار */}
             <div className={`p-3 rounded-lg ${isDark ? 'bg-blue-500/10 border border-blue-500/30' : 'bg-blue-50 border border-blue-200'}`}>
               <p className={`text-sm ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
-                <strong>سيتم:</strong> {selectedTermId === 'new' 
-                  ? `إنشاء فصل جديد باسم "${newTermName || '...'}"` 
+                <strong>سيتم:</strong> {selectedTermId === 'new'
+                  ? `إنشاء فصل جديد باسم "${newTermName || '...'}"`
                   : `استخدام الفصل "${allTerms.find(t => t.id === selectedTermId)?.name || ''}"`
                 }
               </p>
             </div>
+
+            {/* N5: تأكيد التصفير بكتابة اسم الفصل الحالي */}
+            {activeTerm?.name && (
+              <div className={`p-3 rounded-lg ${isDark ? 'bg-red-500/10 border border-red-500/30' : 'bg-red-50 border border-red-200'}`}>
+                <Label className={`text-sm block mb-2 ${isDark ? 'text-red-300' : 'text-red-700'}`}>
+                  للتأكيد، اكتب اسم الفصل الحالي بالضبط: <strong>«{activeTerm.name}»</strong>
+                </Label>
+                <Input
+                  value={confirmTermName}
+                  onChange={(e) => setConfirmTermName(e.target.value)}
+                  placeholder={activeTerm.name}
+                  className={isDark ? 'bg-slate-800 border-white/10 text-white' : ''}
+                />
+              </div>
+            )}
           </div>
 
           <DialogFooter className="gap-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setTermDialogOpen(false)}
               className={isDark ? 'border-white/10' : ''}
             >
               إلغاء
             </Button>
-            <Button 
+            <Button
               onClick={handleCloseTermAndStartNew}
-              disabled={closingTerm || (selectedTermId === 'new' && !newTermName.trim())}
+              disabled={closingTerm || (selectedTermId === 'new' && !newTermName.trim()) || (activeTerm?.name && confirmTermName.trim() !== activeTerm.name.trim())}
               className="bg-red-600 hover:bg-red-700"
             >
               {closingTerm ? (

@@ -9,7 +9,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
 import { toast } from 'sonner';
-import { DollarSign, Plus, Check, Trash2, CreditCard, Clock, CheckCircle, AlertCircle, Calendar, Search } from 'lucide-react';
+import { DollarSign, Plus, Trash2, Clock, CheckCircle, AlertCircle, Calendar, Search, FileDown } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -102,16 +102,6 @@ const FeesManagement = () => {
     }
   };
 
-  const handleMarkPaid = async (feeId) => {
-    try {
-      await axios.put(`${API}/fees/${feeId}/pay`);
-      toast.success('تم تأكيد الدفع');
-      fetchData();
-    } catch (error) {
-      toast.error('فشل في تأكيد الدفع');
-    }
-  };
-
   const handleDelete = async (feeId) => {
     if (!confirm('هل أنت متأكد من حذف هذه الرسوم؟')) return;
     try {
@@ -123,15 +113,44 @@ const FeesManagement = () => {
     }
   };
 
-  // تحديد حالة الدفع
+  // تحديد حالة الدفع (تعتمد على الحالة المحسوبة من الخادم مع احتياطي محلي)
   const getPaymentStatus = (fee) => {
+    if (fee.status && ['pending', 'due', 'paid'].includes(fee.status)) return fee.status;
     if (fee.is_paid) return 'paid';
-    
     const today = new Date();
     const dueDate = new Date(fee.due_date);
-    
     if (dueDate < today) return 'due';  // مستحق (تاريخ الاستحقاق مر)
     return 'pending';  // قائم (لم يأتي وقت دفعه)
+  };
+
+  // تغيير حالة الرسوم يدوياً (المدير)
+  const handleChangeStatus = async (feeId, status) => {
+    try {
+      await axios.put(`${API}/fees/${feeId}/status`, { status });
+      const labels = { pending: 'قائم', due: 'مستحق', paid: 'مدفوع' };
+      toast.success(`تم تحديث الحالة إلى: ${labels[status]}`);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في تحديث الحالة');
+    }
+  };
+
+  // تحميل التقرير المالي Excel
+  const handleExportExcel = async () => {
+    try {
+      const res = await axios.get(`${API}/export/fees?year=${selectedYear}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `التقرير_المالي_${selectedYear}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('تم تحميل التقرير المالي');
+    } catch (error) {
+      toast.error('فشل في تحميل التقرير');
+    }
   };
 
   const getStudentName = (studentId) => {
@@ -209,6 +228,13 @@ const FeesManagement = () => {
               ))}
             </select>
             
+            {isAdmin && (
+              <Button onClick={handleExportExcel} variant="outline" className={isDark ? 'border-white/10 text-white hover:bg-white/5' : ''}>
+                <FileDown className="w-4 h-4 ml-2" />
+                تقرير Excel
+              </Button>
+            )}
+
             {isAdmin && (
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
@@ -436,19 +462,22 @@ const FeesManagement = () => {
                             <span className={`text-sm font-bold ${status === 'paid' ? 'text-emerald-400' : status === 'due' ? 'text-amber-400' : 'text-slate-400'}`}>
                               {fee.amount}
                             </span>
-                            <span className={`text-xs px-2 py-1 rounded-full ${PAYMENT_STATUS[status].color}`}>
-                              <StatusIcon className="w-3 h-3 inline ml-1" />
-                              {PAYMENT_STATUS[status].label}
-                            </span>
-                            {isAdmin && !fee.is_paid && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleMarkPaid(fee.id)}
-                                className="text-emerald-400 hover:bg-emerald-500/10"
+                            {isAdmin ? (
+                              <select
+                                value={status}
+                                onChange={(e) => handleChangeStatus(fee.id, e.target.value)}
+                                className={`text-xs rounded-full px-2 py-1 border cursor-pointer focus:outline-none ${PAYMENT_STATUS[status].color} ${isDark ? 'border-white/10' : 'border-slate-300'}`}
+                                title="تغيير الحالة"
                               >
-                                <Check className="w-4 h-4" />
-                              </Button>
+                                <option value="pending">قائم</option>
+                                <option value="due">مستحق</option>
+                                <option value="paid">مدفوع</option>
+                              </select>
+                            ) : (
+                              <span className={`text-xs px-2 py-1 rounded-full ${PAYMENT_STATUS[status].color}`}>
+                                <StatusIcon className="w-3 h-3 inline ml-1" />
+                                {PAYMENT_STATUS[status].label}
+                              </span>
                             )}
                             {isAdmin && (
                               <Button

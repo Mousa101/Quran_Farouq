@@ -157,6 +157,26 @@ const Attendance = () => {
     }
   };
 
+  // T2: تعليم كل الطلاب "حاضر" دفعةً واحدة (ثم يُستثنى الغائبون فرديًا)
+  const handleMarkAllPresent = async () => {
+    if (isViewingOldTerm) { toast.error('لا يمكن التعديل على سجلات الفصول السابقة'); return; }
+    if (!students.length) return;
+    setSaving(true);
+    try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const records = students.map((s) => ({ student_id: s.id, status: 'present' }));
+      const res = await axios.post(`${API}/attendance/bulk`, { date: dateStr, records });
+      const map = {};
+      students.forEach((s) => { map[s.id] = 'present'; });
+      setAttendance((prev) => ({ ...prev, ...map }));
+      toast.success(res.data.message || 'تم تعليم الكل حاضر');
+    } catch (error) {
+      toast.error('فشل التسجيل الجماعي');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleExcusedClick = (student) => {
     setSelectedStudentForExcuse(student);
     setExcuseReason(excuseReasons[student.id] || '');
@@ -317,10 +337,18 @@ const Attendance = () => {
         {/* Students Attendance */}
         <Card className="glass-card border-white/10 lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-lg font-bold text-white flex items-center gap-3">
-              <UserCheck className="w-6 h-6 text-emerald-400" />
-              الطلاب - {format(selectedDate, 'EEEE d MMMM yyyy', { locale: ar })}
-            </CardTitle>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="text-lg font-bold text-white flex items-center gap-3">
+                <UserCheck className="w-6 h-6 text-emerald-400" />
+                الطلاب - {format(selectedDate, 'EEEE d MMMM yyyy', { locale: ar })}
+              </CardTitle>
+              {/* T2: تسجيل حضور بنقرة واحدة */}
+              {students.length > 0 && !isViewingOldTerm && (
+                <Button onClick={handleMarkAllPresent} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+                  <UserCheck className="w-4 h-4 ml-1" /> تعليم الكل حاضر
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             {students.length === 0 ? (
