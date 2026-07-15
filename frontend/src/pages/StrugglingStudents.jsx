@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { toast } from 'sonner';
 import { AlertTriangle, BellRing, Clock, Users, Save } from 'lucide-react';
+import StudentLink from '../components/StudentLink';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -216,7 +217,7 @@ const StrugglingStudents = () => {
                   <div className="flex items-center gap-3 flex-1 min-w-0">
                     <input type="checkbox" checked={selected.has(s.student_id)} onChange={() => toggleSelect(s.student_id)} />
                     <div className="min-w-0">
-                      <p className={`font-medium text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>{s.name}</p>
+                      <StudentLink studentId={s.student_id} name={s.name} className={`font-medium text-sm ${isDark ? 'text-white' : 'text-slate-900'}`} />
                       <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                         {s.group_name} · آخر تسميع: {s.last_recitation || '—'}
                       </p>

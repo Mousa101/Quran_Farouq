@@ -4,7 +4,7 @@ import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { UserPlus, Clock, Phone, Mail, Key, Copy, CheckCircle, School, Home, Calendar, User, Loader2, BookOpen, Shield, GraduationCap, Briefcase } from 'lucide-react';
+import { UserPlus, Clock, Phone, Mail, Key, Copy, CheckCircle, School, Home, Calendar, User, Loader2, BookOpen, Shield, GraduationCap, Briefcase, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -39,6 +39,20 @@ const PendingStudents = () => {
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
     toast.success('تم النسخ!');
+  };
+
+  // #1 — رفض/حذف طلب تسجيل معلّق
+  const rejectRegistration = async (user) => {
+    if (!window.confirm(`هل أنت متأكد من حذف طلب تسجيل "${user.name}"؟ لا يمكن التراجع.`)) return;
+    try {
+      await axios.delete(`${API}/admin/pending-registrations/${user.id}`);
+      toast.success('تم حذف طلب التسجيل');
+      setDialogOpen(false);
+      setSelectedUser(null);
+      fetchPendingRegistrations();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في حذف الطلب');
+    }
   };
 
   const formatDate = (dateStr) => {
@@ -149,6 +163,9 @@ const PendingStudents = () => {
                           </Button>
                         </div>
                       </div>
+                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-500/10" title="رفض الطلب" onClick={(e) => { e.stopPropagation(); rejectRegistration(user); }}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -204,6 +221,9 @@ const PendingStudents = () => {
                   <p className="text-white font-medium">{selectedUser.specialization}</p>
                 </div>
               )}
+              <Button variant="outline" className="w-full border-red-500/40 text-red-400 hover:bg-red-500/10" onClick={() => rejectRegistration(selectedUser)}>
+                <Trash2 className="w-4 h-4 ml-1" />رفض وحذف طلب التسجيل
+              </Button>
             </div>
           )}
         </DialogContent>

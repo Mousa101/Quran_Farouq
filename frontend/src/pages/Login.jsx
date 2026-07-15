@@ -5,12 +5,13 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { BookOpen, Mail, Lock, Loader2 } from 'lucide-react';
+import { BookOpen, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -92,14 +93,23 @@ const Login = () => {
                   <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 md:w-5 md:h-5 text-slate-500" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pr-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 h-10 md:h-11 text-sm md:text-base"
+                    className="pr-10 pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 h-10 md:h-11 text-sm md:text-base"
                     required
                     data-testid="login-password-input"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                    title={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4 md:w-5 md:h-5" /> : <Eye className="w-4 h-4 md:w-5 md:h-5" />}
+                  </button>
                 </div>
               </div>
 
@@ -129,12 +139,22 @@ const Login = () => {
                 </Link>
               </p>
               <p className="text-slate-500 text-xs md:text-sm">
-                <Link 
-                  to="/forgot-password" 
+                <Link
+                  to="/forgot-password"
                   className="text-amber-400 hover:text-amber-300"
                 >
                   نسيت كلمة المرور؟
                 </Link>
+              </p>
+              <p className="pt-2 border-t border-slate-700/50">
+                <button
+                  type="button"
+                  onClick={() => window.open(`${window.location.origin}/login?login=new`, '_blank')}
+                  className="text-slate-400 hover:text-emerald-400 text-xs"
+                  title="يفتح تبويباً جديداً بجلسة مستقلة — للاختبار بعدة حسابات معاً"
+                >
+                  🧪 فتح حساب آخر في تبويب جديد (للاختبار)
+                </button>
               </p>
             </div>
           </CardContent>

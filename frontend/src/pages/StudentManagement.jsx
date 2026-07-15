@@ -10,6 +10,7 @@ import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
 import { Textarea } from '../components/ui/textarea';
+import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES } from '../lib/constants';
 import {
   Users, Plus, Trash2, Edit, Search, AlertTriangle,
   UserPlus, Eye, RefreshCcw, Loader2, Key, Award
@@ -45,6 +46,8 @@ const StudentManagement = () => {
     school_grade: '',
     birth_date: ''
   });
+
+  const [addMosqueOther, setAddMosqueOther] = useState(false); // #5
 
   const [warningData, setWarningData] = useState({
     type: 'absence',
@@ -282,12 +285,31 @@ const StudentManagement = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-slate-300">المسجد</Label>
-                  <Input
-                    value={newStudentData.mosque_name}
-                    onChange={(e) => setNewStudentData({ ...newStudentData, mosque_name: e.target.value })}
-                    className="bg-slate-800 border-slate-700 text-white"
-                    placeholder="اسم المسجد"
-                  />
+                  <select
+                    value={addMosqueOther ? MOSQUE_OTHER : newStudentData.mosque_name}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === MOSQUE_OTHER) {
+                        setAddMosqueOther(true);
+                        setNewStudentData({ ...newStudentData, mosque_name: '' });
+                      } else {
+                        setAddMosqueOther(false);
+                        setNewStudentData({ ...newStudentData, mosque_name: val });
+                      }
+                    }}
+                    className="w-full h-10 px-3 rounded-md bg-slate-800 border border-slate-700 text-white"
+                  >
+                    <option value="">اختر المسجد</option>
+                    {MOSQUES.map((m) => (<option key={m} value={m}>{m}</option>))}
+                  </select>
+                  {addMosqueOther && (
+                    <Input
+                      value={newStudentData.mosque_name}
+                      onChange={(e) => setNewStudentData({ ...newStudentData, mosque_name: e.target.value })}
+                      className="bg-slate-800 border-slate-700 text-white mt-2"
+                      placeholder="اكتب اسم المسجد"
+                    />
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-slate-300">تاريخ الميلاد</Label>
@@ -311,13 +333,15 @@ const StudentManagement = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-slate-300">الصف / المعدل</Label>
-                  <Input
+                  <Label className="text-slate-300">الصف الدراسي</Label>
+                  <select
                     value={newStudentData.school_grade}
                     onChange={(e) => setNewStudentData({ ...newStudentData, school_grade: e.target.value })}
-                    className="bg-slate-800 border-slate-700 text-white"
-                    placeholder="مثال: الصف السادس - 95%"
-                  />
+                    className="w-full h-10 px-3 rounded-md bg-slate-800 border border-slate-700 text-white"
+                  >
+                    <option value="">اختر الصف</option>
+                    {SCHOOL_GRADES.map((g) => (<option key={g} value={g}>{g}</option>))}
+                  </select>
                 </div>
               </div>
 

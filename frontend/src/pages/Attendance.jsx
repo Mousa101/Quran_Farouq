@@ -12,6 +12,7 @@ import { UserCheck, CheckCircle, XCircle, Clock, Loader2, Star, Sparkles, Archiv
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import StudentLink from '../components/StudentLink';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -151,7 +152,7 @@ const Attendance = () => {
       }
       toast.success('تم تسجيل الحضور');
     } catch (error) {
-      toast.error('فشل تسجيل الحضور');
+      toast.error(error.response?.data?.detail || 'فشل تسجيل الحضور');
     } finally {
       setSaving(false);
     }
@@ -171,7 +172,7 @@ const Attendance = () => {
       setAttendance((prev) => ({ ...prev, ...map }));
       toast.success(res.data.message || 'تم تعليم الكل حاضر');
     } catch (error) {
-      toast.error('فشل التسجيل الجماعي');
+      toast.error(error.response?.data?.detail || 'فشل التسجيل الجماعي');
     } finally {
       setSaving(false);
     }
@@ -366,7 +367,7 @@ const Attendance = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         {getStatusIcon(attendance[student.id])}
-                        <span className="text-white font-medium">{student.name}</span>
+                        <StudentLink studentId={student.id} name={student.name} className="text-white font-medium" />
                       </div>
                       
                       <div className="flex gap-2">

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { Table2, FileDown, ArrowUpNarrowWide, ArrowDownWideNarrow } from 'lucide-react';
+import { SCHOOL_GRADES } from '../lib/constants';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -25,6 +26,7 @@ const StudentStats = () => {
   const [groups, setGroups] = useState([]);
   const [groupId, setGroupId] = useState('all');   // الفلتر الأول: المجموعة
   const [studentId, setStudentId] = useState('all'); // الفلتر الأول: الطالب
+  const [gradeFilter, setGradeFilter] = useState('all'); // #4 فلتر الصف
   const [sortBy, setSortBy] = useState('total_memorization'); // الفلتر الثاني
   const [order, setOrder] = useState('desc');       // الفلتر الثالث
   const [rows, setRows] = useState([]);
@@ -74,7 +76,9 @@ const StudentStats = () => {
     } catch (e) { toast.error('فشل في التحميل'); }
   };
 
-  const displayed = studentId === 'all' ? rows : rows.filter((r) => r.student_id === studentId);
+  const displayed = rows
+    .filter((r) => studentId === 'all' || r.student_id === studentId)
+    .filter((r) => gradeFilter === 'all' || (r.grade || '') === gradeFilter);
 
   const th = 'p-2 whitespace-nowrap';
   const activeCol = (k) => (sortBy === k ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : '');
@@ -108,6 +112,14 @@ const StudentStats = () => {
             <select value={studentId} onChange={(e) => setStudentId(e.target.value)} className={`p-2 rounded-lg border text-sm ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}>
               <option value="all">كل الطلاب</option>
               {rows.map((r) => <option key={r.student_id} value={r.student_id}>{r.name}</option>)}
+            </select>
+          </div>
+          {/* #4 فلتر الصف */}
+          <div>
+            <label className={`block text-xs mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الصف</label>
+            <select value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)} className={`p-2 rounded-lg border text-sm ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}>
+              <option value="all">كل الصفوف</option>
+              {SCHOOL_GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
             </select>
           </div>
           {/* الفلتر الثاني: الترتيب حسب */}

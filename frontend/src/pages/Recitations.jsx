@@ -360,11 +360,14 @@ const Recitations = () => {
           <div className="space-y-2">
             <Label className="text-slate-300">عدد الأخطاء</Label>
             <Input
-              type="number"
-              min="0"
-              max="50"
-              value={formData.error_count}
-              onChange={(e) => setFormData({ ...formData, error_count: parseInt(e.target.value) || 0 })}
+              type="text"
+              inputMode="numeric"
+              placeholder="اكتب عدد الأخطاء"
+              value={formData.error_count === 0 ? '' : formData.error_count}
+              onChange={(e) => {
+                const digits = e.target.value.replace(/[^0-9]/g, '');
+                setFormData({ ...formData, error_count: digits === '' ? 0 : parseInt(digits, 10) });
+              }}
               className="bg-slate-800 border-slate-700 text-white"
             />
           </div>

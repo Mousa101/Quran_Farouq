@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -11,6 +12,9 @@ import { Settings, Clock, Calendar, CheckCircle, XCircle, Loader2 } from 'lucide
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// أيقونات مقترحة لبنود المتابعة
+const ICON_CHOICES = ['⭐', '🕌', '📖', '🤲', '🌙', '☀️', '📿', '🕋', '💧', '📚', '🌱', '❤️', '✅', '🔥'];
 
 const DAYS = [
   { value: 'saturday', label: 'السبت' },
@@ -24,6 +28,8 @@ const DAYS = [
 
 const TrackingSettings = () => {
   const { isDark } = useTheme();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [settings, setSettings] = useState({
     submission_enabled: true,
     submission_start_day: 'friday',
@@ -35,18 +41,30 @@ const TrackingSettings = () => {
   const [saving, setSaving] = useState(false);
   const [checkResult, setCheckResult] = useState(null);
   const [customItems, setCustomItems] = useState([]);
-  const [newItem, setNewItem] = useState({ name: '', max_points: '' });
+  const [newItem, setNewItem] = useState({ name: '', max_points: '', icon: '⭐' });
   const [addingItem, setAddingItem] = useState(false);
+  // #4 — المدير يختار المعلم ليرى/يعدّل بنوده
+  const [sheikhs, setSheikhs] = useState([]);
+  const [selectedSheikh, setSelectedSheikh] = useState('');
 
   useEffect(() => {
     fetchSettings();
     checkSubmissionWindow();
-    fetchCustomItems();
-  }, []);
+    if (isAdmin) {
+      axios.get(`${API}/admin/sheikhs`).then((r) => setSheikhs(r.data || [])).catch(() => {});
+    } else {
+      fetchCustomItems();
+    }
+  }, []); // eslint-disable-line
+
+  useEffect(() => {
+    if (isAdmin && selectedSheikh) fetchCustomItems();
+  }, [selectedSheikh]); // eslint-disable-line
 
   const fetchCustomItems = async () => {
     try {
-      const res = await axios.get(`${API}/tracking-items`);
+      const q = isAdmin && selectedSheikh ? `?sheikh_id=${selectedSheikh}` : '';
+      const res = await axios.get(`${API}/tracking-items${q}`);
       setCustomItems(res.data || []);
     } catch (error) {
       console.error('Error fetching items:', error);
@@ -59,11 +77,17 @@ const TrackingSettings = () => {
       toast.error('أدخل اسم البند ونقاطه (أكبر من صفر)');
       return;
     }
+    if (isAdmin && !selectedSheikh) {
+      toast.error('اختر المعلم أولاً');
+      return;
+    }
     setAddingItem(true);
     try {
-      await axios.post(`${API}/tracking-items`, { name: newItem.name.trim(), max_points: points });
+      const payload = { name: newItem.name.trim(), max_points: points, icon: newItem.icon || '⭐' };
+      if (isAdmin) payload.sheikh_id = selectedSheikh;
+      await axios.post(`${API}/tracking-items`, payload);
       toast.success('تم إضافة البند');
-      setNewItem({ name: '', max_points: '' });
+      setNewItem({ name: '', max_points: '', icon: '⭐' });
       fetchCustomItems();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'فشل في إضافة البند');
@@ -172,12 +196,30 @@ const TrackingSettings = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-slate-400 text-sm">أضف بنوداً خاصة بك بنقاطها، وستظهر للطلاب في ورقة المتابعة وتُحتسب ضمن مجموعهم.</p>
+          <p className="text-slate-400 text-sm">أضف بنوداً بنقاطها ورمزها (icon)، وستظهر في دليل النقاط وفي ورقة المتابعة عند الطالب والمعلم وتُحتسب ضمن المجموع.</p>
+
+          {/* #4 — المدير يختار المعلم */}
+          {isAdmin && (
+            <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>المعلم</Label>
+              <select
+                value={selectedSheikh}
+                onChange={(e) => setSelectedSheikh(e.target.value)}
+                className="w-full h-10 px-3 rounded-md bg-slate-800 border border-slate-700 text-white mt-1"
+              >
+                <option value="">اختر المعلم لعرض/تعديل بنوده</option>
+                {sheikhs.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+              </select>
+            </div>
+          )}
+
           {customItems.length > 0 && (
             <div className="space-y-2">
               {customItems.map((it) => (
                 <div key={it.id} className={`flex items-center justify-between p-3 rounded-lg ${isDark ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
-                  <span className={isDark ? 'text-white' : 'text-slate-900'}>{it.name}</span>
+                  <span className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    <span className="text-xl">{it.icon || '⭐'}</span>{it.name}
+                  </span>
                   <div className="flex items-center gap-3">
                     <span className="text-purple-400 font-bold">{it.max_points} نقطة</span>
                     <Button size="sm" variant="ghost" onClick={() => handleDeleteItem(it.id)} className="text-red-400 hover:bg-red-500/20">
@@ -188,31 +230,52 @@ const TrackingSettings = () => {
               ))}
             </div>
           )}
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex-1 min-w-[160px]">
-              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>اسم البند</Label>
-              <Input
-                value={newItem.name}
-                onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-                placeholder="مثال: قيام الليل"
-                className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
-              />
+
+          {(!isAdmin || selectedSheikh) && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="flex-1 min-w-[160px]">
+                  <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>اسم البند</Label>
+                  <Input
+                    value={newItem.name}
+                    onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                    placeholder="مثال: قيام الليل"
+                    className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                  />
+                </div>
+                <div className="w-28">
+                  <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>النقاط</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    value={newItem.max_points}
+                    onChange={(e) => setNewItem({ ...newItem, max_points: e.target.value })}
+                    placeholder="10"
+                    className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                  />
+                </div>
+                <Button onClick={handleAddItem} disabled={addingItem} className="bg-purple-600 hover:bg-purple-700">
+                  {addingItem ? <Loader2 className="w-4 h-4 animate-spin" /> : 'إضافة'}
+                </Button>
+              </div>
+              {/* اختيار الرمز */}
+              <div>
+                <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>الرمز (icon)</Label>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {ICON_CHOICES.map((ic) => (
+                    <button
+                      key={ic}
+                      type="button"
+                      onClick={() => setNewItem({ ...newItem, icon: ic })}
+                      className={`w-9 h-9 rounded-lg text-lg transition-all ${newItem.icon === ic ? 'bg-purple-500/30 ring-2 ring-purple-400' : (isDark ? 'bg-slate-800' : 'bg-slate-100')}`}
+                    >
+                      {ic}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="w-28">
-              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>النقاط</Label>
-              <Input
-                type="number"
-                min="1"
-                value={newItem.max_points}
-                onChange={(e) => setNewItem({ ...newItem, max_points: e.target.value })}
-                placeholder="10"
-                className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
-              />
-            </div>
-            <Button onClick={handleAddItem} disabled={addingItem} className="bg-purple-600 hover:bg-purple-700">
-              {addingItem ? <Loader2 className="w-4 h-4 animate-spin" /> : 'إضافة'}
-            </Button>
-          </div>
+          )}
         </CardContent>
       </Card>
 

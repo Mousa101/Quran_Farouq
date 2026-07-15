@@ -227,6 +227,17 @@ const Sidebar = () => {
           )}
         </Button>
 
+        {/* فتح حساب آخر في تبويب جديد (جلسة مستقلة — للاختبار بعدة حسابات معاً) */}
+        <Button
+          onClick={() => window.open(`${window.location.origin}/login?login=new`, '_blank')}
+          variant="ghost"
+          className="w-full justify-start gap-3 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 text-xs md:text-sm"
+          title="يفتح تبويباً جديداً بجلسة مستقلة لتسجيل حساب آخر"
+        >
+          <UserPlus className="w-5 h-5" />
+          <span>فتح حساب آخر (تبويب)</span>
+        </Button>
+
         {/* Logout */}
         <Button
           onClick={handleLogout}

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Link } from 'react-router-dom';
 import { Trophy, Users, UserCheck, BookOpen, Filter, Eye, TrendingUp, Medal } from 'lucide-react';
+import StudentLink from '../components/StudentLink';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -105,7 +106,7 @@ const AdminRankings = () => {
                     {badge.icon}
                   </span>
                 </td>
-                <td className={`px-4 py-3 font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.student_name}</td>
+                <td className={`px-4 py-3 font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}><StudentLink studentId={item.student_id} name={item.student_name} /></td>
                 <td className={`px-4 py-3 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{item.group_name}</td>
                 <td className="px-4 py-3 text-emerald-400 font-bold">{item.total_points}</td>
                 <td className="px-4 py-3">
@@ -154,7 +155,7 @@ const AdminRankings = () => {
                     {badge.icon}
                   </span>
                 </td>
-                <td className={`px-4 py-3 font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.student_name}</td>
+                <td className={`px-4 py-3 font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}><StudentLink studentId={item.student_id} name={item.student_name} /></td>
                 <td className={`px-4 py-3 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{item.group_name}</td>
                 <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{item.total_days}</td>
                 <td className="px-4 py-3 text-emerald-400">{item.present_days}</td>
@@ -204,7 +205,7 @@ const AdminRankings = () => {
                     {badge.icon}
                   </span>
                 </td>
-                <td className={`px-4 py-3 font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{item.student_name}</td>
+                <td className={`px-4 py-3 font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}><StudentLink studentId={item.student_id} name={item.student_name} /></td>
                 <td className={`px-4 py-3 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{item.group_name}</td>
                 <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{item.total_recitations}</td>
                 <td className="px-4 py-3 text-emerald-400">{item.new_memorization}</td>

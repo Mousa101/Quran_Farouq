@@ -11,6 +11,7 @@ import {
   Save, Loader2, Upload, Camera, Check, X
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { MOSQUES, MOSQUE_OTHER } from '../lib/constants';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -19,6 +20,7 @@ const SheikhEditProfile = () => {
   const { isDark } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [mosqueOther, setMosqueOther] = useState(false); // #5
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
@@ -54,6 +56,8 @@ const SheikhEditProfile = () => {
         experienceYears: userData.experience_years || '',
         profileImage: userData.profile_image || ''
       });
+      const savedMosque = userData.mosque_name || '';
+      setMosqueOther(!!savedMosque && !MOSQUES.slice(0, -1).includes(savedMosque));
       setImagePreview(userData.profile_image || null);
     } catch (error) {
       toast.error('فشل في تحميل البيانات');
@@ -274,11 +278,33 @@ const SheikhEditProfile = () => {
                   <Home className="w-4 h-4 inline ml-1" />
                   المسجد
                 </Label>
-                <Input
-                  value={formData.mosqueName}
-                  onChange={(e) => handleChange('mosqueName', e.target.value)}
-                  className={isDark ? 'bg-slate-800/50 border-slate-700 text-white' : ''}
-                />
+                <select
+                  value={mosqueOther ? MOSQUE_OTHER : formData.mosqueName}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === MOSQUE_OTHER) {
+                      setMosqueOther(true);
+                      handleChange('mosqueName', '');
+                    } else {
+                      setMosqueOther(false);
+                      handleChange('mosqueName', val);
+                    }
+                  }}
+                  className={`w-full h-10 px-3 rounded-md border ${isDark ? 'bg-slate-800/50 border-slate-700 text-white' : 'border-slate-300'}`}
+                >
+                  <option value="">اختر المسجد</option>
+                  {MOSQUES.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                {mosqueOther && (
+                  <Input
+                    value={formData.mosqueName}
+                    onChange={(e) => handleChange('mosqueName', e.target.value)}
+                    placeholder="اكتب اسم مسجدك"
+                    className={`mt-2 ${isDark ? 'bg-slate-800/50 border-slate-700 text-white' : ''}`}
+                  />
+                )}
               </div>
             </div>
 

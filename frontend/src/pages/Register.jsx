@@ -4,9 +4,10 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { BookOpen, Mail, Lock, User, Loader2, Phone, Calendar, School, Home, CheckCircle, Key, Image, Upload, UserPlus, GraduationCap, Shield, Briefcase } from 'lucide-react';
+import { BookOpen, Mail, Lock, User, Loader2, Phone, Calendar, School, Home, CheckCircle, Key, Image, Upload, UserPlus, GraduationCap, Shield, Briefcase, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
+import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES } from '../lib/constants';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -18,6 +19,8 @@ const Register = () => {
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [activationCode, setActivationCode] = useState('');
   const [selectedRole, setSelectedRole] = useState('student');
+  const [mosqueOther, setMosqueOther] = useState(false); // #5 هل اختار "أخرى" لكتابة اسم مسجده
+  const [showPassword, setShowPassword] = useState(false); // إظهار/إخفاء كلمة المرور
   const fileInputRef = useRef(null);
   const [imagePreview, setImagePreview] = useState(null);
   
@@ -380,14 +383,19 @@ const Register = () => {
                   <div className="relative">
                     <Lock className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <Input
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
                       value={formData.password}
                       onChange={(e) => handleChange('password', e.target.value)}
-                      className="pr-8 h-9 text-sm bg-slate-800/50 border-slate-700 text-white"
+                      className="pr-8 pl-8 h-9 text-sm bg-slate-800/50 border-slate-700 text-white"
                       required
                       minLength={6}
                     />
+                    <button type="button" onClick={() => setShowPassword((v) => !v)} tabIndex={-1}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                      title={showPassword ? 'إخفاء' : 'إظهار'}>
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
                 <div className="space-y-1">
@@ -395,14 +403,19 @@ const Register = () => {
                   <div className="relative">
                     <Lock className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                     <Input
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       placeholder="••••••••"
                       value={formData.confirmPassword}
                       onChange={(e) => handleChange('confirmPassword', e.target.value)}
-                      className="pr-8 h-9 text-sm bg-slate-800/50 border-slate-700 text-white"
+                      className="pr-8 pl-8 h-9 text-sm bg-slate-800/50 border-slate-700 text-white"
                       required
                       minLength={6}
                     />
+                    <button type="button" onClick={() => setShowPassword((v) => !v)} tabIndex={-1}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                      title={showPassword ? 'إخفاء' : 'إظهار'}>
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -499,13 +512,34 @@ const Register = () => {
                     <Home className="w-3 h-3" />
                     المسجد
                   </Label>
-                  <Input
-                    type="text"
-                    placeholder="اسم المسجد"
-                    value={formData.mosqueName}
-                    onChange={(e) => handleChange('mosqueName', e.target.value)}
-                    className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
-                  />
+                  <select
+                    value={mosqueOther ? MOSQUE_OTHER : formData.mosqueName}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === MOSQUE_OTHER) {
+                        setMosqueOther(true);
+                        handleChange('mosqueName', '');
+                      } else {
+                        setMosqueOther(false);
+                        handleChange('mosqueName', val);
+                      }
+                    }}
+                    className="h-8 text-xs bg-slate-800/50 border border-slate-700 text-white rounded-md w-full px-2"
+                  >
+                    <option value="">اختر المسجد</option>
+                    {MOSQUES.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                  {mosqueOther && (
+                    <Input
+                      type="text"
+                      placeholder="اكتب اسم مسجدك"
+                      value={formData.mosqueName}
+                      onChange={(e) => handleChange('mosqueName', e.target.value)}
+                      className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white mt-1"
+                    />
+                  )}
                 </div>
                 <div className="space-y-1">
                     <Label className="text-slate-400 text-xs flex items-center gap-1">
@@ -528,13 +562,16 @@ const Register = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
                     <Label className="text-slate-400 text-xs">الصف الدراسي</Label>
-                    <Input
-                      type="text"
-                      placeholder="مثال: الصف السادس"
+                    <select
                       value={formData.schoolGrade}
                       onChange={(e) => handleChange('schoolGrade', e.target.value)}
-                      className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
-                    />
+                      className="h-8 text-xs bg-slate-800/50 border border-slate-700 text-white rounded-md w-full px-2"
+                    >
+                      <option value="">اختر الصف</option>
+                      {SCHOOL_GRADES.map((g) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
                   </div>
                  <div className="space-y-1">
               <Label className="text-slate-400 text-xs">المعدل الدراسي</Label>

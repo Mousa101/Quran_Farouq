@@ -197,11 +197,11 @@ const StudentTracking = () => {
                         الصلوات (من 35)
                       </Label>
                       <Input
-                        type="number"
-                        min="0"
-                        max="35"
-                        value={formData.prayers_count}
-                        onChange={(e) => setFormData({ ...formData, prayers_count: parseInt(e.target.value) || 0 })}
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="اكتب العدد"
+                        value={formData.prayers_count === 0 ? '' : formData.prayers_count}
+                        onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, prayers_count: d === '' ? 0 : parseInt(d, 10) }); }}
                         className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                       />
                       <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>5 صلوات × 7 أيام</p>
@@ -214,11 +214,11 @@ const StudentTracking = () => {
                         الجلوس مع القرآن (من 35)
                       </Label>
                       <Input
-                        type="number"
-                        min="0"
-                        max="35"
-                        value={formData.quran_sitting_days}
-                        onChange={(e) => setFormData({ ...formData, quran_sitting_days: parseInt(e.target.value) || 0 })}
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="اكتب العدد"
+                        value={formData.quran_sitting_days === 0 ? '' : formData.quran_sitting_days}
+                        onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, quran_sitting_days: d === '' ? 0 : parseInt(d, 10) }); }}
                         className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                       />
                     </div>
@@ -227,15 +227,15 @@ const StudentTracking = () => {
                     {customItems.map((it) => (
                       <div key={it.id}>
                         <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                          <Star className="w-4 h-4 text-purple-400" />
+                          <span className="text-base">{it.icon || '⭐'}</span>
                           {it.name} (من {it.max_points})
                         </Label>
                         <Input
-                          type="number"
-                          min="0"
-                          max={it.max_points}
-                          value={customValues[it.id] ?? 0}
-                          onChange={(e) => setCustomValues({ ...customValues, [it.id]: parseInt(e.target.value) || 0 })}
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="اكتب العدد"
+                          value={(customValues[it.id] ?? 0) === 0 ? '' : customValues[it.id]}
+                          onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setCustomValues({ ...customValues, [it.id]: d === '' ? 0 : parseInt(d, 10) }); }}
                           className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                         />
                       </div>
@@ -273,67 +273,33 @@ const StudentTracking = () => {
         </div>
       </div>
 
-      {/* Points Guide */}
+      {/* Points Guide — ديناميكي حسب بنود المعلم (#3) */}
       <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
         <CardHeader>
-          <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>دليل النقاط (المجموع 100 نقطة)</CardTitle>
+          <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>دليل النقاط (المجموع {70 + customMax()} نقطة)</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
             <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-              <Hand className="w-4 h-4 mx-auto mb-1 text-emerald-400" />
+              <div className="text-lg">🤲</div>
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصلوات</p>
               <p className="text-sm font-bold text-emerald-400">35</p>
             </div>
             <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
-              <BookOpen className="w-4 h-4 mx-auto mb-1 text-blue-400" />
-              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>القرآن</p>
-              <p className="text-sm font-bold text-blue-400">7</p>
+              <div className="text-lg">📖</div>
+              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الجلوس مع القرآن</p>
+              <p className="text-sm font-bold text-blue-400">35</p>
             </div>
-            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
-              <Sunrise className="w-4 h-4 mx-auto mb-1 text-amber-400" />
-              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الضحى</p>
-              <p className="text-sm font-bold text-amber-400">7</p>
-            </div>
-            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-pink-500/10' : 'bg-pink-50'}`}>
-              <Users className="w-4 h-4 mx-auto mb-1 text-pink-400" />
-              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>التسميع</p>
-              <p className="text-sm font-bold text-pink-400">7</p>
-            </div>
-            
-            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
-              <GraduationCap className="w-4 h-4 mx-auto mb-1 text-purple-400" />
-              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الدراسة</p>
-              <p className="text-sm font-bold text-purple-400">7</p>
-            </div>
-            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
-              <Moon className="w-4 h-4 mx-auto mb-1 text-indigo-400" />
-              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الوتر</p>
-              <p className="text-sm font-bold text-indigo-400">7</p>
-            </div>
-            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
-              <Sparkles className="w-4 h-4 mx-auto mb-1 text-teal-400" />
-              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>السنن</p>
-              <p className="text-sm font-bold text-teal-400">7</p>
-            </div>
-            <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
-              <Star className="w-6 h-6 mx-auto mb-2 text-amber-400" />
-              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الأذكار</p>
-              <p className="text-lg font-bold text-amber-400">7 نقاط</p>
-            </div>
-            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-yellow-500/10' : 'bg-yellow-50'}`}>
-              <Star className="w-4 h-4 mx-auto mb-1 text-yellow-400" />
-              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>قيام</p>
-              <p className="text-sm font-bold text-yellow-400">8</p>
-            </div>
-            <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-cyan-500/10' : 'bg-cyan-50'}`}>
-              <Calendar className="w-4 h-4 mx-auto mb-1 text-cyan-400" />
-              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصيام</p>
-              <p className="text-sm font-bold text-cyan-400">8</p>
-            </div>
+            {customItems.map((it) => (
+              <div key={it.id} className={`p-2 rounded-lg text-center ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
+                <div className="text-lg">{it.icon || '⭐'}</div>
+                <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{it.name}</p>
+                <p className="text-sm font-bold text-purple-400">{it.max_points}</p>
+              </div>
+            ))}
           </div>
           <div className={`mt-3 p-2 rounded-lg text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
-            <p className="text-lg font-bold text-emerald-400">المجموع الأسبوعي: 100 نقطة</p>
+            <p className="text-lg font-bold text-emerald-400">المجموع الأسبوعي: {70 + customMax()} نقطة</p>
           </div>
         </CardContent>
       </Card>

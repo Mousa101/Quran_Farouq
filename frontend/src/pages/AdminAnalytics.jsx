@@ -238,10 +238,9 @@ const AdminAnalytics = () => {
             <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
               <CardHeader className="pb-2"><CardTitle className={`text-base flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}><Layers className="w-4 h-4 text-purple-400" />تصنيف الأجزاء (من التقييم المبدئي · {juz.assessed_students}/{juz.total_students} مُقيَّم)</CardTitle></CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div className="grid grid-cols-3 gap-3 mb-4">
                   <div className="text-center p-3 rounded-lg bg-emerald-500/10"><p className="text-xs text-slate-400">أجزاء قوية</p><p className="text-lg font-bold text-emerald-400">{juz.totals.strong}</p></div>
                   <div className="text-center p-3 rounded-lg bg-red-500/10"><p className="text-xs text-slate-400">أجزاء ضعيفة</p><p className="text-lg font-bold text-red-400">{juz.totals.weak}</p></div>
-                  <div className="text-center p-3 rounded-lg bg-blue-500/10"><p className="text-xs text-slate-400">اختبار المفصّل</p><p className="text-lg font-bold text-blue-400">{juz.totals.mufassal}</p></div>
                   <div className="text-center p-3 rounded-lg bg-amber-500/10"><p className="text-xs text-slate-400">الاختبار الإداري</p><p className="text-lg font-bold text-amber-400">{juz.totals.administrative}</p></div>
                 </div>
                 <ResponsiveContainer width="100%" height={220}>

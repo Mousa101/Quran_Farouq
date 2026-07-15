@@ -17,6 +17,7 @@ const MyProgress = () => {
   const { isDark } = useTheme();
   const [stats, setStats] = useState(null);
   const [schedule, setSchedule] = useState(null);
+  const [term, setTerm] = useState(null); // الفصل النشط (يتحدّث عند بدء المدير فصلاً جديداً)
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,16 +28,19 @@ const MyProgress = () => {
     if (!user?.id) return;
     
     try {
-      const [statsRes, scheduleRes] = await Promise.all([
+      const [statsRes, scheduleRes, termRes] = await Promise.all([
         axios.get(`${API}/statistics/student/${user.id}`),
-        axios.get(`${API}/schedules`).catch(() => ({ data: [] }))
+        axios.get(`${API}/schedules`).catch(() => ({ data: [] })),
+        axios.get(`${API}/terms/active`).catch(() => ({ data: null }))
       ]);
-      
+
       setStats(statsRes.data);
-      
+
       // البحث عن الجدول النشط
       const activeSchedule = scheduleRes.data.find(s => s.is_active);
       setSchedule(activeSchedule);
+      // الفصل النشط (المصدر الرسمي — يعكس بدء المدير لفصل جديد)
+      setTerm(termRes.data || null);
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -79,7 +83,9 @@ const MyProgress = () => {
           <div>
             <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>تقدمي في الفصل</h1>
             <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>
-              {schedule ? `${schedule.name} (${schedule.start_date} - ${schedule.end_date})` : 'لا يوجد فصل نشط'}
+              {term
+                ? `${term.name}${term.start_date ? ` (${String(term.start_date).slice(0, 10)}${term.end_date ? ' - ' + String(term.end_date).slice(0, 10) : ''})` : ''}`
+                : (schedule ? `${schedule.name} (${schedule.start_date} - ${schedule.end_date})` : 'لا يوجد فصل نشط')}
             </p>
           </div>
         </div>

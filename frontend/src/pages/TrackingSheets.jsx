@@ -13,6 +13,7 @@ import {
   Sunrise, Users, GraduationCap, Calendar, Sparkles, MessageCircle, Edit
 } from 'lucide-react';
 import { toast } from 'sonner';
+import StudentLink from '../components/StudentLink';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -30,6 +31,13 @@ const TrackingSheets = () => {
   const [imagePreview, setImagePreview] = useState(null);
   const [imageBase64, setImageBase64] = useState('');
   const fileInputRef = useRef(null);
+  // #3/#5 — بنود المتابعة المخصّصة + إدارتها بنفس مكان التسجيل
+  const [customItems, setCustomItems] = useState([]);
+  const [customValues, setCustomValues] = useState({});
+  const [newItem, setNewItem] = useState({ name: '', max_points: '', icon: '⭐' });
+  const [addingItem, setAddingItem] = useState(false);
+  const ICON_CHOICES = ['⭐', '🕌', '📖', '🤲', '🌙', '☀️', '📿', '🕋', '💧', '📚', '🌱', '❤️', '✅', '🔥'];
+  const customMax = () => customItems.reduce((s, it) => s + (it.max_points || 0), 0);
   
   const [formData, setFormData] = useState({
     student_id: '',
@@ -72,13 +80,49 @@ const TrackingSheets = () => {
     setFormData(prev => ({ ...prev, week_start: saturday.toISOString().split('T')[0] }));
   }, []);
 
+  const fetchCustomItems = async () => {
+    try {
+      const res = await axios.get(`${API}/tracking-items`);
+      setCustomItems(res.data || []);
+    } catch (e) { /* ignore */ }
+  };
+
+  const handleAddItem = async () => {
+    const points = parseInt(newItem.max_points);
+    if (!newItem.name.trim() || !points || points <= 0) {
+      toast.error('أدخل اسم البند ونقاطه (أكبر من صفر)');
+      return;
+    }
+    setAddingItem(true);
+    try {
+      await axios.post(`${API}/tracking-items`, { name: newItem.name.trim(), max_points: points, icon: newItem.icon || '⭐' });
+      toast.success('تم إضافة البند');
+      setNewItem({ name: '', max_points: '', icon: '⭐' });
+      fetchCustomItems();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في إضافة البند');
+    } finally {
+      setAddingItem(false);
+    }
+  };
+
+  const handleDeleteItem = async (id) => {
+    try {
+      await axios.delete(`${API}/tracking-items/${id}`);
+      toast.success('تم حذف البند');
+      fetchCustomItems();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في حذف البند');
+    }
+  };
+
   const fetchData = async () => {
     try {
       const [sheetsRes, groupsRes] = await Promise.all([
         axios.get(`${API}/tracking-sheets`),
         axios.get(`${API}/groups`)
       ]);
-      
+      fetchCustomItems();
       setSheets(sheetsRes.data);
       
       // Get all students from groups
@@ -122,10 +166,11 @@ const TrackingSheets = () => {
 
     setSubmitting(true);
     try {
-      const res = await axios.post(`${API}/tracking-sheets/manual`, formData);
+      const res = await axios.post(`${API}/tracking-sheets/manual`, { ...formData, custom_values: customValues });
       toast.success(`تم إدخال ورقة المتابعة - ${res.data.points_breakdown.total_points} نقطة`);
       setDialogOpen(false);
       resetForm();
+      setCustomValues({});
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'فشل في إدخال ورقة المتابعة');
@@ -186,7 +231,8 @@ const TrackingSheets = () => {
   const calculatePoints = () => {
     const prayers = Math.min(formData.prayers_count, 35);
     const quran = Math.min(formData.quran_sitting_days, 35);
-    return prayers + quran; // 70 (صلوات 35 + جلوس 35)
+    const custom = customItems.reduce((s, it) => s + Math.min(Math.max(parseInt(customValues[it.id]) || 0, 0), it.max_points), 0);
+    return prayers + quran + custom;
   };
 
   const calculateEditPoints = () => {
@@ -323,11 +369,11 @@ const TrackingSheets = () => {
                             الصلوات (من 35)
                           </Label>
                           <Input
-                            type="number"
-                            min="0"
-                            max="35"
-                            value={formData.prayers_count}
-                            onChange={(e) => setFormData({ ...formData, prayers_count: parseInt(e.target.value) || 0 })}
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="اكتب العدد"
+                            value={formData.prayers_count === 0 ? '' : formData.prayers_count}
+                            onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, prayers_count: d === '' ? 0 : parseInt(d, 10) }); }}
                             className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                           />
                         </div>
@@ -339,15 +385,37 @@ const TrackingSheets = () => {
                             الجلوس مع القرآن (من 35)
                           </Label>
                           <Input
-                            type="number"
-                            min="0"
-                            max="35"
-                            value={formData.quran_sitting_days}
-                            onChange={(e) => setFormData({ ...formData, quran_sitting_days: parseInt(e.target.value) || 0 })}
+                            type="text"
+                            inputMode="numeric"
+                            placeholder="اكتب العدد"
+                            value={formData.quran_sitting_days === 0 ? '' : formData.quran_sitting_days}
+                            onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, quran_sitting_days: d === '' ? 0 : parseInt(d, 10) }); }}
                             className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                           />
                         </div>
                       </div>
+
+                      {/* بنود المعلم المخصّصة (#3) */}
+                      {customItems.length > 0 && (
+                        <div className="grid grid-cols-2 gap-4 mt-4">
+                          {customItems.map((it) => (
+                            <div key={it.id}>
+                              <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                                <span className="text-base">{it.icon || '⭐'}</span>
+                                {it.name} (من {it.max_points})
+                              </Label>
+                              <Input
+                                type="text"
+                                inputMode="numeric"
+                                placeholder="اكتب العدد"
+                                value={(customValues[it.id] ?? 0) === 0 ? '' : customValues[it.id]}
+                                onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setCustomValues({ ...customValues, [it.id]: d === '' ? 0 : parseInt(d, 10) }); }}
+                                className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -363,7 +431,7 @@ const TrackingSheets = () => {
                     <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
                       <p className={isDark ? 'text-slate-300' : 'text-slate-600'}>النقاط المتوقعة</p>
                       <p className="text-3xl font-bold text-emerald-400">{calculatePoints()} نقطة</p>
-                      <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>الحد الأقصى: 70 نقطة</p>
+                      <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>الحد الأقصى: {70 + customMax()} نقطة</p>
                     </div>
 
                     <Button type="submit" className="w-full bg-purple-600 hover:bg-purple-700" disabled={submitting}>
@@ -440,7 +508,7 @@ const TrackingSheets = () => {
         </div>
       </div>
 
-      {/* Points Guide */}
+      {/* Points Guide — ديناميكي (الأساس + بنود المعلم مع رموزها) #3 */}
       <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
         <CardHeader>
           <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>دليل النقاط (الأسبوعية)</CardTitle>
@@ -448,20 +516,70 @@ const TrackingSheets = () => {
         <CardContent>
           <div className="grid grid-cols-2 gap-2">
             <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-              <Hand className="w-4 h-4 mx-auto mb-1 text-emerald-400" />
+              <div className="text-lg">🤲</div>
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصلوات</p>
               <p className="text-sm font-bold text-emerald-400">35</p>
             </div>
             <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
-              <BookOpen className="w-4 h-4 mx-auto mb-1 text-blue-400" />
+              <div className="text-lg">📖</div>
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الجلوس مع القرآن</p>
               <p className="text-sm font-bold text-blue-400">35</p>
             </div>
+            {customItems.map((it) => (
+              <div key={it.id} className={`p-2 rounded-lg text-center ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
+                <div className="text-lg">{it.icon || '⭐'}</div>
+                <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{it.name}</p>
+                <p className="text-sm font-bold text-purple-400">{it.max_points}</p>
+              </div>
+            ))}
           </div>
           <div className={`mt-3 p-2 rounded-lg text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
             <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>الحد الأقصى الأسبوعي</p>
-            <p className="text-xl font-bold text-emerald-400">70 نقطة</p>
-            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>35 + 35 = 70</p>
+            <p className="text-xl font-bold text-emerald-400">{70 + customMax()} نقطة</p>
+            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>35 + 35{customMax() > 0 ? ` + ${customMax()}` : ''} = {70 + customMax()}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* #5 — إدارة بنود المتابعة بنفس مكان التسجيل */}
+      <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+        <CardHeader>
+          <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <Star className="w-5 h-5 text-purple-400" /> بنود المتابعة (نقاط + رمز)
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {customItems.length > 0 && (
+            <div className="space-y-2">
+              {customItems.map((it) => (
+                <div key={it.id} className={`flex items-center justify-between p-2 rounded-lg ${isDark ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
+                  <span className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}><span className="text-lg">{it.icon || '⭐'}</span>{it.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-purple-400 font-bold text-sm">{it.max_points}</span>
+                    <Button size="sm" variant="ghost" onClick={() => handleDeleteItem(it.id)} className="text-red-400 hover:bg-red-500/20 h-7 w-7 p-0">✕</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="flex-1 min-w-[140px]">
+              <Label className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>اسم البند</Label>
+              <Input value={newItem.name} onChange={(e) => setNewItem({ ...newItem, name: e.target.value })} placeholder="مثال: قيام الليل" className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''} />
+            </div>
+            <div className="w-20">
+              <Label className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>النقاط</Label>
+              <Input type="text" inputMode="numeric" value={newItem.max_points} onChange={(e) => setNewItem({ ...newItem, max_points: e.target.value.replace(/[^0-9]/g, '') })} placeholder="10" className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''} />
+            </div>
+            <Button onClick={handleAddItem} disabled={addingItem} className="bg-purple-600 hover:bg-purple-700">
+              {addingItem ? <Loader2 className="w-4 h-4 animate-spin" /> : 'إضافة'}
+            </Button>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {ICON_CHOICES.map((ic) => (
+              <button key={ic} type="button" onClick={() => setNewItem({ ...newItem, icon: ic })}
+                className={`w-8 h-8 rounded-lg text-base ${newItem.icon === ic ? 'bg-purple-500/30 ring-2 ring-purple-400' : (isDark ? 'bg-slate-800' : 'bg-slate-100')}`}>{ic}</button>
+            ))}
           </div>
         </CardContent>
       </Card>
@@ -486,8 +604,12 @@ const TrackingSheets = () => {
                       <FileText className="w-6 h-6 text-purple-400" />
                     </div>
                     <div>
-                      <h3 className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{getStudentName(sheet.student_id)}</h3>
-                      <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>أسبوع {sheet.week_start}</p>
+                      <StudentLink studentId={sheet.student_id} name={getStudentName(sheet.student_id)} className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`} />
+                      <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        أسبوع {sheet.week_start}
+                        {sheet.submitted_by_student && <span className="text-emerald-400 mr-2">• سجّلها الطالب</span>}
+                        {sheet.updated_by_sheikh && <span className="text-blue-400 mr-2">• عدّلها المعلم</span>}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
@@ -595,11 +717,11 @@ const TrackingSheets = () => {
                     الصلوات (من 35)
                   </Label>
                   <Input
-                    type="number"
-                    min="0"
-                    max="35"
-                    value={editFormData.prayers_count}
-                    onChange={(e) => setEditFormData({ ...editFormData, prayers_count: parseInt(e.target.value) || 0 })}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="اكتب العدد"
+                    value={editFormData.prayers_count === 0 ? '' : editFormData.prayers_count}
+                    onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setEditFormData({ ...editFormData, prayers_count: d === '' ? 0 : parseInt(d, 10) }); }}
                     className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                   />
                 </div>
@@ -611,11 +733,11 @@ const TrackingSheets = () => {
                     الجلوس مع القرآن (من 35)
                   </Label>
                   <Input
-                    type="number"
-                    min="0"
-                    max="35"
-                    value={editFormData.quran_sitting_days}
-                    onChange={(e) => setEditFormData({ ...editFormData, quran_sitting_days: parseInt(e.target.value) || 0 })}
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="اكتب العدد"
+                    value={editFormData.quran_sitting_days === 0 ? '' : editFormData.quran_sitting_days}
+                    onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setEditFormData({ ...editFormData, quran_sitting_days: d === '' ? 0 : parseInt(d, 10) }); }}
                     className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                   />
                 </div>

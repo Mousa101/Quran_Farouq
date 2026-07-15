@@ -5,13 +5,29 @@ import uuid
 
 # ============== HELPER FUNCTIONS ==============
 
-def calculate_pages_from_juz(juz_count: int) -> int:
-    """حساب عدد الصفحات من عدد الأجزاء - 1 جزء = 20 صفحة"""
-    return juz_count * 20
-
-PAGES_PER_JUZ = 20  # ثابت: عدد الصفحات في كل جزء
+# عدد صفحات الأجزاء: كل جزء 20 صفحة ما عدا جزء عمّ (الجزء 30) = 24 صفحة
+# المجموع الكلي = 29×20 + 24 = 604 صفحة
+PAGES_PER_JUZ = 20  # ثابت: عدد الصفحات في كل جزء عادي
+JUZ_AMMA_NUMBER = 30  # رقم جزء عمّ
+JUZ_AMMA_PAGES = 24  # صفحات جزء عمّ
 TOTAL_JUZ = 30
-TOTAL_QURAN_PAGES = TOTAL_JUZ * PAGES_PER_JUZ  # 600 صفحة
+TOTAL_QURAN_PAGES = (TOTAL_JUZ - 1) * PAGES_PER_JUZ + JUZ_AMMA_PAGES  # 604 صفحة
+
+
+def pages_for_juz(juz_number: int) -> int:
+    """عدد صفحات جزء واحد حسب رقمه (جزء عمّ = 24، الباقي = 20)."""
+    return JUZ_AMMA_PAGES if juz_number == JUZ_AMMA_NUMBER else PAGES_PER_JUZ
+
+
+def pages_for_juz_list(juz_list) -> int:
+    """مجموع صفحات قائمة أجزاء (يعالج جزء عمّ = 24). يتجاهل التكرار."""
+    return sum(pages_for_juz(j) for j in set(juz_list or []))
+
+
+def calculate_pages_from_juz(juz_count: int) -> int:
+    """حساب تقريبي لعدد الصفحات من عدد الأجزاء (بدون معرفة الأجزاء تحديداً) - 20 صفحة للجزء.
+    للحساب الدقيق الذي يراعي جزء عمّ استخدم pages_for_juz_list."""
+    return juz_count * PAGES_PER_JUZ
 
 # ============== TERM MANAGEMENT MODELS ==============
 
@@ -148,7 +164,6 @@ class User(UserBase):
     # آخر تقييم (snapshot)
     weak_juz: Optional[List[int]] = None
     strong_juz: Optional[List[int]] = None
-    mufassal_test_juz: Optional[List[int]] = None
     administrative_test_juz: Optional[List[int]] = None
     last_assessment_date: Optional[str] = None
     assessment_count: Optional[int] = None
@@ -176,7 +191,6 @@ class UserResponse(BaseModel):
     initial_assessment_done: bool = False
     weak_juz: Optional[List[int]] = None
     strong_juz: Optional[List[int]] = None
-    mufassal_test_juz: Optional[List[int]] = None
     administrative_test_juz: Optional[List[int]] = None
     last_assessment_date: Optional[str] = None
     assessment_count: Optional[int] = None
@@ -204,7 +218,6 @@ class InitialAssessment(BaseModel):
     # تصنيف الأجزاء وحالة الاختبارات (إعادة التقييم)
     weak_juz: List[int] = []  # الأجزاء الضعيفة في الحفظ
     strong_juz: List[int] = []  # الأجزاء القوية في الحفظ
-    mufassal_test_juz: List[int] = []  # الأجزاء المختبَرة في المفصل
     administrative_test_juz: List[int] = []  # الأجزاء المختبَرة إدارياً (مضاعفات 5)
 
 # Group Models
@@ -288,6 +301,7 @@ class TrackingSheetManualCreate(BaseModel):
     night_prayer: int = 0  # قيام الليل (0-1)
     fasting: int = 0  # الصيام (0-1)
     notes: Optional[str] = None
+    custom_values: Optional[dict] = None  # بنود المعلم المخصّصة: {item_id: value}
 
 class TrackingSheet(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -676,7 +690,8 @@ class Schedule(BaseModel):
     description: Optional[str] = None
     start_date: str
     end_date: str
-    lesson_days: List[str] = []  # أيام الدروس
+    lesson_days: List[str] = []  # أيام الدروس (تحدّد أيام تسجيل الدوام والتسميع)
+    term_id: Optional[str] = None  # #6 — الفصل المرتبط بالجدول
     is_active: bool = True
     created_by: str  # Admin ID
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

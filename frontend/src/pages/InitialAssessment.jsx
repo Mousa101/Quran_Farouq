@@ -20,24 +20,33 @@ const EMPTY_FORM = {
   notes: '',
   weakJuz: [],
   strongJuz: [],
-  mufassalJuz: [],
   adminJuz: []
 };
 
 // شبكة اختيار الأجزاء (1-30)
-const JuzGrid = ({ selected, onToggle, activeClass = 'bg-emerald-500 text-white' }) => (
+// allowed: إن مُرِّرت، لا يُسمح باختيار إلا الأجزاء ضمنها (الباقي مُعطَّل)
+const JuzGrid = ({ selected, onToggle, activeClass = 'bg-emerald-500 text-white', allowed = null }) => (
   <div className="grid grid-cols-6 gap-2 max-h-44 overflow-y-auto p-3 bg-slate-800/50 rounded-lg border border-slate-700">
-    {Array.from({ length: 30 }, (_, i) => i + 1).map((juz) => (
-      <div
-        key={juz}
-        onClick={() => onToggle(juz)}
-        className={`p-2 text-center rounded-lg cursor-pointer transition-all text-sm font-bold ${
-          selected.includes(juz) ? activeClass : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-        }`}
-      >
-        {juz}
-      </div>
-    ))}
+    {Array.from({ length: 30 }, (_, i) => i + 1).map((juz) => {
+      const isAllowed = allowed === null || allowed.includes(juz);
+      const isSelected = selected.includes(juz);
+      return (
+        <div
+          key={juz}
+          onClick={() => isAllowed && onToggle(juz)}
+          title={isAllowed ? '' : 'اختر هذا الجزء في الحفظ السابق أولاً'}
+          className={`p-2 text-center rounded-lg transition-all text-sm font-bold ${
+            !isAllowed
+              ? 'bg-slate-800/40 text-slate-600 cursor-not-allowed opacity-40'
+              : isSelected
+                ? `${activeClass} cursor-pointer`
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600 cursor-pointer'
+          }`}
+        >
+          {juz}
+        </div>
+      );
+    })}
   </div>
 );
 
@@ -88,7 +97,6 @@ const InitialAssessment = () => {
     notes: '',
     weakJuz: student.weak_juz || [],
     strongJuz: student.strong_juz || [],
-    mufassalJuz: student.mufassal_test_juz || [],
     adminJuz: student.administrative_test_juz || []
   });
 
@@ -117,7 +125,15 @@ const InitialAssessment = () => {
       const next = current.includes(juzNumber)
         ? current.filter(j => j !== juzNumber)
         : [...current, juzNumber].sort((a, b) => a - b);
-      return { ...prev, [field]: next };
+      const updated = { ...prev, [field]: next };
+      // عند إزالة جزء من الحفظ السابق: نظّف القوية/الضعيفة/الإدارية منه (تبقى ⊆ المحفوظ)
+      if (field === 'previousJuz') {
+        const memo = new Set(next);
+        updated.strongJuz = prev.strongJuz.filter(j => memo.has(j));
+        updated.weakJuz = prev.weakJuz.filter(j => memo.has(j));
+        updated.adminJuz = prev.adminJuz.filter(j => memo.has(j));
+      }
+      return updated;
     });
   };
 
@@ -139,6 +155,18 @@ const InitialAssessment = () => {
       toast.error('عدد الأجزاء المختبَرة إدارياً يجب أن يكون من مضاعفات 5 (5، 10، 15، ...)');
       return;
     }
+    // الأجزاء القوية/الضعيفة/الإدارية يجب أن تكون من ضمن المحفوظ
+    const memo = new Set(formData.previousJuz);
+    const outside = [...formData.strongJuz, ...formData.weakJuz, ...formData.adminJuz].filter(j => !memo.has(j));
+    if (outside.length) {
+      toast.error('لا يمكن تسجيل أجزاء قوية/ضعيفة/مختبَرة خارج الأجزاء المحفوظة');
+      return;
+    }
+    const both = formData.strongJuz.filter(j => formData.weakJuz.includes(j));
+    if (both.length) {
+      toast.error(`الأجزاء التالية قوية وضعيفة معاً: ${both.join('، ')} — اختر واحدة فقط`);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -150,7 +178,6 @@ const InitialAssessment = () => {
         notes: formData.notes,
         weak_juz: formData.weakJuz,
         strong_juz: formData.strongJuz,
-        mufassal_test_juz: formData.mufassalJuz,
         administrative_test_juz: formData.adminJuz
       });
 
@@ -180,7 +207,10 @@ const InitialAssessment = () => {
     }
   };
 
-  const calculateTotalPages = () => formData.previousJuz.length * 20 + formData.additionalPages;
+  // كل جزء 20 صفحة ما عدا جزء عمّ (30) = 24 صفحة
+  const pagesForJuzList = (juzList) =>
+    (juzList || []).reduce((sum, j) => sum + (Number(j) === 30 ? 24 : 20), 0);
+  const calculateTotalPages = () => pagesForJuzList(formData.previousJuz) + formData.additionalPages;
 
   if (loading) {
     return (
@@ -330,30 +360,21 @@ const InitialAssessment = () => {
               </p>
             </div>
 
-            {/* الأجزاء القوية */}
+            {/* الأجزاء القوية — من ضمن المحفوظ فقط */}
             <div className="space-y-3">
-              <Label className="text-slate-300">الأجزاء القوية في الحفظ</Label>
-              <JuzGrid selected={formData.strongJuz} onToggle={toggleIn('strongJuz')} activeClass="bg-emerald-600 text-white" />
+              <Label className="text-slate-300">الأجزاء القوية في الحفظ <span className="text-xs text-slate-500">(من ضمن المحفوظ فقط)</span></Label>
+              <JuzGrid selected={formData.strongJuz} onToggle={toggleIn('strongJuz')} activeClass="bg-emerald-600 text-white" allowed={formData.previousJuz} />
               {formData.strongJuz.length > 0 && (
                 <p className="text-emerald-400 text-sm">{formData.strongJuz.length} جزء قوي</p>
               )}
             </div>
 
-            {/* الأجزاء الضعيفة */}
+            {/* الأجزاء الضعيفة — من ضمن المحفوظ فقط */}
             <div className="space-y-3">
-              <Label className="text-slate-300">الأجزاء الضعيفة في الحفظ</Label>
-              <JuzGrid selected={formData.weakJuz} onToggle={toggleIn('weakJuz')} activeClass="bg-red-500 text-white" />
+              <Label className="text-slate-300">الأجزاء الضعيفة في الحفظ <span className="text-xs text-slate-500">(من ضمن المحفوظ فقط)</span></Label>
+              <JuzGrid selected={formData.weakJuz} onToggle={toggleIn('weakJuz')} activeClass="bg-red-500 text-white" allowed={formData.previousJuz} />
               {formData.weakJuz.length > 0 && (
                 <p className="text-red-400 text-sm">{formData.weakJuz.length} جزء ضعيف</p>
-              )}
-            </div>
-
-            {/* اختبارات المفصل */}
-            <div className="space-y-3">
-              <Label className="text-slate-300">الأجزاء المختبَرة في المفصل</Label>
-              <JuzGrid selected={formData.mufassalJuz} onToggle={toggleIn('mufassalJuz')} activeClass="bg-amber-500 text-white" />
-              {formData.mufassalJuz.length > 0 && (
-                <p className="text-amber-400 text-sm">{formData.mufassalJuz.length} جزء مختبَر</p>
               )}
             </div>
 
@@ -364,13 +385,17 @@ const InitialAssessment = () => {
                 {[1, 6, 11, 16, 21, 26].map((start) => {
                   const block = [start, start + 1, start + 2, start + 3, start + 4];
                   const allIn = block.every(j => formData.adminJuz.includes(j));
+                  const memorizedAll = block.every(j => formData.previousJuz.includes(j));
                   return (
                     <button
                       key={start}
                       type="button"
-                      onClick={() => toggleAdminBlock(start)}
+                      disabled={!memorizedAll}
+                      title={memorizedAll ? '' : 'يجب حفظ كل أجزاء هذه الكتلة أولاً'}
+                      onClick={() => memorizedAll && toggleAdminBlock(start)}
                       className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                        allIn ? 'bg-purple-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        !memorizedAll ? 'bg-slate-800/40 text-slate-600 cursor-not-allowed opacity-40'
+                        : allIn ? 'bg-purple-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                       }`}
                     >
                       {start}-{start + 4}
@@ -455,7 +480,6 @@ const InitialAssessment = () => {
                     <p>التجويد: <span className="text-white">{rec.tajweed_level}</span></p>
                     {rec.strong_juz?.length > 0 && <p className="text-emerald-400">قوية: {rec.strong_juz.join(', ')}</p>}
                     {rec.weak_juz?.length > 0 && <p className="text-red-400">ضعيفة: {rec.weak_juz.join(', ')}</p>}
-                    {rec.mufassal_test_juz?.length > 0 && <p className="text-amber-400">المفصل: {rec.mufassal_test_juz.join(', ')}</p>}
                     {rec.administrative_test_juz?.length > 0 && <p className="text-purple-400">إدارية: {rec.administrative_test_juz.join(', ')} ({rec.administrative_test_juz.length} جزء)</p>}
                     {rec.notes && <p className="text-slate-400">ملاحظات: {rec.notes}</p>}
                   </div>

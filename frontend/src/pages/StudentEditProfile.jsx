@@ -8,6 +8,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { User, Phone, School, Camera, Save, ArrowRight, Loader2, Calendar, Building } from 'lucide-react';
 import { toast } from 'sonner';
+import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES } from '../lib/constants';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -16,6 +17,7 @@ const StudentEditProfile = () => {
   const { user, updateUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [mosqueOther, setMosqueOther] = useState(false); // #5
   const [formData, setFormData] = useState({
     name: '',
     student_phone: '',
@@ -49,6 +51,9 @@ const StudentEditProfile = () => {
         school_average: data.school_average || '',
         mosque_name: data.mosque_name || ''
       });
+      // #5 إذا المسجد المحفوظ خارج القائمة، اعتبره "أخرى" وأظهر حقل الكتابة
+      const savedMosque = data.mosque_name || '';
+      setMosqueOther(!!savedMosque && !MOSQUES.slice(0, -1).includes(savedMosque));
     } catch (error) {
       console.error('Error:', error);
       toast.error('فشل في تحميل البيانات');
@@ -247,13 +252,17 @@ const StudentEditProfile = () => {
               {/* School Grade */}
               <div className="space-y-2">
                 <Label className="text-slate-300">الصف الدراسي</Label>
-                <Input
+                <select
                   name="school_grade"
                   value={formData.school_grade}
                   onChange={handleChange}
-                  placeholder="مثال: الصف الخامس"
-                  className="bg-slate-800 border-slate-700 text-white"
-                />
+                  className="w-full h-10 px-3 rounded-md bg-slate-800 border border-slate-700 text-white"
+                >
+                  <option value="">اختر الصف</option>
+                  {SCHOOL_GRADES.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
               </div>
 
               {/* School Average */}
@@ -275,13 +284,34 @@ const StudentEditProfile = () => {
                 <Building className="w-4 h-4" />
                 اسم المسجد
               </Label>
-              <Input
-                name="mosque_name"
-                value={formData.mosque_name}
-                onChange={handleChange}
-                placeholder="اسم المسجد أو الحلقة"
-                className="bg-slate-800 border-slate-700 text-white"
-              />
+              <select
+                value={mosqueOther ? MOSQUE_OTHER : formData.mosque_name}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === MOSQUE_OTHER) {
+                    setMosqueOther(true);
+                    setFormData(prev => ({ ...prev, mosque_name: '' }));
+                  } else {
+                    setMosqueOther(false);
+                    setFormData(prev => ({ ...prev, mosque_name: val }));
+                  }
+                }}
+                className="w-full h-10 px-3 rounded-md bg-slate-800 border border-slate-700 text-white"
+              >
+                <option value="">اختر المسجد</option>
+                {MOSQUES.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              {mosqueOther && (
+                <Input
+                  name="mosque_name"
+                  value={formData.mosque_name}
+                  onChange={handleChange}
+                  placeholder="اكتب اسم مسجدك"
+                  className="bg-slate-800 border-slate-700 text-white mt-2"
+                />
+              )}
             </div>
 
             <Button
