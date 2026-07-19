@@ -204,9 +204,22 @@ class StudentProfileUpdate(BaseModel):
     mosque_name: Optional[str] = None
     school_name: Optional[str] = None
     school_grade: Optional[str] = None
+    school_average: Optional[str] = None
     birth_date: Optional[str] = None
+    join_date: Optional[str] = None
     profile_image: Optional[str] = None
     group_id: Optional[str] = None
+
+class AdminSheikhUpdate(BaseModel):
+    """الحقول التي يمكن للمدير تعديلها في حساب المعلم (بيانات شخصية فقط — لا دور/كلمة مرور)."""
+    name: Optional[str] = None
+    student_phone: Optional[str] = None   # هاتف المعلم
+    mosque_name: Optional[str] = None
+    birth_date: Optional[str] = None
+    join_date: Optional[str] = None
+    specialization: Optional[str] = None
+    experience_years: Optional[str] = None
+    profile_image: Optional[str] = None
 
 # Initial Assessment by Sheikh
 class InitialAssessment(BaseModel):

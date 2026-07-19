@@ -7,12 +7,13 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
-import { 
-  BookOpen, Users, Search, Eye, Trash2, Phone, Mail, 
+import {
+  BookOpen, Users, Search, Eye, Trash2, Phone, Mail,
   Calendar, Award, GraduationCap, AlertTriangle, X,
-  Briefcase, MapPin, Star, UserCheck, FileText, Key
+  Briefcase, MapPin, Star, UserCheck, FileText, Key, Edit, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { MOSQUES, MOSQUE_OTHER } from '../lib/constants';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -31,6 +32,37 @@ const SheikhManagement = () => {
   const [newPassword, setNewPassword] = useState('');
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+  // تعديل بيانات المعلم
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [mosqueOther, setMosqueOther] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEditSheikh = (sheikh) => {
+    setEditTarget(sheikh);
+    setEditForm({
+      name: sheikh.name || '', student_phone: sheikh.student_phone || '', mosque_name: sheikh.mosque_name || '',
+      birth_date: sheikh.birth_date || '', join_date: sheikh.join_date || '',
+      specialization: sheikh.specialization || '', experience_years: sheikh.experience_years || '',
+    });
+    setMosqueOther(!!(sheikh.mosque_name) && !MOSQUES.slice(0, -1).includes(sheikh.mosque_name));
+    setEditOpen(true);
+  };
+
+  const saveEditSheikh = async () => {
+    setSavingEdit(true);
+    try {
+      await axios.put(`${API}/admin/sheikhs/${editTarget.id}`, editForm);
+      toast.success('تم تحديث بيانات المعلم');
+      setEditOpen(false);
+      fetchSheikhs();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في تحديث البيانات');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   useEffect(() => {
     fetchSheikhs();
@@ -184,6 +216,15 @@ const SheikhManagement = () => {
                 >
                   <Eye className="w-3 h-3 ml-1" />
                   عرض التفاصيل
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => openEditSheikh(sheikh)}
+                  className={`text-xs ${isDark ? 'border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10' : 'border-emerald-500 text-emerald-600'}`}
+                  title="تعديل البيانات"
+                >
+                  <Edit className="w-3 h-3" />
                 </Button>
                 <Button
                   size="sm"
@@ -353,6 +394,55 @@ const SheikhManagement = () => {
             <Button variant="destructive" onClick={handleDelete}>
               <Trash2 className="w-4 h-4 ml-2" />
               حذف المعلم
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Sheikh Modal */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className={`max-w-lg ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}>
+          <DialogHeader>
+            <DialogTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <Edit className="w-5 h-5 text-emerald-400" />تعديل بيانات {editTarget?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 mt-2">
+            <div className="col-span-2">
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>الاسم</Label>
+              <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+            </div>
+            <div>
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>الهاتف</Label>
+              <Input value={editForm.student_phone} onChange={(e) => setEditForm({ ...editForm, student_phone: e.target.value })} dir="ltr" className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+            </div>
+            <div>
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>تاريخ الميلاد</Label>
+              <Input type="date" value={editForm.birth_date} onChange={(e) => setEditForm({ ...editForm, birth_date: e.target.value })} className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+            </div>
+            <div className="col-span-2">
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>المسجد</Label>
+              <select value={mosqueOther ? MOSQUE_OTHER : editForm.mosque_name}
+                onChange={(e) => { const v = e.target.value; if (v === MOSQUE_OTHER) { setMosqueOther(true); setEditForm({ ...editForm, mosque_name: '' }); } else { setMosqueOther(false); setEditForm({ ...editForm, mosque_name: v }); } }}
+                className={`w-full h-10 px-3 rounded-md border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-300'}`}>
+                <option value="">اختر المسجد</option>
+                {MOSQUES.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+              {mosqueOther && <Input value={editForm.mosque_name} onChange={(e) => setEditForm({ ...editForm, mosque_name: e.target.value })} placeholder="اكتب اسم المسجد" className={`mt-1 ${isDark ? 'bg-slate-800 border-slate-700 text-white' : ''}`} />}
+            </div>
+            <div>
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>التخصص</Label>
+              <Input value={editForm.specialization} onChange={(e) => setEditForm({ ...editForm, specialization: e.target.value })} className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+            </div>
+            <div>
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>سنوات الخبرة</Label>
+              <Input value={editForm.experience_years} onChange={(e) => setEditForm({ ...editForm, experience_years: e.target.value })} className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setEditOpen(false)} className={isDark ? 'border-slate-600 text-slate-300' : ''}>إلغاء</Button>
+            <Button onClick={saveEditSheikh} disabled={savingEdit} className="bg-emerald-600 hover:bg-emerald-700">
+              {savingEdit ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}حفظ
             </Button>
           </DialogFooter>
         </DialogContent>

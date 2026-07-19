@@ -5,13 +5,17 @@ import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import {
   User, BookOpen, UserCheck, Star, Trophy, Calendar, ArrowRight,
   CheckCircle, XCircle, Clock, FileText, AlertTriangle, School, Home, Phone, TrendingUp,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, Edit, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES } from '../lib/constants';
 import { format, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 
@@ -25,10 +29,44 @@ const StudentProfile = () => {
   const [progressData, setProgressData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAllPersonalInfo, setShowAllPersonalInfo] = useState(false);
+  // تعديل البيانات الشخصية (المدير والمعلم)
+  const canEdit = user?.role === 'admin' || user?.role === 'sheikh';
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [mosqueOther, setMosqueOther] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     fetchData();
   }, [studentId]);
+
+  const openEdit = () => {
+    const s = profileData?.student || {};
+    setEditForm({
+      name: s.name || '', student_phone: s.student_phone || '', father_phone: s.father_phone || '',
+      mother_phone: s.mother_phone || '', mosque_name: s.mosque_name || '', school_name: s.school_name || '',
+      school_grade: s.school_grade || '', school_average: s.school_average || '', birth_date: s.birth_date || '',
+      join_date: s.join_date || '',
+    });
+    setMosqueOther(!!(s.mosque_name) && !MOSQUES.slice(0, -1).includes(s.mosque_name));
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    setSavingEdit(true);
+    try {
+      // المعلم يستخدم نقطة نهاية الشيخ، والمدير نقطة نهاية الطالب — كلاهما يعدّل كل البيانات الشخصية
+      const url = user?.role === 'sheikh' ? `${API}/sheikh/students/${studentId}` : `${API}/students/${studentId}`;
+      await axios.put(url, editForm);
+      toast.success('تم تحديث بيانات الطالب');
+      setEditOpen(false);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في تحديث البيانات');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -135,7 +173,14 @@ const StudentProfile = () => {
 
             {/* Basic Info */}
             <div className="flex-1">
-              <h1 className="text-2xl font-bold text-white">{student.name}</h1>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-2xl font-bold text-white">{student.name}</h1>
+                {canEdit && (
+                  <Button size="sm" variant="outline" onClick={openEdit} className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10">
+                    <Edit className="w-4 h-4 ml-1" />تعديل البيانات
+                  </Button>
+                )}
+              </div>
               <p className="text-slate-400 text-sm">{student.email}</p>
               {group && (
                 <Badge className="mt-2 bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
@@ -541,6 +586,71 @@ const StudentProfile = () => {
           </TabsContent>
         </Tabs>
       </Card>
+
+      {/* تعديل البيانات الشخصية للطالب (المدير والمعلم) */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700 max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Edit className="w-5 h-5 text-emerald-400" />تعديل بيانات {student.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 mt-2">
+            <div className="col-span-2">
+              <Label className="text-slate-300 text-sm">الاسم</Label>
+              <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+            <div>
+              <Label className="text-slate-300 text-sm">هاتف الطالب</Label>
+              <Input value={editForm.student_phone} onChange={(e) => setEditForm({ ...editForm, student_phone: e.target.value })} dir="ltr" className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+            <div>
+              <Label className="text-slate-300 text-sm">هاتف الأب</Label>
+              <Input value={editForm.father_phone} onChange={(e) => setEditForm({ ...editForm, father_phone: e.target.value })} dir="ltr" className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+            <div>
+              <Label className="text-slate-300 text-sm">هاتف الأم</Label>
+              <Input value={editForm.mother_phone} onChange={(e) => setEditForm({ ...editForm, mother_phone: e.target.value })} dir="ltr" className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+            <div>
+              <Label className="text-slate-300 text-sm">تاريخ الميلاد</Label>
+              <Input type="date" value={editForm.birth_date} onChange={(e) => setEditForm({ ...editForm, birth_date: e.target.value })} className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+            <div>
+              <Label className="text-slate-300 text-sm">المسجد</Label>
+              <select value={mosqueOther ? MOSQUE_OTHER : editForm.mosque_name}
+                onChange={(e) => { const v = e.target.value; if (v === MOSQUE_OTHER) { setMosqueOther(true); setEditForm({ ...editForm, mosque_name: '' }); } else { setMosqueOther(false); setEditForm({ ...editForm, mosque_name: v }); } }}
+                className="w-full h-10 px-3 rounded-md bg-slate-800 border border-slate-700 text-white">
+                <option value="">اختر المسجد</option>
+                {MOSQUES.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+              {mosqueOther && <Input value={editForm.mosque_name} onChange={(e) => setEditForm({ ...editForm, mosque_name: e.target.value })} placeholder="اكتب اسم المسجد" className="bg-slate-800 border-slate-700 text-white mt-1" />}
+            </div>
+            <div>
+              <Label className="text-slate-300 text-sm">الصف</Label>
+              <select value={editForm.school_grade} onChange={(e) => setEditForm({ ...editForm, school_grade: e.target.value })}
+                className="w-full h-10 px-3 rounded-md bg-slate-800 border border-slate-700 text-white">
+                <option value="">اختر الصف</option>
+                {SCHOOL_GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label className="text-slate-300 text-sm">المدرسة</Label>
+              <Input value={editForm.school_name} onChange={(e) => setEditForm({ ...editForm, school_name: e.target.value })} className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+            <div>
+              <Label className="text-slate-300 text-sm">المعدل الدراسي</Label>
+              <Input value={editForm.school_average} onChange={(e) => setEditForm({ ...editForm, school_average: e.target.value })} className="bg-slate-800 border-slate-700 text-white" />
+            </div>
+          </div>
+          <DialogFooter className="mt-4">
+            <Button variant="outline" onClick={() => setEditOpen(false)} className="border-slate-600 text-slate-300">إلغاء</Button>
+            <Button onClick={saveEdit} disabled={savingEdit} className="bg-emerald-600 hover:bg-emerald-700">
+              {savingEdit ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : null}حفظ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

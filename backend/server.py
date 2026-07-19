@@ -22,7 +22,7 @@ from models import (
     ActivityCreate, Activity,
     NotificationCreate, Notification,
     StudentScore, WeeklyRanking,
-    StudentProfileUpdate, StudentCreate, QURAN_JUZ,
+    StudentProfileUpdate, AdminSheikhUpdate, StudentCreate, QURAN_JUZ,
     InitialAssessment, StudentSelfUpdate, SheikhUpdateStudent,
     StudentRegistrationRequest, ActivationRequest,
     CurriculumCreate, Curriculum, CurriculumEntryCreate, CurriculumEntry,
@@ -1156,6 +1156,63 @@ async def _load_points_config():
             apply_points_config(doc["value"])
     except Exception as e:
         logger.error(f"load points config failed: {e}")
+
+
+# فهارس قاعدة البيانات — أهم إصلاح للأداء: بدونها كل استعلام يمسح المجموعة كاملةً (full scan).
+# لا يغيّر أي وظيفة؛ فقط يسرّع القراءات. آمن للتكرار (create_index لا يعيد الإنشاء إن وُجد).
+DB_INDEXES = {
+    "users": [[("id", 1)], [("email", 1)], [("role", 1)], [("group_id", 1)],
+              [("role", 1), ("group_id", 1)], [("is_activated", 1)]],
+    "recitations": [[("student_id", 1)], [("sheikh_id", 1)], [("term_id", 1)],
+                    [("student_id", 1), ("record_date", -1)],
+                    [("student_id", 1), ("did_not_recite", 1)]],
+    "recitations_archives": [[("student_id", 1)], [("term_id", 1)]],
+    "attendance": [[("student_id", 1)], [("term_id", 1)], [("group_id", 1)],
+                   [("student_id", 1), ("date", 1)], [("status", 1)]],
+    "attendance_archives": [[("student_id", 1)], [("term_id", 1)]],
+    "tracking_sheets": [[("student_id", 1)], [("sheikh_id", 1)],
+                        [("student_id", 1), ("week_start", 1)]],
+    "tracking_items": [[("sheikh_id", 1)]],
+    "student_points": [[("student_id", 1)]],
+    "points_transactions": [[("student_id", 1)]],
+    "groups": [[("id", 1)], [("sheikh_id", 1)]],
+    "notifications": [[("user_id", 1)], [("user_id", 1), ("created_at", -1)]],
+    "terms": [[("id", 1)], [("is_active", 1)]],
+    "term_archives": [[("student_id", 1)], [("term_id", 1)]],
+    "assessments": [[("student_id", 1)], [("term_id", 1)]],
+    "fees": [[("student_id", 1)]],
+    "homework": [[("id", 1)]],
+    "homework_submissions": [[("homework_id", 1)], [("student_id", 1)]],
+    "admin_exams": [[("student_id", 1)]],
+    "tajweed_exams": [[("student_id", 1)]],
+    "online_exams": [[("id", 1)]],
+    "exam_submissions": [[("exam_id", 1)], [("student_id", 1)]],
+    "activities": [[("id", 1)]],
+    "announcements": [[("id", 1)]],
+    "audit_logs": [[("action", 1)], [("created_at", -1)]],
+    "warnings": [[("student_id", 1)]],
+    "curriculum": [[("id", 1)]],
+    "curriculum_entries": [[("curriculum_id", 1)]],
+    "schedules": [[("id", 1)], [("is_active", 1)]],
+    "schedule_slots": [[("schedule_id", 1)]],
+    "registration_codes": [[("code", 1)]],
+    "competitions": [[("id", 1)]],
+    "weekly_badges": [[("student_id", 1)]],
+    "badge_types": [[("id", 1)]],
+    "settings": [[("key", 1)]],
+}
+
+
+@app.on_event("startup")
+async def _ensure_indexes():
+    """إنشاء الفهارس عند الإقلاع (يُنفَّذ مرة واحدة فعليًا؛ آمن للتكرار)."""
+    for collection, indexes in DB_INDEXES.items():
+        for keys in indexes:
+            try:
+                await db[collection].create_index(keys, background=True)
+            except Exception as e:
+                logger.warning(f"index {collection}{keys} failed: {e}")
+    logger.info("Database indexes ensured.")
 
 
 class PointsConfigUpdate(BaseModel):
@@ -3551,27 +3608,29 @@ async def get_weekly_rankings(
     # Calculate scores for all students
     students = await db.users.find({"role": "student"}, {"_id": 0}).to_list(1000)
     
+    # جلب دفعة واحدة بدل 3 استعلامات لكل طالب (إصلاح N+1)
+    sids = [s["id"] for s in students]
+    trk_by, rec_by, att_by = {}, {}, {}
+    for t in await db.tracking_sheets.find({"student_id": {"$in": sids}}, {"_id": 0}).to_list(100000):
+        trk_by.setdefault(t["student_id"], []).append(t)
+    for r in await db.recitations.find({"student_id": {"$in": sids}}, {"_id": 0}).to_list(100000):
+        rec_by.setdefault(r["student_id"], []).append(r)
+    for a in await db.attendance.find({"student_id": {"$in": sids}}, {"_id": 0, "student_id": 1, "status": 1}).to_list(100000):
+        att_by.setdefault(a["student_id"], []).append(a)
+
     scores = []
     for student in students:
-        # Get tracking sheets
-        tracking = await db.tracking_sheets.find(
-            {"student_id": student["id"]},
-            {"_id": 0}
-        ).to_list(100)
-        
+        tracking = trk_by.get(student["id"], [])
+
         tracking_score = sum(
-            (t["data"]["prayers_count"] * 0.3 + 
+            (t["data"]["prayers_count"] * 0.3 +
              t["data"]["quran_sitting_minutes"] * 0.1 +
              t["data"]["family_recitation_count"] * 2)
             for t in tracking
         ) / max(len(tracking), 1)
-        
-        # Get recitations
-        recitations = await db.recitations.find(
-            {"student_id": student["id"]},
-            {"_id": 0}
-        ).to_list(100)
-        
+
+        recitations = rec_by.get(student["id"], [])
+
         # Calculate recitation score from rating or points
         recitation_score = 0
         if recitations:
@@ -3579,13 +3638,9 @@ async def get_weekly_rankings(
             rated_count = sum(1 for r in recitations if r.get("rating"))
             if rated_count > 0:
                 recitation_score = (total_rating / rated_count) * 10  # Scale to 100
-        
-        # Get attendance
-        attendance = await db.attendance.find(
-            {"student_id": student["id"]},
-            {"_id": 0}
-        ).to_list(1000)
-        
+
+        attendance = att_by.get(student["id"], [])
+
         present_count = sum(1 for a in attendance if a["status"] == "present")
         attendance_score = (present_count / max(len(attendance), 1)) * 100
         
@@ -3640,35 +3695,42 @@ async def get_group_rankings(
         {"_id": 0}
     ).to_list(1000)
     
+    # جلب دفعة واحدة بدل استعلام لكل طالب (إصلاح N+1: من 3×عدد الطلاب استعلام إلى 3 استعلامات)
+    sids = [s["id"] for s in group_students]
+    pts_rows = await db.student_points.find({"student_id": {"$in": sids}}, {"_id": 0, "student_id": 1, "total_points": 1}).to_list(10000)
+    pts_by = {p["student_id"]: p.get("total_points", 0) for p in pts_rows}
+    att_rows = await db.attendance.find({"student_id": {"$in": sids}}, {"_id": 0, "student_id": 1, "status": 1}).to_list(100000)
+    att_by = {}
+    for a in att_rows:
+        att_by.setdefault(a["student_id"], []).append(a)
+    rec_rows = await db.recitations.find({"student_id": {"$in": sids}}, {"_id": 0, "student_id": 1, "did_not_recite": 1, "created_at": 1, "passed_minimum": 1, "passed_review_minimum": 1}).to_list(100000)
+    rec_by = {}
+    for r in rec_rows:
+        rec_by.setdefault(r["student_id"], []).append(r)
+
     scores = []
     for s in group_students:
-        # Get student points
-        points_record = await db.student_points.find_one({"student_id": s["id"]}, {"_id": 0})
-        total_points = points_record.get("total_points", 0) if points_record else 0
-        
-        # Get attendance
-        attendance = await db.attendance.find({"student_id": s["id"]}, {"_id": 0}).to_list(1000)
+        total_points = pts_by.get(s["id"], 0)
+
+        attendance = att_by.get(s["id"], [])
         present_count = sum(1 for a in attendance if a["status"] == "present")
         attendance_rate = (present_count / max(len(attendance), 1)) * 100
-        
-        # Get recitations count - عدد الأيام التي سمع فيها (يُحسب يوم واحد فقط)
-        recitations = await db.recitations.find({"student_id": s["id"]}, {"_id": 0}).to_list(100)
-        # حساب عدد الأيام الفريدة التي تم التسميع فيها
+
+        recitations = rec_by.get(s["id"], [])
         recitation_days = set()
         passed_days = set()
         for r in recitations:
             if not r.get("did_not_recite"):
-                # استخراج التاريخ من created_at
                 created_at = r.get("created_at", "")
                 if created_at:
                     day = created_at[:10] if isinstance(created_at, str) else created_at.strftime("%Y-%m-%d")
                     recitation_days.add(day)
                     if r.get("passed_minimum") or r.get("passed_review_minimum"):
                         passed_days.add(day)
-        
+
         recitation_count = len(recitation_days)  # عدد أيام التسميع
         passed_count = len(passed_days)  # عدد أيام الاجتياز
-        
+
         scores.append({
             "student_id": s["id"],
             "student_name": s["name"],
@@ -4131,27 +4193,36 @@ async def update_student(student_id: str, data: StudentProfileUpdate, current_us
     if not student:
         raise HTTPException(status_code=404, detail="الطالب غير موجود")
     
-    # Build update dict
-    update_data = {}
-    if data.name is not None:
-        update_data["name"] = data.name
-    if data.mosque_name is not None:
-        update_data["mosque_name"] = data.mosque_name
-    if data.school_name is not None:
-        update_data["school_name"] = data.school_name
-    if data.school_grade is not None:
-        update_data["school_grade"] = data.school_grade
-    if data.birth_date is not None:
-        update_data["birth_date"] = data.birth_date
-    if data.profile_image is not None:
-        update_data["profile_image"] = data.profile_image
-    if data.group_id is not None:
-        update_data["group_id"] = data.group_id
-    
+    # المدير يعدّل كل البيانات الشخصية للطالب (كل الحقول المُرسَلة فقط)
+    update_data = data.model_dump(exclude_unset=True)
+    # حقول لا يجوز تعديلها من هنا (حماية)
+    for protected in ("id", "email", "role", "password", "password_hash"):
+        update_data.pop(protected, None)
+
     if update_data:
         await db.users.update_one({"id": student_id}, {"$set": update_data})
-    
+
     return {"message": "تم تحديث بيانات الطالب بنجاح"}
+
+@api_router.put("/admin/sheikhs/{sheikh_id}")
+async def admin_update_sheikh(sheikh_id: str, data: AdminSheikhUpdate, current_user: dict = Depends(get_current_user)):
+    """تعديل البيانات الشخصية للمعلم — المدير فقط."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل بيانات المعلم")
+
+    sheikh = await db.users.find_one({"id": sheikh_id, "role": "sheikh"})
+    if not sheikh:
+        raise HTTPException(status_code=404, detail="المعلم غير موجود")
+
+    update_data = data.model_dump(exclude_unset=True)
+    for protected in ("id", "email", "role", "password", "password_hash"):
+        update_data.pop(protected, None)
+
+    if update_data:
+        await db.users.update_one({"id": sheikh_id}, {"$set": update_data})
+        await log_admin_action(current_user, "user_update", "sheikh", sheikh_id, sheikh.get("name"),
+                               "تعديل بيانات المعلم: " + "، ".join(update_data.keys()))
+
+    return {"message": "تم تحديث بيانات المعلم بنجاح"}
 
 @api_router.delete("/students/{student_id}")
 async def delete_student(student_id: str, current_user: dict = Depends(get_current_user)):
