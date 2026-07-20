@@ -70,7 +70,7 @@ const UsersPage = () => {
   const getRoleLabel = (role) => {
     switch (role) {
       case 'admin': return 'مدير';
-      case 'sheikh': return 'شيخ';
+      case 'sheikh': return 'مشرف';
       case 'student': return 'طالب';
       default: return role;
     }
@@ -151,7 +151,7 @@ const UsersPage = () => {
           {[
             { key: 'all', label: 'الكل' },
             { key: 'student', label: 'الطلاب' },
-            { key: 'sheikh', label: 'الشيوخ' },
+            { key: 'sheikh', label: 'المشرفين' },
             { key: 'admin', label: 'المدراء' },
           ].map((tab) => (
             <button

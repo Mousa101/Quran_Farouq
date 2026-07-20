@@ -120,10 +120,10 @@ const RecitationsNew = () => {
     setIsViewingOldTerm(term && !term.is_active);
   };
 
-  // جلب طلاب المعلم (من مجموعاته)
+  // جلب طلاب المشرف (من مجموعاته)
   const fetchMyStudents = async () => {
     try {
-      // جلب مجموعات المعلم
+      // جلب مجموعات المشرف
       const groupsRes = await axios.get(`${API}/groups`);
       const myGroups = groupsRes.data;
       
@@ -239,7 +239,7 @@ const RecitationsNew = () => {
   };
 
   const handleJuzChange = (newJuzNumber) => {
-    // لا قيم افتراضية للصفحات — تُترك فارغة ليُدخلها المعلم بنفسه (أبسط وبدون تعليق)
+    // لا قيم افتراضية للصفحات — تُترك فارغة ليُدخلها المشرف بنفسه (أبسط وبدون تعليق)
     setFormData(prev => ({
       ...prev,
       juz_number: newJuzNumber,

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import StudentLink from '../components/StudentLink';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -329,94 +330,114 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid — بطاقات مربوطة بصفحاتها */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
-        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-          <CardContent className="p-3 md:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الطلاب</p>
-                <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_students}</p>
+        <Link to="/student-management" className="block">
+          <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-emerald-500/50 transition-colors cursor-pointer h-full`}>
+            <CardContent className="p-3 md:p-4">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الطلاب</p>
+                  <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_students}</p>
+                </div>
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                  <GraduationCap className="w-5 h-5 md:w-6 md:h-6 text-emerald-400" />
+                </div>
               </div>
-              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                <GraduationCap className="w-5 h-5 md:w-6 md:h-6 text-emerald-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-          <CardContent className="p-3 md:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المشايخ</p>
-                <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_sheikhs}</p>
+        <Link to="/sheikh-management" className="block">
+          <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-blue-500/50 transition-colors cursor-pointer h-full`}>
+            <CardContent className="p-3 md:p-4">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المشرفين</p>
+                  <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_sheikhs}</p>
+                </div>
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-blue-400" />
+                </div>
               </div>
-              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-blue-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-          <CardContent className="p-3 md:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المجموعات</p>
-                <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_groups}</p>
+        <Link to="/group-management" className="block">
+          <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-purple-500/50 transition-colors cursor-pointer h-full`}>
+            <CardContent className="p-3 md:p-4">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المجموعات</p>
+                  <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_groups}</p>
+                </div>
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                  <Users className="w-5 h-5 md:w-6 md:h-6 text-purple-400" />
+                </div>
               </div>
-              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
-                <Users className="w-5 h-5 md:w-6 md:h-6 text-purple-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-          <CardContent className="p-3 md:p-4">
-            <div className="flex items-center justify-between">
-              <div className="min-w-0">
-                <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>إجمالي النقاط</p>
-                <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_points}</p>
+        <Link to="/statistics" className="block">
+          <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-amber-500/50 transition-colors cursor-pointer h-full`}>
+            <CardContent className="p-3 md:p-4">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>إجمالي النقاط</p>
+                  <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_points}</p>
+                </div>
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                  <Trophy className="w-5 h-5 md:w-6 md:h-6 text-amber-400" />
+                </div>
               </div>
-              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                <Trophy className="w-5 h-5 md:w-6 md:h-6 text-amber-400" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
-      {/* Weekly Stats */}
+      {/* Weekly Averages — متوسطات الأسبوع (السبت→الجمعة)، مربوطة بالإحصائيات */}
       <div className="grid grid-cols-2 gap-2 md:gap-4">
-        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-          <CardContent className="p-3 md:p-4">
-            <div className="flex items-center gap-2 md:gap-3">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                <UserCheck className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
+        <Link to="/statistics" className="block">
+          <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-emerald-500/50 transition-colors cursor-pointer h-full`}>
+            <CardContent className="p-3 md:p-4">
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                  <UserCheck className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className={`text-[10px] md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>متوسط حضور الأسبوع</p>
+                  <p className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.week_attendance_avg ?? 0} <span className="text-xs font-normal">/ طالب</span></p>
+                  {summary.week_start && (
+                    <p className={`text-[9px] md:text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{summary.week_start} — {summary.week_end}</p>
+                  )}
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className={`text-[10px] md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>حضور هذا الأسبوع</p>
-                <p className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.week_attendance} مرة</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              <p className="text-[10px] md:text-xs text-emerald-400 mt-1 text-left">عرض المزيد ←</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-          <CardContent className="p-3 md:p-4">
-            <div className="flex items-center gap-2 md:gap-3">
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                <BookOpen className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
+        <Link to="/statistics" className="block">
+          <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-blue-500/50 transition-colors cursor-pointer h-full`}>
+            <CardContent className="p-3 md:p-4">
+              <div className="flex items-center gap-2 md:gap-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <BookOpen className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className={`text-[10px] md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>متوسط صفحات الأسبوع</p>
+                  <p className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.week_pages_avg ?? 0} <span className="text-xs font-normal">ص / طالب</span></p>
+                  {summary.week_start && (
+                    <p className={`text-[9px] md:text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{summary.week_start} — {summary.week_end}</p>
+                  )}
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className={`text-[10px] md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>صفحات هذا الأسبوع</p>
-                <p className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.week_pages} صفحة</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              <p className="text-[10px] md:text-xs text-blue-400 mt-1 text-left">عرض المزيد ←</p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
@@ -496,7 +517,7 @@ const AdminDashboard = () => {
                           {badge.icon}
                         </span>
                         <div>
-                          <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{student.student_name}</p>
+                          <StudentLink studentId={student.student_id} name={student.student_name} className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`} />
                           <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{student.group_name}</p>
                         </div>
                       </div>
@@ -522,18 +543,18 @@ const AdminDashboard = () => {
         <CardHeader>
           <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             <BookOpen className="w-5 h-5 text-blue-400" />
-            بيانات المشايخ
+            بيانات المشرفين
           </CardTitle>
         </CardHeader>
         <CardContent>
           {sheikhs.length === 0 ? (
-            <p className={`text-center py-4 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا يوجد مشايخ</p>
+            <p className={`text-center py-4 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا يوجد مشرفين</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className={`border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المعلم</th>
+                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المشرف</th>
                     <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>البريد</th>
                     <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المجموعات</th>
                     <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الطلاب</th>
@@ -681,7 +702,7 @@ const AdminDashboard = () => {
               <Calendar className="w-8 h-8 mx-auto mb-2 text-purple-400" />
               <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>ورقة المتابعة</p>
               <p className="text-2xl font-bold text-purple-400">{pointsConfig.tracking_base_max} نقطة</p>
-              <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>الأساس الأسبوعي (+ بنود المعلم)</p>
+              <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>الأساس الأسبوعي (+ بنود المشرف)</p>
             </div>
             <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-amber-50 border border-amber-200'}`}>
               <Trophy className="w-8 h-8 mx-auto mb-2 text-amber-400" />

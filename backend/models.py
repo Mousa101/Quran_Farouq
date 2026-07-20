@@ -103,7 +103,7 @@ class StudentRegistrationRequest(BaseModel):
     join_date: Optional[str] = None  # تاريخ الإلتحاق
     profile_image: Optional[str] = None
     # Sheikh/Admin specific
-    specialization: Optional[str] = None  # تخصص الشيخ
+    specialization: Optional[str] = None  # تخصص المشرف
     experience_years: Optional[int] = None  # سنوات الخبرة
 
 # Activation request
@@ -211,9 +211,9 @@ class StudentProfileUpdate(BaseModel):
     group_id: Optional[str] = None
 
 class AdminSheikhUpdate(BaseModel):
-    """الحقول التي يمكن للمدير تعديلها في حساب المعلم (بيانات شخصية فقط — لا دور/كلمة مرور)."""
+    """الحقول التي يمكن للمدير تعديلها في حساب المشرف (بيانات شخصية فقط — لا دور/كلمة مرور)."""
     name: Optional[str] = None
-    student_phone: Optional[str] = None   # هاتف المعلم
+    student_phone: Optional[str] = None   # هاتف المشرف
     mosque_name: Optional[str] = None
     birth_date: Optional[str] = None
     join_date: Optional[str] = None
@@ -244,7 +244,7 @@ class Group(BaseModel):
     name: str
     description: Optional[str] = None
     sheikh_id: str
-    # A4: مدة التنبيه (بالأيام) للطالب المنقطع عن التسميع — يعدّلها المعلم لمجموعاته (الافتراضي 2)
+    # A4: مدة التنبيه (بالأيام) للطالب المنقطع عن التسميع — يعدّلها المشرف لمجموعاته (الافتراضي 2)
     recitation_alert_days: Optional[int] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -286,7 +286,7 @@ class TrackingSheetData(BaseModel):
     fasting: int = 0  # صيام في الأسبوع (0-1)
     # ملاحظات
     notes: Optional[str] = None
-    # بنود المعلم المخصصة: {item_id: نقاط} (محسوبة)
+    # بنود المشرف المخصصة: {item_id: نقاط} (محسوبة)
     custom_values: Optional[dict] = None
     # Legacy fields (للتوافق مع البيانات القديمة)
     adhkar_count: int = 0
@@ -314,7 +314,7 @@ class TrackingSheetManualCreate(BaseModel):
     night_prayer: int = 0  # قيام الليل (0-1)
     fasting: int = 0  # الصيام (0-1)
     notes: Optional[str] = None
-    custom_values: Optional[dict] = None  # بنود المعلم المخصّصة: {item_id: value}
+    custom_values: Optional[dict] = None  # بنود المشرف المخصّصة: {item_id: value}
 
 class TrackingSheet(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -419,9 +419,9 @@ class StudentSelfUpdate(BaseModel):
     school_average: Optional[str] = None  # المعدل الدراسي
     mosque_name: Optional[str] = None  # اسم المسجد
 
-# Sheikh Update Student Model - ما يمكن للشيخ تعديله
+# Sheikh Update Student Model - ما يمكن للمشرف تعديله
 class SheikhUpdateStudent(BaseModel):
-    """الحقول المسموح للشيخ بتعديلها - لا يشمل email أو role أو id"""
+    """الحقول المسموح للمشرف بتعديلها - لا يشمل email أو role أو id"""
     # بيانات شخصية
     name: Optional[str] = None
     student_phone: Optional[str] = None
@@ -509,7 +509,7 @@ WEEKLY_BADGES = {
     "interactive": {
         "id": "interactive",
         "name": "المتفاعل",
-        "description": "يمنحها المعلم للطالب المتفاعل",
+        "description": "يمنحها المشرف للطالب المتفاعل",
         "icon": "⭐",
         "category": "interaction"
     },
@@ -548,13 +548,13 @@ class BadgeTypeCreate(BaseModel):
     category: str
 
 class BadgeAssign(BaseModel):
-    """تعيين شارة لطالب - الشيخ فقط"""
+    """تعيين شارة لطالب - المشرف فقط"""
     student_id: str
     badge_id: str
     notes: Optional[str] = None
 
 class BadgeRemove(BaseModel):
-    """إزالة شارة من طالب - الشيخ فقط"""
+    """إزالة شارة من طالب - المشرف فقط"""
     student_id: str
     badge_id: str
     reason: Optional[str] = None
@@ -572,7 +572,7 @@ class WeeklyBadge(BaseModel):
     granted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class InteractionGrant(BaseModel):
-    """منح نقاط التفاعل من المعلم"""
+    """منح نقاط التفاعل من المشرف"""
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     student_id: str
@@ -599,7 +599,7 @@ class StudentPoints(BaseModel):
     - ورقة المتابعة: 100 نقطة/أسبوع
     - كل تسميع: 10 نقاط
     - كل يوم حضور: 10 نقاط
-    - تفاعل من المعلم: 10 نقاط
+    - تفاعل من المشرف: 10 نقاط
     - نقاط إدارية للتميز: 50 نقطة/أسبوع (من المدير)
     """
     model_config = ConfigDict(extra="ignore")
@@ -609,7 +609,7 @@ class StudentPoints(BaseModel):
     attendance_points: int = 0  # نقاط الحضور
     recitation_points: int = 0  # نقاط التسميع
     tracking_points: int = 0  # نقاط ورق المتابعة
-    interaction_points: int = 0  # نقاط التفاعل من المعلم
+    interaction_points: int = 0  # نقاط التفاعل من المشرف
     admin_bonus_points: int = 0  # نقاط إدارية للتميز
     weekly_badges: List[str] = []  # شارات الأسبوع الحالي
     badges_count: int = 0  # عدد الشارات المكتسبة (إجمالي)
@@ -894,14 +894,14 @@ class OnlineExam(BaseModel):
     category: str = "general"
     target_groups: List[str] = []
     questions: List[dict]  # أسئلة الامتحان (بدون الإجابات الصحيحة للطالب)
-    questions_with_answers: List[dict]  # أسئلة مع الإجابات (للمعلم)
+    questions_with_answers: List[dict]  # أسئلة مع الإجابات (للمشرف)
     duration_minutes: int = 30
     passing_score: int = 60
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     is_active: bool = True
     total_points: int = 0
-    created_by: str  # معرف المنشئ (شيخ/مدير)
+    created_by: str  # معرف المنشئ (مشرف/مدير)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ExamSubmissionCreate(BaseModel):

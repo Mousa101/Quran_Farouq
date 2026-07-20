@@ -15,10 +15,11 @@ const SORT_FIELDS = [
   { key: 'total_memorization', label: 'الحفظ الكلي' },
   { key: 'new_memorization', label: 'الحفظ الجديد' },
   { key: 'review', label: 'المراجعة' },
-  { key: 'attendance', label: 'الحضور' },
+  { key: 'attendance', label: 'أيام الحضور' },
   { key: 'tracking', label: 'تسليم ورق المتابعة' },
   { key: 'age', label: 'العمر' },
   { key: 'grade', label: 'الصف' },
+  { key: 'average', label: 'المعدل' },
 ];
 
 const StudentStats = () => {
@@ -27,6 +28,7 @@ const StudentStats = () => {
   const [groupId, setGroupId] = useState('all');   // الفلتر الأول: المجموعة
   const [studentId, setStudentId] = useState('all'); // الفلتر الأول: الطالب
   const [gradeFilter, setGradeFilter] = useState('all'); // #4 فلتر الصف
+  const [minAverage, setMinAverage] = useState(''); // فلتر: المعدل من (الحد الأدنى)
   const [sortBy, setSortBy] = useState('total_memorization'); // الفلتر الثاني
   const [order, setOrder] = useState('desc');       // الفلتر الثالث
   const [rows, setRows] = useState([]);
@@ -78,7 +80,8 @@ const StudentStats = () => {
 
   const displayed = rows
     .filter((r) => studentId === 'all' || r.student_id === studentId)
-    .filter((r) => gradeFilter === 'all' || (r.grade || '') === gradeFilter);
+    .filter((r) => gradeFilter === 'all' || (r.grade || '') === gradeFilter)
+    .filter((r) => minAverage === '' || (r.average != null && r.average >= parseFloat(minAverage)));
 
   const th = 'p-2 whitespace-nowrap';
   const activeCol = (k) => (sortBy === k ? (isDark ? 'text-emerald-400' : 'text-emerald-600') : '');
@@ -122,6 +125,16 @@ const StudentStats = () => {
               {SCHOOL_GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
             </select>
           </div>
+          {/* فلتر المعدل (الحد الأدنى) */}
+          <div>
+            <label className={`block text-xs mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المعدل من (%)</label>
+            <input
+              type="text" inputMode="numeric" placeholder="مثال: 85"
+              value={minAverage}
+              onChange={(e) => setMinAverage(e.target.value.replace(/[^0-9.]/g, ''))}
+              className={`p-2 rounded-lg border text-sm w-24 ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}
+            />
+          </div>
           {/* الفلتر الثاني: الترتيب حسب */}
           <div>
             <label className={`block text-xs mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الترتيب حسب</label>
@@ -161,10 +174,11 @@ const StudentStats = () => {
                     <th className={`${th} ${activeCol('total_memorization')}`}>الحفظ الكلي</th>
                     <th className={`${th} ${activeCol('new_memorization')}`}>الحفظ الجديد</th>
                     <th className={`${th} ${activeCol('review')}`}>المراجعة</th>
-                    <th className={`${th} ${activeCol('attendance')}`}>الحضور %</th>
+                    <th className={`${th} ${activeCol('attendance')}`}>أيام الحضور</th>
                     <th className={`${th} ${activeCol('tracking')}`}>تسليم المتابعة</th>
                     <th className={`${th} ${activeCol('age')}`}>العمر</th>
                     <th className={`${th} ${activeCol('grade')}`}>الصف</th>
+                    <th className={`${th} ${activeCol('average')}`}>المعدل</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -176,10 +190,11 @@ const StudentStats = () => {
                       <td className={`p-2 ${activeCol('total_memorization')}`}>{r.total_memorization}</td>
                       <td className={`p-2 ${activeCol('new_memorization')}`}>{r.new_memorization}</td>
                       <td className={`p-2 ${activeCol('review')}`}>{r.review}</td>
-                      <td className={`p-2 ${activeCol('attendance')}`}>{r.attendance}%</td>
+                      <td className={`p-2 ${activeCol('attendance')}`}>{r.attendance} يوم</td>
                       <td className={`p-2 ${activeCol('tracking')}`}>{r.tracking}</td>
                       <td className={`p-2 ${activeCol('age')}`}>{r.age ?? '—'}</td>
                       <td className={`p-2 ${activeCol('grade')}`}>{r.grade || '—'}</td>
+                      <td className={`p-2 ${activeCol('average')}`}>{r.average != null ? `${r.average}%` : '—'}</td>
                     </tr>
                   ))}
                 </tbody>

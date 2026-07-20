@@ -37,7 +37,7 @@ db.users.update_one({"email": admin["email"]}, {"$set": admin}, upsert=True)
 admin = db.users.find_one({"email": admin["email"]})
 
 # --- Teacher (sheikh) ---
-teacher = base_user("teacher@faruq.com", "teacher123", "الشيخ عبد الله", "sheikh")
+teacher = base_user("teacher@faruq.com", "teacher123", "المشرف عبد الله", "sheikh")
 teacher["mosque_name"] = "مسجد الفالوجة"
 db.users.update_one({"email": teacher["email"]}, {"$set": teacher}, upsert=True)
 teacher = db.users.find_one({"email": teacher["email"]})

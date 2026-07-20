@@ -65,7 +65,7 @@ const PendingStudents = () => {
   const getRoleInfo = (role) => {
     switch(role) {
       case 'sheikh':
-        return { label: 'معلم', icon: BookOpen, bgColor: 'bg-blue-500/20', textColor: 'text-blue-400' };
+        return { label: 'مشرف', icon: BookOpen, bgColor: 'bg-blue-500/20', textColor: 'text-blue-400' };
       case 'admin':
         return { label: 'مدير', icon: Shield, bgColor: 'bg-purple-500/20', textColor: 'text-purple-400' };
       default:
@@ -118,7 +118,7 @@ const PendingStudents = () => {
             <GraduationCap className="w-4 h-4 ml-1" />طلاب ({pendingData.students.length})
           </Button>
           <Button variant={activeTab === 'sheikhs' ? 'default' : 'outline'} size="sm" onClick={() => setActiveTab('sheikhs')} className={activeTab === 'sheikhs' ? 'bg-blue-600' : 'border-slate-700'}>
-            <BookOpen className="w-4 h-4 ml-1" />معلمين ({pendingData.sheikhs.length})
+            <BookOpen className="w-4 h-4 ml-1" />مشرفين ({pendingData.sheikhs.length})
           </Button>
           <Button variant={activeTab === 'admins' ? 'default' : 'outline'} size="sm" onClick={() => setActiveTab('admins')} className={activeTab === 'admins' ? 'bg-purple-600' : 'border-slate-700'}>
             <Shield className="w-4 h-4 ml-1" />مدراء ({pendingData.admins.length})

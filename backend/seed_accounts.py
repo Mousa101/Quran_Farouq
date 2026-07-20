@@ -17,7 +17,7 @@ db = client[os.environ["DB_NAME"]]
 
 ACCOUNTS = [
     {"email": "admin@faruq.com", "password": "admin123", "name": "مدير النظام", "role": "admin"},
-    {"email": "teacher@faruq.com", "password": "teacher123", "name": "الشيخ المعلم", "role": "sheikh"},
+    {"email": "teacher@faruq.com", "password": "teacher123", "name": "المشرف المشرف", "role": "sheikh"},
     {"email": "student@faruq.com", "password": "student123", "name": "الطالب التجريبي", "role": "student"},
 ]
 

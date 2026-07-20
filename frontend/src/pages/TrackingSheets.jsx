@@ -395,7 +395,7 @@ const TrackingSheets = () => {
                         </div>
                       </div>
 
-                      {/* بنود المعلم المخصّصة (#3) */}
+                      {/* بنود المشرف المخصّصة (#3) */}
                       {customItems.length > 0 && (
                         <div className="grid grid-cols-2 gap-4 mt-4">
                           {customItems.map((it) => (
@@ -508,7 +508,7 @@ const TrackingSheets = () => {
         </div>
       </div>
 
-      {/* Points Guide — ديناميكي (الأساس + بنود المعلم مع رموزها) #3 */}
+      {/* Points Guide — ديناميكي (الأساس + بنود المشرف مع رموزها) #3 */}
       <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
         <CardHeader>
           <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>دليل النقاط (الأسبوعية)</CardTitle>
@@ -608,7 +608,7 @@ const TrackingSheets = () => {
                       <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                         أسبوع {sheet.week_start}
                         {sheet.submitted_by_student && <span className="text-emerald-400 mr-2">• سجّلها الطالب</span>}
-                        {sheet.updated_by_sheikh && <span className="text-blue-400 mr-2">• عدّلها المعلم</span>}
+                        {sheet.updated_by_sheikh && <span className="text-blue-400 mr-2">• عدّلها المشرف</span>}
                       </p>
                     </div>
                   </div>

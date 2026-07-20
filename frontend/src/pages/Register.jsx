@@ -46,7 +46,7 @@ const Register = () => {
 
   const roles = [
     { id: 'student', label: 'طالب', icon: GraduationCap, color: 'emerald', description: 'التسجيل كطالب في حلقات التحفيظ' },
-    { id: 'sheikh', label: 'معلم', icon: BookOpen, color: 'blue', description: 'التسجيل كمعلم قرآن كريم' },
+    { id: 'sheikh', label: 'مشرف', icon: BookOpen, color: 'blue', description: 'التسجيل كمشرف قرآن كريم' },
     { id: 'admin', label: 'مدير', icon: Shield, color: 'purple', description: 'التسجيل كمدير للمركز' }
   ];
 
@@ -146,7 +146,7 @@ const Register = () => {
 
       const response = await axios.post(`${API}/auth/register`, payload);
       
-      const roleLabel = selectedRole === 'student' ? 'طالب' : (selectedRole === 'sheikh' ? 'معلم' : 'مدير');
+      const roleLabel = selectedRole === 'student' ? 'طالب' : (selectedRole === 'sheikh' ? 'مشرف' : 'مدير');
       toast.success(`تم تسجيل بياناتك كـ${roleLabel} بنجاح`);
       setRegisteredEmail(formData.email);
       setStep(2);
@@ -285,7 +285,7 @@ const Register = () => {
         />
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center p-8">
-            <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center overflow-hidden">
+            <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-white border border-white/20 flex items-center justify-center overflow-hidden p-2">
               <img src="/logo.png" alt="شعار المركز" className="w-28 h-28 object-contain" />
             </div>
             <h1 className="text-4xl font-bold text-white mb-2 font-cairo">مركز الفاروق</h1>
@@ -301,7 +301,7 @@ const Register = () => {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 overflow-y-auto">
         <Card className="w-full max-w-lg glass-card animate-fadeIn my-4">
           <CardHeader className="text-center space-y-2 pb-4">
-            <div className="lg:hidden w-20 h-20 mx-auto mb-2 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+            <div className="lg:hidden w-20 h-20 mx-auto mb-2 rounded-full bg-white flex items-center justify-center overflow-hidden p-1.5">
               <img src="/logo.png" alt="شعار المركز" className="w-16 h-16 object-contain" />
             </div>
             <CardTitle className="text-xl font-bold text-white font-cairo">تسجيل مستخدم جديد</CardTitle>
@@ -574,15 +574,18 @@ const Register = () => {
                     </select>
                   </div>
                  <div className="space-y-1">
-              <Label className="text-slate-400 text-xs">المعدل الدراسي</Label>
-              <Input
-                type="text"
-                value={formData.school_average}
-                onChange={(e) => handleChange('school_average', e.target.value)}
-                placeholder="مثال: 95%"
-                className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
-                    
-              />
+              <Label className="text-slate-400 text-xs">المعدل الدراسي (%)</Label>
+              <div className="relative">
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={formData.school_average}
+                  onChange={(e) => handleChange('school_average', e.target.value.replace(/[^0-9.]/g, ''))}
+                  placeholder="مثال: 95"
+                  className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white pl-6"
+                />
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-xs">%</span>
+              </div>
             </div>
                 
                 </div>

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-// #2 — الوصول السريع لصفحة الطالب: النقر على اسم الطالب يفتح صفحته (للمدير والمعلم فقط)
+// #2 — الوصول السريع لصفحة الطالب: النقر على اسم الطالب يفتح صفحته (للمدير والمشرف فقط)
 const StudentLink = ({ studentId, name, className = '', onNavigate }) => {
   const navigate = useNavigate();
   const { user } = useAuth();

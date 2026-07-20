@@ -43,7 +43,7 @@ const TrackingSettings = () => {
   const [customItems, setCustomItems] = useState([]);
   const [newItem, setNewItem] = useState({ name: '', max_points: '', icon: '⭐' });
   const [addingItem, setAddingItem] = useState(false);
-  // #4 — المدير يختار المعلم ليرى/يعدّل بنوده
+  // #4 — المدير يختار المشرف ليرى/يعدّل بنوده
   const [sheikhs, setSheikhs] = useState([]);
   const [selectedSheikh, setSelectedSheikh] = useState('');
 
@@ -78,7 +78,7 @@ const TrackingSettings = () => {
       return;
     }
     if (isAdmin && !selectedSheikh) {
-      toast.error('اختر المعلم أولاً');
+      toast.error('اختر المشرف أولاً');
       return;
     }
     setAddingItem(true);
@@ -196,18 +196,18 @@ const TrackingSettings = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-slate-400 text-sm">أضف بنوداً بنقاطها ورمزها (icon)، وستظهر في دليل النقاط وفي ورقة المتابعة عند الطالب والمعلم وتُحتسب ضمن المجموع.</p>
+          <p className="text-slate-400 text-sm">أضف بنوداً بنقاطها ورمزها (icon)، وستظهر في دليل النقاط وفي ورقة المتابعة عند الطالب والمشرف وتُحتسب ضمن المجموع.</p>
 
-          {/* #4 — المدير يختار المعلم */}
+          {/* #4 — المدير يختار المشرف */}
           {isAdmin && (
             <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>المعلم</Label>
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>المشرف</Label>
               <select
                 value={selectedSheikh}
                 onChange={(e) => setSelectedSheikh(e.target.value)}
                 className="w-full h-10 px-3 rounded-md bg-slate-800 border border-slate-700 text-white mt-1"
               >
-                <option value="">اختر المعلم لعرض/تعديل بنوده</option>
+                <option value="">اختر المشرف لعرض/تعديل بنوده</option>
                 {sheikhs.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
               </select>
             </div>

@@ -62,7 +62,7 @@ const StudentTracking = () => {
 
   const fetchData = async () => {
     try {
-      // بنود المعلم المخصصة
+      // بنود المشرف المخصصة
       try {
         const itemsRes = await axios.get(`${API}/tracking-items`);
         setCustomItems(itemsRes.data || []);
@@ -127,7 +127,7 @@ const StudentTracking = () => {
   const calculatePoints = () => {
     const prayers = Math.min(formData.prayers_count, 35);
     const quran = Math.min(formData.quran_sitting_days, 35);
-    return prayers + quran + customTotal(); // 70 (صلوات 35 + جلوس 35) + بنود المعلم
+    return prayers + quran + customTotal(); // 70 (صلوات 35 + جلوس 35) + بنود المشرف
   };
 
   const viewSheet = (sheet) => {
@@ -223,7 +223,7 @@ const StudentTracking = () => {
                       />
                     </div>
 
-                    {/* بنود المعلم المخصصة */}
+                    {/* بنود المشرف المخصصة */}
                     {customItems.map((it) => (
                       <div key={it.id}>
                         <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
@@ -273,7 +273,7 @@ const StudentTracking = () => {
         </div>
       </div>
 
-      {/* Points Guide — ديناميكي حسب بنود المعلم (#3) */}
+      {/* Points Guide — ديناميكي حسب بنود المشرف (#3) */}
       <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
         <CardHeader>
           <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>دليل النقاط (المجموع {70 + customMax()} نقطة)</CardTitle>

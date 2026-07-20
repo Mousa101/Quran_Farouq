@@ -62,7 +62,7 @@ const Announcements = () => {
           <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center"><Megaphone className="w-6 h-6 text-amber-400" /></div>
           <div>
             <h1 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>الإعلانات</h1>
-            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>بثّ إعلان للمعلمين — يظهر في إشعاراتهم وعلى شريط لوحتهم</p>
+            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>بثّ إعلان للمشرفين — يظهر في إشعاراتهم وعلى شريط لوحتهم</p>
           </div>
         </div>
       </div>
@@ -83,8 +83,8 @@ const Announcements = () => {
             <div>
               <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>الجمهور</Label>
               <select value={audience} onChange={(e) => setAudience(e.target.value)} className={`block p-2 rounded-lg border text-sm ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}>
-                <option value="sheikhs">المعلمون فقط</option>
-                <option value="all">المعلمون والطلاب</option>
+                <option value="sheikhs">المشرفون فقط</option>
+                <option value="all">المشرفون والطلاب</option>
               </select>
             </div>
             <Button onClick={send} disabled={sending} className="bg-amber-600 hover:bg-amber-700"><Send className="w-4 h-4 ml-1" />بثّ الإعلان</Button>
@@ -107,7 +107,7 @@ const Announcements = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>{a.title}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${a.audience === 'all' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{a.audience === 'all' ? 'الكل' : 'المعلمون'}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${a.audience === 'all' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{a.audience === 'all' ? 'الكل' : 'المشرفون'}</span>
                     </div>
                     <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{a.message}</p>
                     <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmt(a.created_at)}</p>

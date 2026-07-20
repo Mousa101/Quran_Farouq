@@ -90,12 +90,10 @@ const Sidebar = () => {
       return [
         ...baseItems,
         { to: '/pending-students', icon: UserPlus, label: 'طلبات التسجيل' },
-        { to: '/sheikh-management', icon: BookOpen, label: 'إدارة المعلمين' },
+        { to: '/sheikh-management', icon: BookOpen, label: 'إدارة المشرفين' },
         { to: '/group-management', icon: UsersRound, label: 'إدارة المجموعات' },
         { to: '/student-management', icon: GraduationCap, label: 'إدارة الطلاب' },
-        { to: '/admin-rankings', icon: TrendingUp, label: 'الترتيب والإحصائيات' },
-        { to: '/admin-analytics', icon: BarChart3, label: 'التحليلات والتقارير' },
-        { to: '/student-stats', icon: Table2, label: 'إحصائيات الطلاب' },
+        { to: '/statistics', icon: Table2, label: 'إحصائيات الطلاب' },
         { to: '/struggling-students', icon: AlertTriangle, label: 'الطلاب المتعثّرون' },
         { to: '/competitions', icon: Trophy, label: 'مرشّحو المسابقات' },
         { to: '/fees', icon: DollarSign, label: 'الرسوم المالية' },
@@ -109,6 +107,7 @@ const Sidebar = () => {
         { to: '/activities', icon: Calendar, label: 'الأنشطة' },
         { to: '/users', icon: Users, label: 'المستخدمين' },
         { to: '/audit-log', icon: Shield, label: 'سجل العمليات' },
+        { to: '/chat-monitor', icon: MessageSquare, label: 'مراقبة المحادثات' },
         { to: '/notifications', icon: Bell, label: 'الإشعارات' },
       ];
     }
@@ -157,7 +156,7 @@ const Sidebar = () => {
       {/* Logo */}
       <div className={`p-4 md:p-6 border-b flex-shrink-0 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white flex items-center justify-center overflow-hidden p-1">
             <img src="/logo.png" alt="شعار المركز" className="w-8 h-8 md:w-10 md:h-10 object-contain" />
           </div>
           <div>
@@ -173,7 +172,7 @@ const Sidebar = () => {
           <p className={`font-medium text-sm md:text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>{user?.name}</p>
           <p className="text-xs text-emerald-500">
             {user?.role === 'admin' && 'مدير'}
-            {user?.role === 'sheikh' && 'معلم'}
+            {user?.role === 'sheikh' && 'مشرف'}
             {user?.role === 'student' && 'طالب'}
           </p>
         </div>
@@ -259,7 +258,7 @@ const Sidebar = () => {
         isDark ? 'bg-slate-900/95 border-b border-white/10' : 'bg-white/95 border-b border-slate-200'
       } backdrop-blur-xl`}>
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+          <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center overflow-hidden p-0.5">
             <img src="/logo.png" alt="شعار المركز" className="w-7 h-7 object-contain" />
           </div>
           <span className={`font-bold font-cairo ${isDark ? 'text-white' : 'text-slate-900'}`}>مركز الفاروق</span>

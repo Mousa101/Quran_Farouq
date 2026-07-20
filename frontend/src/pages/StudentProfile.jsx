@@ -29,7 +29,7 @@ const StudentProfile = () => {
   const [progressData, setProgressData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showAllPersonalInfo, setShowAllPersonalInfo] = useState(false);
-  // تعديل البيانات الشخصية (المدير والمعلم)
+  // تعديل البيانات الشخصية (المدير والمشرف)
   const canEdit = user?.role === 'admin' || user?.role === 'sheikh';
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -55,7 +55,7 @@ const StudentProfile = () => {
   const saveEdit = async () => {
     setSavingEdit(true);
     try {
-      // المعلم يستخدم نقطة نهاية الشيخ، والمدير نقطة نهاية الطالب — كلاهما يعدّل كل البيانات الشخصية
+      // المشرف يستخدم نقطة نهاية المشرف، والمدير نقطة نهاية الطالب — كلاهما يعدّل كل البيانات الشخصية
       const url = user?.role === 'sheikh' ? `${API}/sheikh/students/${studentId}` : `${API}/students/${studentId}`;
       await axios.put(url, editForm);
       toast.success('تم تحديث بيانات الطالب');
@@ -352,7 +352,7 @@ const StudentProfile = () => {
                     <p className="text-xs text-slate-400">المدرسة / الصف</p>
                     <p className="text-white text-sm">{student.school_name || '-'} {student.school_grade ? `(${student.school_grade})` : ''}</p>
                     {student.school_average && (
-                      <p className="text-emerald-400 text-xs mt-1">المعدل: {student.school_average}</p>
+                      <p className="text-emerald-400 text-xs mt-1">المعدل: {String(student.school_average).replace(/%/g, '')}%</p>
                     )}
                   </div>
                 </div>
@@ -587,7 +587,7 @@ const StudentProfile = () => {
         </Tabs>
       </Card>
 
-      {/* تعديل البيانات الشخصية للطالب (المدير والمعلم) */}
+      {/* تعديل البيانات الشخصية للطالب (المدير والمشرف) */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="bg-slate-900 border-slate-700 max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -639,8 +639,13 @@ const StudentProfile = () => {
               <Input value={editForm.school_name} onChange={(e) => setEditForm({ ...editForm, school_name: e.target.value })} className="bg-slate-800 border-slate-700 text-white" />
             </div>
             <div>
-              <Label className="text-slate-300 text-sm">المعدل الدراسي</Label>
-              <Input value={editForm.school_average} onChange={(e) => setEditForm({ ...editForm, school_average: e.target.value })} className="bg-slate-800 border-slate-700 text-white" />
+              <Label className="text-slate-300 text-sm">المعدل الدراسي (%)</Label>
+              <div className="relative">
+                <Input inputMode="numeric" value={editForm.school_average}
+                  onChange={(e) => setEditForm({ ...editForm, school_average: e.target.value.replace(/[^0-9.]/g, '') })}
+                  placeholder="مثال: 95" className="bg-slate-800 border-slate-700 text-white pl-7" />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
+              </div>
             </div>
           </div>
           <DialogFooter className="mt-4">

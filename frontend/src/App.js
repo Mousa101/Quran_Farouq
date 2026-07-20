@@ -3,6 +3,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { Toaster } from './components/ui/sonner';
 import Sidebar from './components/Sidebar';
+import TopBar from './components/TopBar';
+import ChatWidget from './components/ChatWidget';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Activate from './pages/Activate';
@@ -36,6 +38,8 @@ import AdminAnalytics from './pages/AdminAnalytics';
 import StrugglingStudents from './pages/StrugglingStudents';
 import CompetitionsAnalysis from './pages/CompetitionsAnalysis';
 import AuditLog from './pages/AuditLog';
+import ChatMonitor from './pages/ChatMonitor';
+import StatisticsHub from './pages/StatisticsHub';
 import StudentStats from './pages/StudentStats';
 import Announcements from './pages/Announcements';
 import BulkOperations from './pages/BulkOperations';
@@ -100,8 +104,10 @@ const Layout = ({ children }) => {
       <Sidebar />
       {/* Add top padding for mobile header and right margin for desktop sidebar */}
       <main className="pt-16 md:pt-0 md:mr-64 min-h-screen p-4 md:p-8">
+        <TopBar />
         {children}
       </main>
+      <ChatWidget />
     </div>
   );
 };
@@ -388,6 +394,28 @@ function AppRoutes() {
           <ProtectedRoute allow={['admin']}>
             <Layout>
               <AuditLog />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/chat-monitor"
+        element={
+          <ProtectedRoute allow={['admin']}>
+            <Layout>
+              <ChatMonitor />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/statistics"
+        element={
+          <ProtectedRoute allow={['admin']}>
+            <Layout>
+              <StatisticsHub />
             </Layout>
           </ProtectedRoute>
         }

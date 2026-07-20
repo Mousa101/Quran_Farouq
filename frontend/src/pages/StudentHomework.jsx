@@ -426,7 +426,7 @@ const StudentHomework = () => {
                   <p className="text-3xl font-bold text-emerald-400">{selectedHomework.submission.grade}/100</p>
                   {selectedHomework.submission.feedback && (
                     <p className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                      ملاحظات المعلم: {selectedHomework.submission.feedback}
+                      ملاحظات المشرف: {selectedHomework.submission.feedback}
                     </p>
                   )}
                 </div>

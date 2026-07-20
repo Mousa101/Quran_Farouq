@@ -10,7 +10,7 @@ import { BarChart3, UserCheck, BookOpen, TrendingUp, Trophy, AlertTriangle, Clip
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// T1 + T5 - تحليلات المعلم (مقصورة على مجموعاته)
+// T1 + T5 - تحليلات المشرف (مقصورة على مجموعاته)
 const SheikhAnalytics = () => {
   const { isDark } = useTheme();
   const [groups, setGroups] = useState([]);

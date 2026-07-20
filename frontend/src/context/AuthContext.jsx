@@ -6,7 +6,7 @@ const AuthContext = createContext(null);
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const TOKEN_KEY = 'hafiz_token';
 
-// جلسة مستقلة لكل تبويب (sessionStorage) — تسمح بفتح حساب مدير ومعلم وطالب في تبويبات مختلفة معاً.
+// جلسة مستقلة لكل تبويب (sessionStorage) — تسمح بفتح حساب مدير ومشرف وطالب في تبويبات مختلفة معاً.
 // مع بقاء "تذكّر الدخول" عبر localStorage للتبويب الأول (إلا إذا فُتح التبويب بـ ?login=new).
 const getInitialToken = () => {
   const sessionToken = sessionStorage.getItem(TOKEN_KEY);

@@ -69,7 +69,7 @@ const GroupManagement = () => {
   const handleCreateGroup = async (e) => {
     e.preventDefault();
     if (!formData.sheikh_id) {
-      toast.error('يرجى اختيار معلم للمجموعة');
+      toast.error('يرجى اختيار مشرف للمجموعة');
       return;
     }
     setSubmitting(true);
@@ -195,7 +195,7 @@ const GroupManagement = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">إدارة المجموعات</h1>
-          <p className="text-slate-400">إنشاء وتعديل وحذف المجموعات وتعيين الشيوخ والطلاب</p>
+          <p className="text-slate-400">إنشاء وتعديل وحذف المجموعات وتعيين المشرفين والطلاب</p>
         </div>
 
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
@@ -232,13 +232,13 @@ const GroupManagement = () => {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-slate-300">معلم المجموعة</Label>
+                <Label className="text-slate-300">مشرف المجموعة</Label>
                 <Select 
                   value={formData.sheikh_id} 
                   onValueChange={(v) => setFormData({ ...formData, sheikh_id: v })}
                 >
                   <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                    <SelectValue placeholder="اختر المعلم" />
+                    <SelectValue placeholder="اختر المشرف" />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-800 border-slate-700">
                     {sheikhs.map((sheikh) => (
@@ -306,7 +306,7 @@ const GroupManagement = () => {
                 
                 <div className="flex items-center gap-2 text-sm">
                   <User className="w-4 h-4 text-slate-400" />
-                  <span className="text-slate-400">المعلم:</span>
+                  <span className="text-slate-400">المشرف:</span>
                   <span className="text-emerald-400">{group.sheikh_name || getSheikhName(group.sheikh_id)}</span>
                 </div>
 
@@ -357,13 +357,13 @@ const GroupManagement = () => {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-slate-300">معلم المجموعة</Label>
+              <Label className="text-slate-300">مشرف المجموعة</Label>
               <Select 
                 value={formData.sheikh_id} 
                 onValueChange={(v) => setFormData({ ...formData, sheikh_id: v })}
               >
                 <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                  <SelectValue placeholder="اختر المعلم" />
+                  <SelectValue placeholder="اختر المشرف" />
                 </SelectTrigger>
                 <SelectContent className="bg-slate-800 border-slate-700">
                   {sheikhs.map((sheikh) => (

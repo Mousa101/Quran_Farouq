@@ -36,7 +36,7 @@ const RegistrationCodes = () => {
     setGenerating(true);
     try {
       const response = await axios.post(`${API}/auth/generate-code`, { role: selectedRole });
-      const roleLabels = { student: 'الطالب', sheikh: 'الشيخ', admin: 'المدير' };
+      const roleLabels = { student: 'الطالب', sheikh: 'المشرف', admin: 'المدير' };
       toast.success(`تم إنشاء كود ${roleLabels[selectedRole]}: ${response.data.code}`);
       fetchCodes();
     } catch (error) {
@@ -73,7 +73,7 @@ const RegistrationCodes = () => {
 
   const getRoleLabel = (role) => {
     if (role === 'student') return 'طالب';
-    if (role === 'sheikh') return 'شيخ';
+    if (role === 'sheikh') return 'مشرف';
     return 'مدير';
   };
 
@@ -103,7 +103,7 @@ const RegistrationCodes = () => {
     <div className="space-y-8 animate-fadeIn" data-testid="registration-codes-page">
       <div>
         <h1 className="text-2xl font-bold text-white">أكواد التسجيل</h1>
-        <p className="text-slate-400">إنشاء وإدارة أكواد تسجيل الطلاب والشيوخ والمدراء</p>
+        <p className="text-slate-400">إنشاء وإدارة أكواد تسجيل الطلاب والمشرفين والمدراء</p>
       </div>
 
       {/* Generate Code */}
@@ -130,7 +130,7 @@ const RegistrationCodes = () => {
                 <SelectItem value="sheikh" className="text-white">
                   <div className="flex items-center gap-2">
                     <Users className="w-4 h-4" />
-                    شيخ
+                    مشرف
                   </div>
                 </SelectItem>
                 <SelectItem value="admin" className="text-white">
@@ -197,7 +197,7 @@ const RegistrationCodes = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg text-white flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-400" />
-              أكواد الشيوخ ({sheikhCodes.length})
+              أكواد المشرفين ({sheikhCodes.length})
             </CardTitle>
           </CardHeader>
           <CardContent>

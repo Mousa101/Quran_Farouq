@@ -32,7 +32,7 @@ const SheikhManagement = () => {
   const [newPassword, setNewPassword] = useState('');
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
-  // تعديل بيانات المعلم
+  // تعديل بيانات المشرف
   const [editOpen, setEditOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -54,7 +54,7 @@ const SheikhManagement = () => {
     setSavingEdit(true);
     try {
       await axios.put(`${API}/admin/sheikhs/${editTarget.id}`, editForm);
-      toast.success('تم تحديث بيانات المعلم');
+      toast.success('تم تحديث بيانات المشرف');
       setEditOpen(false);
       fetchSheikhs();
     } catch (error) {
@@ -73,7 +73,7 @@ const SheikhManagement = () => {
       const res = await axios.get(`${API}/admin/sheikhs`);
       setSheikhs(res.data);
     } catch (error) {
-      toast.error('فشل في تحميل بيانات المعلمين');
+      toast.error('فشل في تحميل بيانات المشرفين');
     } finally {
       setLoading(false);
     }
@@ -86,7 +86,7 @@ const SheikhManagement = () => {
       setSheikhDetails(res.data);
       setShowDetailsModal(true);
     } catch (error) {
-      toast.error('فشل في تحميل تفاصيل المعلم');
+      toast.error('فشل في تحميل تفاصيل المشرف');
     } finally {
       setDetailsLoading(false);
     }
@@ -97,12 +97,12 @@ const SheikhManagement = () => {
     
     try {
       await axios.delete(`${API}/admin/sheikh/${deleteTarget.id}`);
-      toast.success(`تم حذف المعلم ${deleteTarget.name} بنجاح`);
+      toast.success(`تم حذف المشرف ${deleteTarget.name} بنجاح`);
       setSheikhs(prev => prev.filter(s => s.id !== deleteTarget.id));
       setShowDeleteModal(false);
       setDeleteTarget(null);
     } catch (error) {
-      toast.error('فشل في حذف المعلم');
+      toast.error('فشل في حذف المشرف');
     }
   };
 
@@ -154,10 +154,10 @@ const SheikhManagement = () => {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className={`text-lg md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-              إدارة المعلمين
+              إدارة المشرفين
             </h1>
             <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-              عرض وإدارة جميع المعلمين في المركز ({sheikhs.length} معلم)
+              عرض وإدارة جميع المشرفين في المركز ({sheikhs.length} مشرف)
             </p>
           </div>
           <div className="relative">
@@ -252,7 +252,7 @@ const SheikhManagement = () => {
       {filteredSheikhs.length === 0 && (
         <div className={`text-center py-12 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
           <BookOpen className="w-12 h-12 mx-auto text-slate-500 mb-3" />
-          <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>لا يوجد معلمين</p>
+          <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>لا يوجد مشرفين</p>
         </div>
       )}
 
@@ -262,7 +262,7 @@ const SheikhManagement = () => {
           <DialogHeader>
             <DialogTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : ''}`}>
               <BookOpen className="w-5 h-5 text-blue-400" />
-              تفاصيل المعلم
+              تفاصيل المشرف
             </DialogTitle>
           </DialogHeader>
           
@@ -379,12 +379,12 @@ const SheikhManagement = () => {
           <DialogHeader>
             <DialogTitle className={`flex items-center gap-2 text-red-500`}>
               <AlertTriangle className="w-5 h-5" />
-              تأكيد حذف المعلم
+              تأكيد حذف المشرف
             </DialogTitle>
             <DialogDescription className={isDark ? 'text-slate-400' : 'text-slate-600'}>
-              هل أنت متأكد من حذف المعلم <span className="font-bold text-red-400">{deleteTarget?.name}</span>؟
+              هل أنت متأكد من حذف المشرف <span className="font-bold text-red-400">{deleteTarget?.name}</span>؟
               <br />
-              سيتم إلغاء ربط المجموعات بهذا المعلم.
+              سيتم إلغاء ربط المجموعات بهذا المشرف.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
@@ -393,7 +393,7 @@ const SheikhManagement = () => {
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
               <Trash2 className="w-4 h-4 ml-2" />
-              حذف المعلم
+              حذف المشرف
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -459,7 +459,7 @@ const SheikhManagement = () => {
           </DialogHeader>
           <div className="space-y-4 mt-4">
             <p className={isDark ? 'text-slate-300' : 'text-slate-600'}>
-              تغيير كلمة مرور المعلم <span className="text-purple-400 font-bold">{passwordTarget?.name}</span>
+              تغيير كلمة مرور المشرف <span className="text-purple-400 font-bold">{passwordTarget?.name}</span>
             </p>
             <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{passwordTarget?.email}</p>
             

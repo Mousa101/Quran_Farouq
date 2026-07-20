@@ -43,7 +43,7 @@ const Login = () => {
         />
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center p-8">
-            <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center overflow-hidden">
+            <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-white border border-white/20 flex items-center justify-center overflow-hidden p-2">
               <img src="/logo.png" alt="شعار المركز" className="w-28 h-28 object-contain" />
             </div>
             <h1 className="text-4xl font-bold text-white mb-2 font-cairo">مركز الفاروق</h1>
@@ -59,7 +59,7 @@ const Login = () => {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-4 md:p-8">
         <Card className="w-full max-w-md glass-card animate-fadeIn">
           <CardHeader className="text-center space-y-2 p-4 md:p-6">
-            <div className="lg:hidden w-14 h-14 md:w-16 md:h-16 mx-auto mb-2 md:mb-4 rounded-xl bg-emerald-500/20 flex items-center justify-center overflow-hidden">
+            <div className="lg:hidden w-14 h-14 md:w-16 md:h-16 mx-auto mb-2 md:mb-4 rounded-xl bg-white flex items-center justify-center overflow-hidden p-1">
               <img src="/logo.png" alt="شعار المركز" className="w-12 h-12 md:w-14 md:h-14 object-contain" />
             </div>
             <CardTitle className="text-xl md:text-2xl font-bold text-white font-cairo">تسجيل الدخول</CardTitle>

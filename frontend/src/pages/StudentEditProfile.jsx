@@ -267,14 +267,18 @@ const StudentEditProfile = () => {
 
               {/* School Average */}
               <div className="space-y-2">
-                <Label className="text-slate-300">المعدل الدراسي</Label>
-                <Input
-                  name="school_average"
-                  value={formData.school_average}
-                  onChange={handleChange}
-                  placeholder="مثال: 95%"
-                  className="bg-slate-800 border-slate-700 text-white"
-                />
+                <Label className="text-slate-300">المعدل الدراسي (%)</Label>
+                <div className="relative">
+                  <Input
+                    name="school_average"
+                    inputMode="numeric"
+                    value={formData.school_average}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, school_average: e.target.value.replace(/[^0-9.]/g, '') }))}
+                    placeholder="مثال: 95"
+                    className="bg-slate-800 border-slate-700 text-white pl-7"
+                  />
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">%</span>
+                </div>
               </div>
             </div>
 

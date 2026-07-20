@@ -117,7 +117,7 @@ const AdminAnalytics = () => {
             <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center"><BarChart3 className="w-6 h-6 text-emerald-400" /></div>
             <div>
               <h1 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>التحليلات والتقارير</h1>
-              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>اتجاهات زمنية · مقارنة المعلمين · مالية · تصنيف الأجزاء</p>
+              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>اتجاهات زمنية · مقارنة المشرفين · مالية · تصنيف الأجزاء</p>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -163,7 +163,7 @@ const AdminAnalytics = () => {
           <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <CardTitle className={`text-base flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}><Users className="w-4 h-4 text-emerald-400" />مقارنة أداء المعلمين</CardTitle>
+                <CardTitle className={`text-base flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}><Users className="w-4 h-4 text-emerald-400" />مقارنة أداء المشرفين</CardTitle>
                 <div className="flex items-center gap-2">
                   <select value={sortKey} onChange={(e) => setSortKey(e.target.value)} className={`p-1.5 rounded-lg border text-xs ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}>
                     <option value="avg_points">ترتيب: متوسط النقاط</option>
@@ -176,11 +176,11 @@ const AdminAnalytics = () => {
               </div>
             </CardHeader>
             <CardContent>
-              {sortedTeachers.length === 0 ? <p className={`text-center py-6 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>لا يوجد معلمون</p> : (
+              {sortedTeachers.length === 0 ? <p className={`text-center py-6 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>لا يوجد مشرفون</p> : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm text-right">
                     <thead><tr className={isDark ? 'text-slate-400' : 'text-slate-600'}>
-                      <th className="p-2">#</th><th className="p-2">المعلم</th><th className="p-2">الطلاب</th><th className="p-2">الحضور</th><th className="p-2">التسميعات</th><th className="p-2">الصفحات</th><th className="p-2">متوسط النقاط</th><th className="p-2">تسليم المتابعة</th>
+                      <th className="p-2">#</th><th className="p-2">المشرف</th><th className="p-2">الطلاب</th><th className="p-2">الحضور</th><th className="p-2">التسميعات</th><th className="p-2">الصفحات</th><th className="p-2">متوسط النقاط</th><th className="p-2">تسليم المتابعة</th>
                     </tr></thead>
                     <tbody>
                       {sortedTeachers.map((t, i) => (

@@ -106,7 +106,7 @@ const MyPoints = () => {
   // الشارات الأسبوعية المتاحة
   const availableBadges = [
     { id: 'worshipper', name: 'العابد', icon: '🏅', description: 'إتمام ورق المتابعة 90%+' },
-    { id: 'interactive', name: 'المتفاعل', icon: '⭐', description: 'يمنحها المعلم' },
+    { id: 'interactive', name: 'المتفاعل', icon: '⭐', description: 'يمنحها المشرف' },
     { id: 'committed', name: 'الملتزم', icon: '📅', description: 'حضور كل الدروس' },
     { id: 'memorizer', name: 'الحافظ', icon: '📖', description: 'تسميع في كل درس' }
   ];

@@ -199,7 +199,7 @@ const StudentDashboard = () => {
   const calculateTrackingPoints = () => {
     const prayers = Math.min(trackingForm.prayers_count, 35);
     const quran = Math.min(trackingForm.quran_sitting_days, 35);
-    return prayers + quran + customTrackingTotal(); // 70 + بنود المعلم
+    return prayers + quran + customTrackingTotal(); // 70 + بنود المشرف
   };
 
   if (loading) {
@@ -955,7 +955,7 @@ console.log(stats)
                 />
               </div>
 
-              {/* بنود المعلم المخصصة */}
+              {/* بنود المشرف المخصصة */}
               {customItems.map((it) => (
                 <div key={it.id}>
                   <Label className="text-slate-300 flex items-center gap-2">

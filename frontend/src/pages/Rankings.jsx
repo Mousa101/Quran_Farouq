@@ -174,7 +174,7 @@ const Rankings = () => {
               </ul>
             </div>
             <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
-              <h4 className="text-lg font-bold text-blue-400 mb-2">التسميع للمعلم (40%)</h4>
+              <h4 className="text-lg font-bold text-blue-400 mb-2">التسميع للمشرف (40%)</h4>
               <ul className="text-slate-400 text-sm space-y-1">
                 <li>• درجة التسميع</li>
                 <li>• عدد الأخطاء</li>
