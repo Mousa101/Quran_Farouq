@@ -1943,7 +1943,11 @@ async def _build_student_stats(current_user, group_id=None, student_id=None,
     sort_by = sort_by if sort_by in (STUDENT_STATS_NUMERIC | {"name", "grade"}) else "name"
     reverse = (order == "desc")
     if sort_by in STUDENT_STATS_NUMERIC:
-        rows.sort(key=lambda r: (r[sort_by] is None, r[sort_by] if r[sort_by] is not None else 0), reverse=reverse)
+        # القيم الفارغة تبقى في الآخر دائماً (تصاعدي أو تنازلي)
+        filled = [r for r in rows if r.get(sort_by) is not None]
+        empty = [r for r in rows if r.get(sort_by) is None]
+        filled.sort(key=lambda r: r[sort_by], reverse=reverse)
+        rows = filled + empty
     elif sort_by == "grade":
         rows.sort(key=lambda r: _grade_sort_key(r.get("grade")), reverse=reverse)
     else:
