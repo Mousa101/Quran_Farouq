@@ -133,6 +133,12 @@ const InitialAssessment = () => {
         updated.weakJuz = prev.weakJuz.filter(j => memo.has(j));
         updated.adminJuz = prev.adminJuz.filter(j => memo.has(j));
       }
+      // #5 — الجزء لا يكون قوياً وضعيفاً معاً: عند تعليمه في إحداهما يُزال من الأخرى
+      if (field === 'strongJuz') {
+        updated.weakJuz = prev.weakJuz.filter(j => j !== juzNumber);
+      } else if (field === 'weakJuz') {
+        updated.strongJuz = prev.strongJuz.filter(j => j !== juzNumber);
+      }
       return updated;
     });
   };

@@ -34,6 +34,7 @@ const BulkOperations = () => {
   const [selMove, setSelMove] = useState(new Set());
   const [selNotify, setSelNotify] = useState(new Set());
   const [moveGroup, setMoveGroup] = useState('');
+  const [moveData, setMoveData] = useState(true); // نقل بيانات الطالب للمجموعة الجديدة
   const [notifyTitle, setNotifyTitle] = useState('');
   const [notifyMsg, setNotifyMsg] = useState('');
 
@@ -72,7 +73,7 @@ const BulkOperations = () => {
     if (selMove.size === 0) { toast.error('اختر طالبًا واحدًا على الأقل'); return; }
     if (!moveGroup) { toast.error('اختر المجموعة'); return; }
     try {
-      const res = await axios.post(`${API}/admin/bulk/change-group`, { student_ids: [...selMove], group_id: moveGroup });
+      const res = await axios.post(`${API}/admin/bulk/change-group`, { student_ids: [...selMove], group_id: moveGroup, move_data: moveData });
       toast.success(res.data.message);
       setSelMove(new Set());
       refresh();
@@ -119,6 +120,11 @@ const BulkOperations = () => {
         {card(<MoveRight className="w-4 h-4 text-blue-400" />, 'نقل الطلاب بين المجموعات')}
         <CardContent className="space-y-3">
           <CheckList items={students} idKey="id" labelFn={(s) => `${s.name}${s.group_name ? ` · ${s.group_name}` : ''}`} selected={selMove} onToggle={toggle(selMove, setSelMove)} isDark={isDark} empty="لا يوجد طلاب" />
+          <label className={`flex items-center gap-2 text-sm cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+            <input type="checkbox" checked={moveData} onChange={(e) => setMoveData(e.target.checked)} />
+            نقل بيانات الطالب (التسميع وورق المتابعة) لمشرف المجموعة الجديدة
+            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>— إن أُلغيت، تبقى البيانات القديمة مع المجموعة السابقة</span>
+          </label>
           <div className="flex items-center gap-2 flex-wrap">
             <select value={moveGroup} onChange={(e) => setMoveGroup(e.target.value)} className={`p-2 rounded-lg border text-sm ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}>
               <option value="">اختر المجموعة الهدف</option>

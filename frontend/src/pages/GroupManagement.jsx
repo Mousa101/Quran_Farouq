@@ -16,6 +16,7 @@ import {
   Loader2, UsersRound, User
 } from 'lucide-react';
 import { toast } from 'sonner';
+import BulkOperations from './BulkOperations';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -498,6 +499,11 @@ const GroupManagement = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* #4 — العمليات الجماعية بنفس صفحة إدارة المجموعات */}
+      <div className="mt-8 pt-6 border-t border-white/10">
+        <BulkOperations />
+      </div>
     </div>
   );
 };

@@ -1,5 +1,13 @@
 // قوائم ثابتة مشتركة عبر التطبيق (لتوحيد صيغة الكتابة وضمان عمل الفلاتر)
 
+// #1 — نطاق البريد الثابت (المستخدم يكتب الاسم فقط ويُضاف تلقائياً)
+export const EMAIL_DOMAIN = '@faroq.com';
+export const emailLocalPart = (email) => (email || '').split('@')[0];
+export const buildEmail = (localPart) => {
+  const local = (localPart || '').trim().split('@')[0];
+  return local ? local + EMAIL_DOMAIN : '';
+};
+
 // #5 — قائمة المساجد المعتمدة (الخيار الأخير "أخرى" يفتح حقل كتابة حر)
 export const MOSQUE_OTHER = 'أخرى';
 export const MOSQUES = [
@@ -7,7 +15,7 @@ export const MOSQUES = [
   'مسجد المغيرة (الاستقلال)',
   'مسجد صقر شنك',
   'مسجد السنجوقية',
-  'مسجد ابو بكر (ضاحية الأقصى)',
+  'مسجد أبو بكر (ضاحية الأقصى)',
   MOSQUE_OTHER,
 ];
 

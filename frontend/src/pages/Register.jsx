@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { BookOpen, Mail, Lock, User, Loader2, Phone, Calendar, School, Home, CheckCircle, Key, Image, Upload, UserPlus, GraduationCap, Shield, Briefcase, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES } from '../lib/constants';
+import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES, EMAIL_DOMAIN, emailLocalPart, buildEmail } from '../lib/constants';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -361,17 +361,16 @@ const Register = () => {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-slate-300 text-sm">البريد الإلكتروني <span className="text-red-400">*</span></Label>
-                  <div className="relative">
-                    <Mail className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <div className="flex items-center" dir="ltr">
                     <Input
-                      type="email"
-                      placeholder="email@example.com"
-                      value={formData.email}
-                      onChange={(e) => handleChange('email', e.target.value)}
-                      className="pr-8 h-9 text-sm bg-slate-800/50 border-slate-700 text-white text-left"
-                      dir="ltr"
+                      type="text"
+                      placeholder="اسم المستخدم"
+                      value={emailLocalPart(formData.email)}
+                      onChange={(e) => handleChange('email', buildEmail(e.target.value))}
+                      className="h-9 text-sm bg-slate-800/50 border-slate-700 text-white text-left rounded-r-none flex-1"
                       required
                     />
+                    <span className="h-9 flex items-center px-2 text-xs text-slate-300 bg-slate-700/70 border border-slate-700 border-r-0 rounded-r-md whitespace-nowrap select-none">{EMAIL_DOMAIN}</span>
                   </div>
                 </div>
               </div>

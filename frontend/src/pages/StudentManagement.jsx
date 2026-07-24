@@ -10,7 +10,7 @@ import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
 import { Textarea } from '../components/ui/textarea';
-import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES } from '../lib/constants';
+import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES, EMAIL_DOMAIN, emailLocalPart, buildEmail } from '../lib/constants';
 import {
   Users, Plus, Trash2, Edit, Search, AlertTriangle,
   UserPlus, Eye, RefreshCcw, Loader2, Key, Award
@@ -257,15 +257,17 @@ const StudentManagement = () => {
                 </div>
                 <div className="space-y-2">
                   <Label className="text-slate-300">البريد الإلكتروني</Label>
-                  <Input
-                    type="email"
-                    required
-                    value={newStudentData.email}
-                    onChange={(e) => setNewStudentData({ ...newStudentData, email: e.target.value })}
-                    className="bg-slate-800 border-slate-700 text-white"
-                    placeholder="email@example.com"
-                    dir="ltr"
-                  />
+                  <div className="flex items-center" dir="ltr">
+                    <Input
+                      type="text"
+                      required
+                      value={emailLocalPart(newStudentData.email)}
+                      onChange={(e) => setNewStudentData({ ...newStudentData, email: buildEmail(e.target.value) })}
+                      className="bg-slate-800 border-slate-700 text-white text-left rounded-r-none flex-1"
+                      placeholder="اسم المستخدم"
+                    />
+                    <span className="h-10 flex items-center px-2 text-xs text-slate-300 bg-slate-700/70 border border-slate-700 border-r-0 rounded-r-md whitespace-nowrap select-none">{EMAIL_DOMAIN}</span>
+                  </div>
                 </div>
               </div>
 

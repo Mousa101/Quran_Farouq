@@ -103,7 +103,6 @@ const Sidebar = () => {
         { to: '/schedule', icon: CalendarDays, label: 'إدارة الجداول' },
         { to: '/tracking-settings', icon: Settings, label: 'إعدادات ورق المتابعة' },
         { to: '/announcements', icon: Megaphone, label: 'الإعلانات' },
-        { to: '/bulk-operations', icon: Layers, label: 'العمليات الجماعية' },
         { to: '/activities', icon: Calendar, label: 'الأنشطة' },
         { to: '/users', icon: Users, label: 'المستخدمين' },
         { to: '/audit-log', icon: Shield, label: 'سجل العمليات' },

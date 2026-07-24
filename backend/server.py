@@ -4271,8 +4271,8 @@ async def delete_student(student_id: str, current_user: dict = Depends(get_curre
     return {"message": "تم حذف الطالب وجميع بياناته بنجاح"}
 
 @api_router.post("/students/{student_id}/change-group")
-async def change_student_group(student_id: str, group_id: str, current_user: dict = Depends(get_current_user)):
-    """Change student's group (Admin only) - البيانات تنتقل تلقائياً مع الطالب"""
+async def change_student_group(student_id: str, group_id: str, move_data: bool = True, current_user: dict = Depends(get_current_user)):
+    """Change student's group (Admin only). move_data: نقل بيانات الطالب لمشرف المجموعة الجديدة أو إبقاؤها للقديمة."""
     ensure_role(current_user, "admin", "فقط المدير يمكنه نقل الطالب")
     
     # Check if student exists
@@ -4294,28 +4294,24 @@ async def change_student_group(student_id: str, group_id: str, current_user: dic
     new_group_id = group_id if group_id else None
     await db.users.update_one({"id": student_id}, {"$set": {"group_id": new_group_id}})
     
-    # Update sheikh_id in tracking sheets for new group's sheikh
-    if new_sheikh_id:
+    # نقل بيانات الطالب (التسميع/المتابعة) لمشرف المجموعة الجديدة — فقط إذا اختير ذلك
+    if move_data and new_sheikh_id:
         await db.tracking_sheets.update_many(
             {"student_id": student_id},
             {"$set": {"sheikh_id": new_sheikh_id}}
         )
-        
-        # Update recitations sheikh_id
         await db.recitations.update_many(
             {"student_id": student_id},
             {"$set": {"sheikh_id": new_sheikh_id}}
         )
-    
-    # Create notification for student
-    await create_notification_internal(
-        student_id,
-        "تم نقلك إلى مجموعة جديدة",
-        "تم نقلك إلى مجموعة أخرى. جميع بياناتك السابقة (التسميعات، ورق المتابعة، الحضور) محفوظة.",
-        "info"
-    )
 
-    return {"message": "تم نقل الطالب مع جميع بياناته بنجاح"}
+    # Create notification for student
+    note = ("تم نقلك إلى مجموعة أخرى. جميع بياناتك السابقة (التسميعات، ورق المتابعة، الحضور) محفوظة."
+            if move_data else
+            "تم نقلك إلى مجموعة أخرى. بياناتك السابقة تبقى مسجّلة مع مجموعتك القديمة.")
+    await create_notification_internal(student_id, "تم نقلك إلى مجموعة جديدة", note, "info")
+
+    return {"message": "تم نقل الطالب بنجاح" + ("" if move_data else " (بدون نقل البيانات القديمة)")}
 
 
 # ============== N4 - العمليات الجماعية ==============
@@ -4326,6 +4322,7 @@ class BulkIdsRequest(BaseModel):
 class BulkGroupRequest(BaseModel):
     student_ids: List[str]
     group_id: Optional[str] = None
+    move_data: bool = True  # نقل بيانات الطالب (التسميع/المتابعة) لمشرف المجموعة الجديدة أو إبقاؤها للقديمة
 
 
 class BulkNotifyRequest(BaseModel):
@@ -4361,11 +4358,13 @@ async def bulk_change_group(data: BulkGroupRequest, current_user: dict = Depends
         {"id": {"$in": data.student_ids}, "role": "student"},
         {"$set": {"group_id": data.group_id}},
     )
-    if new_sheikh_id:
+    # نقل البيانات (سجل التسميع والمتابعة) لمشرف المجموعة الجديدة — فقط إذا اختير ذلك
+    if data.move_data and new_sheikh_id:
         await db.tracking_sheets.update_many({"student_id": {"$in": data.student_ids}}, {"$set": {"sheikh_id": new_sheikh_id}})
         await db.recitations.update_many({"student_id": {"$in": data.student_ids}}, {"$set": {"sheikh_id": new_sheikh_id}})
+    note = "تم نقلك إلى مجموعة أخرى مع الحفاظ على جميع بياناتك." if data.move_data else "تم نقلك إلى مجموعة أخرى (بياناتك السابقة تبقى مع مجموعتك القديمة)."
     for sid in data.student_ids:
-        await create_notification_internal(sid, "تم نقلك إلى مجموعة جديدة", "تم نقلك إلى مجموعة أخرى مع الحفاظ على جميع بياناتك.", "info")
+        await create_notification_internal(sid, "تم نقلك إلى مجموعة جديدة", note, "info")
     return {"message": f"تم نقل {result.modified_count} طالب", "count": result.modified_count}
 
 

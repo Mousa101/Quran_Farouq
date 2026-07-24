@@ -260,21 +260,21 @@ console.log(stats)
             </div>
           </div>
 
-          {/* Rank & Total Points */}
+          {/* مقدار الحفظ والتجويد + مجموع النقاط (بدل ترتيبك في المجموعة) */}
           <div className="grid grid-cols-2 gap-2 md:gap-4">
-            {myRank && (
-              <div className={`flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-3 rounded-xl ${getRankStyle(myRank.rank).bg}`}>
-                <Trophy className={`w-6 h-6 md:w-8 md:h-8 ${getRankStyle(myRank.rank).text}`} />
-                <div>
-                  <p className={`text-sm md:text-lg font-bold ${getRankStyle(myRank.rank).text}`}>
-                    {myPosition} من {totalInGroup}
-                  </p>
-                  <p className="text-slate-400 text-[10px] md:text-sm">ترتيبك في المجموعة</p>
-                </div>
+            <div className="flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-3 rounded-xl bg-blue-500/20 border border-blue-500/30">
+              <BookOpen className="w-6 h-6 md:w-8 md:h-8 text-blue-400 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xl md:text-2xl font-bold text-blue-400">
+                  {stats?.memorization?.total_memorized || 0} <span className="text-xs font-normal">صفحة</span>
+                </p>
+                <p className="text-slate-400 text-[10px] md:text-sm truncate">
+                  مقدار الحفظ · تجويد: <span className="text-purple-400">{stats?.student?.tajweed_level || '-'}</span>
+                </p>
               </div>
-            )}
+            </div>
             <div className="flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30">
-              <Award className="w-6 h-6 md:w-8 md:h-8 text-emerald-400" />
+              <Award className="w-6 h-6 md:w-8 md:h-8 text-emerald-400 flex-shrink-0" />
               <div>
                 <p className="text-xl md:text-2xl font-bold text-emerald-400">{stats?.total_points || 0}</p>
                 <p className="text-slate-400 text-[10px] md:text-sm">مجموع النقاط</p>
@@ -341,15 +341,15 @@ console.log(stats)
               </div>
             </div>
 
-            {/* School Average / GPA */}
+            {/* المسجد (بدل المعدل المدرسي في هذا المكان) */}
             <div className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5">
               <div className="flex items-center gap-2 md:gap-3">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                  <GraduationCap className="w-4 h-4 md:w-5 md:h-5 text-amber-400" />
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
+                  <Home className="w-4 h-4 md:w-5 md:h-5 text-cyan-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-slate-400 text-[10px] md:text-xs">المعدل المدرسي</p>
-                  <p className="text-amber-400 font-bold text-sm md:text-base truncate">{stats?.student?.school_average || '-'}</p>
+                  <p className="text-slate-400 text-[10px] md:text-xs">المسجد</p>
+                  <p className="text-cyan-400 font-bold text-sm md:text-base truncate">{stats?.student?.mosque_name || '-'}</p>
                 </div>
               </div>
             </div>
@@ -415,15 +415,15 @@ console.log(stats)
                 </div>
               </div>
 
-              {/* Mosque */}
+              {/* المعدل المدرسي (نُقل إلى هنا) */}
               <div className="p-3 md:p-4 rounded-xl bg-slate-800/50 border border-white/5">
                 <div className="flex items-center gap-2 md:gap-3">
-                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center flex-shrink-0">
-                    <Home className="w-4 h-4 md:w-5 md:h-5 text-cyan-400" />
+                  <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                    <GraduationCap className="w-4 h-4 md:w-5 md:h-5 text-amber-400" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-slate-400 text-[10px] md:text-xs">المسجد</p>
-                    <p className="text-white font-bold text-sm md:text-base truncate">{stats?.student?.mosque_name || '-'}</p>
+                    <p className="text-slate-400 text-[10px] md:text-xs">المعدل المدرسي</p>
+                    <p className="text-amber-400 font-bold text-sm md:text-base truncate">{stats?.student?.school_average ? `${String(stats.student.school_average).replace(/%/g,'')}%` : '-'}</p>
                   </div>
                 </div>
               </div>
