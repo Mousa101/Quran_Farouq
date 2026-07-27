@@ -22,6 +22,7 @@ import Notifications from './pages/Notifications';
 import Rankings from './pages/Rankings';
 import UsersPage from './pages/UsersPage';
 import MyPoints from './pages/MyPoints';
+import MyWarnings from './pages/MyWarnings';
 import RegistrationCodes from './pages/RegistrationCodes';
 import StudentProfile from './pages/StudentProfile';
 import StudentManagement from './pages/StudentManagement';
@@ -502,7 +503,7 @@ function AppRoutes() {
       <Route
         path="/recitations"
         element={
-          <ProtectedRoute allow={['sheikh']}>
+          <ProtectedRoute allow={['sheikh', 'admin']}>
             <Layout>
               <RecitationsNew />
             </Layout>
@@ -524,7 +525,7 @@ function AppRoutes() {
       <Route
         path="/attendance"
         element={
-          <ProtectedRoute allow={['sheikh']}>
+          <ProtectedRoute allow={['sheikh', 'admin']}>
             <Layout>
               <Attendance />
             </Layout>
@@ -594,6 +595,17 @@ function AppRoutes() {
           <ProtectedRoute allow={['student']}>
             <Layout>
               <MyProgress />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/my-warnings"
+        element={
+          <ProtectedRoute allow={['student']}>
+            <Layout>
+              <MyWarnings />
             </Layout>
           </ProtectedRoute>
         }

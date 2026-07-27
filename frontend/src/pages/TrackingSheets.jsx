@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   FileText, Upload, Plus, Loader2, BookOpen, Moon, Star, Hand, Clock, Eye, 
-  Sunrise, Users, GraduationCap, Calendar, Sparkles, MessageCircle, Edit
+  Sunrise, Users, GraduationCap, Calendar, Sparkles, MessageCircle, Edit, History
 } from 'lucide-react';
 import { toast } from 'sonner';
 import StudentLink from '../components/StudentLink';
@@ -20,6 +20,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const TrackingSheets = () => {
   const { isDark } = useTheme();
   const [sheets, setSheets] = useState([]);
+  const [lastSheets, setLastSheets] = useState([]); // آخر ورقة لكل طالب
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -116,6 +117,13 @@ const TrackingSheets = () => {
     }
   };
 
+  const fetchLastSheets = async () => {
+    try {
+      const res = await axios.get(`${API}/tracking-sheets/last-per-student`);
+      setLastSheets(res.data || []);
+    } catch (e) { /* ignore */ }
+  };
+
   const fetchData = async () => {
     try {
       const [sheetsRes, groupsRes] = await Promise.all([
@@ -123,6 +131,7 @@ const TrackingSheets = () => {
         axios.get(`${API}/groups`)
       ]);
       fetchCustomItems();
+      fetchLastSheets();
       setSheets(sheetsRes.data);
       
       // Get all students from groups
@@ -581,6 +590,58 @@ const TrackingSheets = () => {
                 className={`w-8 h-8 rounded-lg text-base ${newItem.icon === ic ? 'bg-purple-500/30 ring-2 ring-purple-400' : (isDark ? 'bg-slate-800' : 'bg-slate-100')}`}>{ic}</button>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* آخر ورقة متابعة لكل طالب */}
+      <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+        <CardHeader>
+          <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <History className="w-5 h-5 text-purple-400" />
+            آخر ورقة متابعة لكل طالب
+            {lastSheets.filter((r) => !r.last_sheet).length > 0 && (
+              <span className="text-xs font-normal text-amber-400">
+                ({lastSheets.filter((r) => !r.last_sheet).length} ما سلّموا)
+              </span>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {lastSheets.length === 0 ? (
+            <p className={`text-center py-6 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا يوجد طلاب</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {lastSheets.map((r) => (
+                <div
+                  key={r.student_id}
+                  className={`p-3 rounded-lg border ${
+                    r.last_sheet
+                      ? (isDark ? 'bg-slate-800/40 border-white/10' : 'bg-slate-50 border-slate-200')
+                      : 'bg-amber-500/10 border-amber-500/30'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="min-w-0">
+                      <StudentLink studentId={r.student_id} name={r.student_name} className={`font-medium text-sm ${isDark ? 'text-white' : 'text-slate-900'}`} />
+                      <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.group_name}</p>
+                    </div>
+                    {r.last_sheet ? (
+                      <div className="text-left">
+                        <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>أسبوع {r.last_sheet.week_start}</p>
+                        <div className="flex items-center gap-2 text-[11px] justify-end mt-0.5">
+                          <span className="text-emerald-400">🕌 {r.last_sheet.prayers_count}</span>
+                          <span className="text-blue-400">📖 {r.last_sheet.quran_sitting_days}</span>
+                          <span className="text-amber-400 font-bold">{r.last_sheet.points_earned}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-amber-400 text-xs font-medium">لم يسلّم أي ورقة</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

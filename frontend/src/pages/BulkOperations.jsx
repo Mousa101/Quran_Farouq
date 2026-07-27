@@ -7,7 +7,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { toast } from 'sonner';
-import { Layers, UserCheck, MoveRight, Send } from 'lucide-react';
+import { Layers, UserCheck, MoveRight, Send, Loader2 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -25,7 +25,27 @@ const CheckList = ({ items, idKey, labelFn, selected, onToggle, isDark, empty })
   )
 );
 
-const BulkOperations = () => {
+// أوضاع نقل الطالب — لازم تطابق TRANSFER_MODES في الخادم
+const TRANSFER_MODES = [
+  {
+    value: 'with_data',
+    label: 'نقل الطالب مع بياناته',
+    hint: 'التسميع وورق المتابعة بتنتقل لمشرف المجموعة الجديدة، والنقاط بتضل زي ما هي.',
+  },
+  {
+    value: 'keep_old',
+    label: 'نقل بدون البيانات',
+    hint: 'الطالب بينتقل، بس سجلاته السابقة بتضل مسجّلة عند مشرف مجموعته القديمة.',
+  },
+  {
+    value: 'fresh_start',
+    label: 'البدء ببيانات جديدة',
+    hint: 'أرشفة كل بيانات الطالب (تسميع/حضور/متابعة) وتصفير نقاطه ليبدأ من الصفر. البيانات بتضل محفوظة بالأرشيف.',
+    danger: true,
+  },
+];
+
+const BulkOperations = ({ onChanged }) => {
   const { isDark } = useTheme();
   const [pending, setPending] = useState([]);
   const [students, setStudents] = useState([]);
@@ -34,7 +54,8 @@ const BulkOperations = () => {
   const [selMove, setSelMove] = useState(new Set());
   const [selNotify, setSelNotify] = useState(new Set());
   const [moveGroup, setMoveGroup] = useState('');
-  const [moveData, setMoveData] = useState(true); // نقل بيانات الطالب للمجموعة الجديدة
+  const [transferMode, setTransferMode] = useState('with_data'); // with_data | keep_old | fresh_start
+  const [moving, setMoving] = useState(false);
   const [notifyTitle, setNotifyTitle] = useState('');
   const [notifyMsg, setNotifyMsg] = useState('');
 
@@ -72,12 +93,33 @@ const BulkOperations = () => {
   const doMove = async () => {
     if (selMove.size === 0) { toast.error('اختر طالبًا واحدًا على الأقل'); return; }
     if (!moveGroup) { toast.error('اختر المجموعة'); return; }
+    // «البدء ببيانات جديدة» بيأرشف ويصفّر — تأكيد قبل التنفيذ
+    if (transferMode === 'fresh_start') {
+      const ok = window.confirm(
+        `سيتم أرشفة بيانات ${selMove.size} طالب (التسميع والحضور وورق المتابعة) وتصفير نقاطهم ليبدأوا من جديد.\n` +
+        'البيانات تبقى محفوظة في الأرشيف. هل تريد المتابعة؟'
+      );
+      if (!ok) return;
+    }
+    setMoving(true);
     try {
-      const res = await axios.post(`${API}/admin/bulk/change-group`, { student_ids: [...selMove], group_id: moveGroup, move_data: moveData });
-      toast.success(res.data.message);
+      const res = await axios.post(`${API}/admin/bulk/change-group`, {
+        student_ids: [...selMove], group_id: moveGroup, mode: transferMode,
+      });
+      const a = res.data.archived;
+      toast.success(
+        a
+          ? `${res.data.message} — أُرشِف ${a.recitations} تسميع و${a.attendance} حضور و${a.tracking_sheets} ورقة متابعة`
+          : res.data.message
+      );
       setSelMove(new Set());
       refresh();
-    } catch (e) { toast.error('فشل في النقل'); }
+      onChanged?.();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'فشل في النقل');
+    } finally {
+      setMoving(false);
+    }
   };
 
   const doNotify = async () => {
@@ -120,17 +162,48 @@ const BulkOperations = () => {
         {card(<MoveRight className="w-4 h-4 text-blue-400" />, 'نقل الطلاب بين المجموعات')}
         <CardContent className="space-y-3">
           <CheckList items={students} idKey="id" labelFn={(s) => `${s.name}${s.group_name ? ` · ${s.group_name}` : ''}`} selected={selMove} onToggle={toggle(selMove, setSelMove)} isDark={isDark} empty="لا يوجد طلاب" />
-          <label className={`flex items-center gap-2 text-sm cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-            <input type="checkbox" checked={moveData} onChange={(e) => setMoveData(e.target.checked)} />
-            نقل بيانات الطالب (التسميع وورق المتابعة) لمشرف المجموعة الجديدة
-            <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>— إن أُلغيت، تبقى البيانات القديمة مع المجموعة السابقة</span>
-          </label>
+          {/* وضع النقل — ماذا يحدث لبيانات الطالب */}
+          <div className="space-y-2">
+            <p className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>ماذا يحدث لبيانات الطالب؟</p>
+            {TRANSFER_MODES.map((m) => (
+              <label
+                key={m.value}
+                className={`flex items-start gap-2 text-sm cursor-pointer p-2 rounded-lg border transition-colors ${
+                  transferMode === m.value
+                    ? (isDark ? 'bg-blue-500/10 border-blue-500/40' : 'bg-blue-50 border-blue-300')
+                    : (isDark ? 'border-white/10 hover:bg-white/5' : 'border-slate-200 hover:bg-slate-50')
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="transfer-mode"
+                  value={m.value}
+                  checked={transferMode === m.value}
+                  onChange={() => setTransferMode(m.value)}
+                  className="mt-1"
+                />
+                <span>
+                  <span className={`font-medium ${m.danger ? 'text-amber-400' : (isDark ? 'text-slate-200' : 'text-slate-800')}`}>
+                    {m.label}
+                  </span>
+                  <span className={`block text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{m.hint}</span>
+                </span>
+              </label>
+            ))}
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <select value={moveGroup} onChange={(e) => setMoveGroup(e.target.value)} className={`p-2 rounded-lg border text-sm ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}>
-              <option value="">اختر المجموعة الهدف</option>
+              <option value="">اختر المجموعة </option>
               {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
             </select>
-            <Button onClick={doMove} disabled={selMove.size === 0} className="bg-blue-600 hover:bg-blue-700"><MoveRight className="w-4 h-4 ml-1" />نقل المحدّدين ({selMove.size})</Button>
+            <Button
+              onClick={doMove}
+              disabled={selMove.size === 0 || moving}
+              className={transferMode === 'fresh_start' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'}
+            >
+              {moving ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <MoveRight className="w-4 h-4 ml-1" />}
+              نقل المحدّدين ({selMove.size})
+            </Button>
           </div>
         </CardContent>
       </Card>

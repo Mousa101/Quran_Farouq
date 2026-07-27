@@ -8,7 +8,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Switch } from '../components/ui/switch';
-import { Settings, Clock, Calendar, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Settings, Clock, Calendar, CheckCircle, XCircle, Loader2, Trophy } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -46,19 +46,56 @@ const TrackingSettings = () => {
   // #4 — المدير يختار المشرف ليرى/يعدّل بنوده
   const [sheikhs, setSheikhs] = useState([]);
   const [selectedSheikh, setSelectedSheikh] = useState('');
+  // إعدادات نقاط التميز (المدير فقط)
+  const [excellence, setExcellence] = useState({ points: 50, period_days: 7 });
+  const [savingExcellence, setSavingExcellence] = useState(false);
 
   useEffect(() => {
     fetchSettings();
     checkSubmissionWindow();
     if (isAdmin) {
       axios.get(`${API}/admin/sheikhs`).then((r) => setSheikhs(r.data || [])).catch(() => {});
+      fetchExcellence();
     } else {
       fetchCustomItems();
     }
   }, []); // eslint-disable-line
 
+  const fetchExcellence = async () => {
+    try {
+      const res = await axios.get(`${API}/settings/excellence-points`);
+      setExcellence({ points: res.data.points, period_days: res.data.period_days });
+    } catch (error) {
+      console.error('Error fetching excellence settings:', error);
+    }
+  };
+
+  const saveExcellence = async () => {
+    const points = parseInt(excellence.points, 10);
+    const periodDays = parseInt(excellence.period_days, 10);
+    if (isNaN(points) || points < 1 || points > 1000) {
+      toast.error('مقدار النقاط يجب أن يكون بين 1 و 1000');
+      return;
+    }
+    if (isNaN(periodDays) || periodDays < 0 || periodDays > 365) {
+      toast.error('المدة يجب أن تكون بين 0 و 365 يوم');
+      return;
+    }
+    setSavingExcellence(true);
+    try {
+      const res = await axios.put(`${API}/settings/excellence-points`, { points, period_days: periodDays });
+      setExcellence({ points: res.data.settings.points, period_days: res.data.settings.period_days });
+      toast.success('تم حفظ إعدادات نقاط التميز');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في حفظ الإعدادات');
+    } finally {
+      setSavingExcellence(false);
+    }
+  };
+
+  // المدير: تغيير النطاق يعيد جلب البنود (بدون اختيار مشرف = البنود العامة)
   useEffect(() => {
-    if (isAdmin && selectedSheikh) fetchCustomItems();
+    if (isAdmin) fetchCustomItems();
   }, [selectedSheikh]); // eslint-disable-line
 
   const fetchCustomItems = async () => {
@@ -77,16 +114,13 @@ const TrackingSettings = () => {
       toast.error('أدخل اسم البند ونقاطه (أكبر من صفر)');
       return;
     }
-    if (isAdmin && !selectedSheikh) {
-      toast.error('اختر المشرف أولاً');
-      return;
-    }
     setAddingItem(true);
     try {
       const payload = { name: newItem.name.trim(), max_points: points, icon: newItem.icon || '⭐' };
-      if (isAdmin) payload.sheikh_id = selectedSheikh;
+      // المدير: بدون اختيار مشرف = بند عام للجميع؛ مع اختيار مشرف = خاص فيه
+      if (isAdmin && selectedSheikh) payload.sheikh_id = selectedSheikh;
       await axios.post(`${API}/tracking-items`, payload);
-      toast.success('تم إضافة البند');
+      toast.success(isAdmin && !selectedSheikh ? 'تم إضافة بند عام لكل المشرفين' : 'تم إضافة البند');
       setNewItem({ name: '', max_points: '', icon: '⭐' });
       fetchCustomItems();
     } catch (error) {
@@ -187,6 +221,64 @@ const TrackingSettings = () => {
         </Card>
       )}
 
+      {/* إعدادات نقاط التميز — المدير فقط */}
+      {isAdmin && (
+        <Card className={`${isDark ? 'glass-card' : 'bg-white'} border-amber-500/30`}>
+          <CardHeader>
+            <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <Trophy className="w-5 h-5 text-amber-400" />
+              نقاط التميز
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-slate-400 text-sm">
+              النقاط الإدارية اللي بمنحها المدير للطالب المتميّز. حدّد المقدار وكل قديش مرة بيُسمح بمنحها لنفس الطالب.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>مقدار النقاط</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  value={excellence.points}
+                  onChange={(e) => setExcellence({ ...excellence, points: e.target.value })}
+                  className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''}
+                />
+                <p className="text-slate-500 text-xs">بين 1 و 1000</p>
+              </div>
+              <div className="space-y-2">
+                <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>المدة (كل كم يوم)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="365"
+                  value={excellence.period_days}
+                  onChange={(e) => setExcellence({ ...excellence, period_days: e.target.value })}
+                  className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''}
+                />
+                <p className="text-slate-500 text-xs">7 = مرة بالأسبوع • 0 = بدون تقييد</p>
+              </div>
+              <div className="flex items-end">
+                <Button
+                  onClick={saveExcellence}
+                  disabled={savingExcellence}
+                  className="bg-amber-600 hover:bg-amber-700 w-full"
+                >
+                  {savingExcellence ? <Loader2 className="w-4 h-4 ml-2 animate-spin" /> : <Trophy className="w-4 h-4 ml-2" />}
+                  حفظ إعدادات التميز
+                </Button>
+              </div>
+            </div>
+            <div className={`p-3 rounded-lg text-sm ${isDark ? 'bg-amber-500/10 border border-amber-500/20 text-amber-300' : 'bg-amber-50 border border-amber-200 text-amber-800'}`}>
+              حاليًا: <strong>{excellence.points}</strong> نقطة، {Number(excellence.period_days) === 0
+                ? 'بدون تقييد على عدد المرات'
+                : <>مرة كل <strong>{excellence.period_days}</strong> يوم لكل طالب</>}.
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* بنود المتابعة المخصصة */}
       <Card className={isDark ? 'glass-card' : 'bg-white'}>
         <CardHeader>
@@ -198,18 +290,23 @@ const TrackingSettings = () => {
         <CardContent className="space-y-4">
           <p className="text-slate-400 text-sm">أضف بنوداً بنقاطها ورمزها (icon)، وستظهر في دليل النقاط وفي ورقة المتابعة عند الطالب والمشرف وتُحتسب ضمن المجموع.</p>
 
-          {/* #4 — المدير يختار المشرف */}
+          {/* #4 — المدير يختار المشرف، أو يضيف بندًا عامًّا للجميع */}
           {isAdmin && (
             <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>المشرف</Label>
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>نطاق البند</Label>
               <select
                 value={selectedSheikh}
                 onChange={(e) => setSelectedSheikh(e.target.value)}
                 className="w-full h-10 px-3 rounded-md bg-slate-800 border border-slate-700 text-white mt-1"
               >
-                <option value="">اختر المشرف لعرض/تعديل بنوده</option>
-                {sheikhs.map((s) => (<option key={s.id} value={s.id}>{s.name}</option>))}
+                <option value="">🌍 بند عام — يظهر عند كل المشرفين وطلابهم</option>
+                {sheikhs.map((s) => (<option key={s.id} value={s.id}>بنود {s.name} فقط</option>))}
               </select>
+              <p className="text-slate-400 text-xs mt-2">
+                {selectedSheikh
+                  ? 'البند اللي بتضيفه رح يظهر عند هذا المشرف وطلابه فقط.'
+                  : 'البند اللي بتضيفه رح ينضاف عند كل المشرفين والطلاب. والقائمة تحت بتعرض البنود العامة.'}
+              </p>
             </div>
           )}
 
@@ -219,6 +316,9 @@ const TrackingSettings = () => {
                 <div key={it.id} className={`flex items-center justify-between p-3 rounded-lg ${isDark ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
                   <span className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
                     <span className="text-xl">{it.icon || '⭐'}</span>{it.name}
+                    {it.is_global && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400">عام</span>
+                    )}
                   </span>
                   <div className="flex items-center gap-3">
                     <span className="text-purple-400 font-bold">{it.max_points} نقطة</span>
@@ -231,11 +331,11 @@ const TrackingSettings = () => {
             </div>
           )}
 
-          {(!isAdmin || selectedSheikh) && (
+          {(
             <div className="space-y-3">
               <div className="flex flex-wrap items-end gap-3">
                 <div className="flex-1 min-w-[160px]">
-                  <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>اسم البند</Label>
+                  <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>اسم البند الجديد</Label>
                   <Input
                     value={newItem.name}
                     onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}

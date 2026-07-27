@@ -37,7 +37,8 @@ import {
   Table2,
   Megaphone,
   Layers,
-  MessageSquare
+  MessageSquare,
+  BookUser
 } from 'lucide-react';
 import { Button } from './ui/button';
 
@@ -89,13 +90,18 @@ const Sidebar = () => {
     if (user?.role === 'admin') {
       return [
         ...baseItems,
+         { to: '/sheikh-management', icon: BookUser, label: 'إدارة المشرفين' },
+          { to: '/student-management', icon: GraduationCap, label: 'إدارة الطلاب' },
+          { to: '/group-management', icon: UsersRound, label: 'إدارة المجموعات' },
         { to: '/pending-students', icon: UserPlus, label: 'طلبات التسجيل' },
-        { to: '/sheikh-management', icon: BookOpen, label: 'إدارة المشرفين' },
-        { to: '/group-management', icon: UsersRound, label: 'إدارة المجموعات' },
-        { to: '/student-management', icon: GraduationCap, label: 'إدارة الطلاب' },
+       
+        
+       
+        { to: '/attendance', icon: UserCheck, label: 'تسجيل الحضور' },
+        { to: '/recitations', icon: BookOpen, label: 'تسجيل التسميع' },
         { to: '/statistics', icon: Table2, label: 'إحصائيات الطلاب' },
         { to: '/struggling-students', icon: AlertTriangle, label: 'الطلاب المتعثّرون' },
-        { to: '/competitions', icon: Trophy, label: 'مرشّحو المسابقات' },
+        
         { to: '/fees', icon: DollarSign, label: 'الرسوم المالية' },
         { to: '/homework', icon: BookText, label: 'الواجبات' },
         { to: '/exams', icon: Award, label: 'الامتحانات' },
@@ -108,6 +114,7 @@ const Sidebar = () => {
         { to: '/audit-log', icon: Shield, label: 'سجل العمليات' },
         { to: '/chat-monitor', icon: MessageSquare, label: 'مراقبة المحادثات' },
         { to: '/notifications', icon: Bell, label: 'الإشعارات' },
+        { to: '/competitions', icon: Trophy, label: 'مرشّحو المسابقات' },
       ];
     }
 
@@ -140,6 +147,7 @@ const Sidebar = () => {
       { to: '/my-progress', icon: Trophy, label: 'تقدمي' },
       { to: '/my-points', icon: Star, label: 'نقاطي' },
       { to: '/student-tracking', icon: FileText, label: 'ورق المتابعة' },
+      { to: '/my-warnings', icon: AlertTriangle, label: 'الإنذارات' },
       { to: '/fees', icon: DollarSign, label: 'المستحقات المالية' },
       { to: '/homework', icon: BookText, label: 'واجباتي' },
       { to: '/exams', icon: Award, label: 'امتحاناتي' },

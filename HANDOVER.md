@@ -1,7 +1,17 @@
 # وثيقة التسليم — Quran Farouq (مركز الفاروق القرآني)
 
 > اقرأ هذا الملف أول شي عند بدء محادثة جديدة لمتابعة العمل.
-> آخر تحديث: بعد commit `e96620e`.
+> آخر تحديث: 2026-07-25 — بعد commit `9a79892` + مراجعة كود شاملة + **دفعتَي تعديلات (7 + 7 بنود)** موثّقتين في `EDITS_SUMMARY.md`.
+> **الجديد:** القسم 7 (حالة شجرة العمل) والقسم 8 (قائمة الإصلاحات حسب الأولوية — **لسّا كلها مفتوحة**).
+
+> ℹ️ **تغييرات مهمة للمعمارية بعد الدفعات الثلاث:**
+> - **بنود المتابعة صار إلها نطاقان:** حقل `is_global` — بند المدير بدون `sheikh_id` عام للجميع، وبند المشرف خاص بطلابه. `get_tracking_items_for_sheikh()` بترجّع الاتنين معًا.
+> - **جدول الإحصائيات صار فيه `tracking_period`** (week/month/term) وأعمدة `tracking_prayers` و`tracking_sitting` و`last_sheet`.
+> - **endpoint جديد:** `GET /tracking-sheets/last-per-student` — آخر ورقة لكل طالب بما فيهم اللي ما سلّموا.
+> - **المدير صار يقدر يسجّل تسميع وحضور** — `POST /recitations` و`/attendance` و`/attendance/bulk` صاروا `["sheikh","admin"]`. المدير بيسجّل **نيابةً عن مشرف مجموعة الطالب** عبر `resolve_recording_sheikh_id()` — فلا تعتمد على أن `sheikh_id` في السجل = من ضغط الزر.
+> - **نقل الطالب صار بثلاثة أوضاع** (`with_data` / `keep_old` / `fresh_start`). `fresh_start` بيأرشف ويصفّر عبر `archive_and_reset_student()`. الحقل القديم `move_data` لسّا مدعوم.
+> - **بطاقتا لوحة المدير صارتا نِسَبًا مئوية** — `week_attendance_avg` و`week_pages_avg` **أُزيلا**؛ استخدم `week_attendance_rate` و`week_recitation_rate` و`week_groups`.
+> - **مجموعات أرشيف جديدة:** `tracking_sheets_archives` (+ حقلا `archived_at` و`archive_reason` في كل مجموعات الأرشيف).
 
 ---
 
@@ -117,3 +127,90 @@ BROWSER=none PORT=3000 npm start > /tmp/frontend.log 2>&1 &
 - لا تكوميت تغييرات `yarn.lock` الناتجة عن npm (مجرد نهايات أسطر — أرجعها بـ `git checkout -- frontend/yarn.lock`).
 - رسائل الكومِت بالإنجليزي + سطر `Co-Authored-By`. الرفع مباشرة على `main`.
 - المستخدم يكتب بالعامية الفلسطينية؛ الردود والواجهة بالعربي.
+
+---
+
+## 7) حالة شجرة العمل الحالية (غير مكوميت) ⚠️
+
+آخر commit = `9a79892`. **كل الشغل الجديد لسّا غير مكوميت** — التعديلات اليدوية السابقة + دفعة الـ 7 بنود فوقها.
+
+**الحالة:** الخادم يعدّي `py_compile`، والواجهة تُصرَّف بـ **`Compiled successfully` بدون تحذيرات**، و**35/35 اختبار E2E ناجح**.
+
+**الملفات المعدّلة:**
+
+| الملف | المحتوى |
+|------|---------|
+| `backend/server.py` | البنود 1، 3، 4، 6، 7 + تحسين endpoint الإنذارات + فهرس `admin_bonus_grants` + إصلاح N+1 في `dashboard-stats` |
+| `frontend/src/pages/AdminDashboard.jsx` | تعديلات المستخدم اليدوية + قائمة الطلاب مع «إظهار المزيد» وأزرار التنزيل + عرض أداء المشرفين + شريط الوصول السريع |
+| `frontend/src/pages/MyWarnings.jsx` | **ملف جديد** — تبويب إنذارات الطالب |
+| `frontend/src/pages/SheikhManagement.jsx` | حوار «إضافة مشرف» + المسجد يدوي |
+| `frontend/src/pages/TrackingSettings.jsx` | كرت إعدادات نقاط التميز |
+| `frontend/src/pages/StudentManagement.jsx` | قراءة إعدادات التميز بدل 50 الثابتة |
+| `frontend/src/pages/SheikhEditProfile.jsx`، `Register.jsx` | المسجد يدوي للمشرف |
+| `frontend/src/pages/StudentDashboard.jsx`، `components/Sidebar.jsx`، `App.js` | ربط تبويب الإنذارات |
+| `frontend/src/pages/FeesManagement.jsx`، `BulkOperations.jsx` | تعديلات المستخدم اليدوية (إعادة ترتيب + نصوص) |
+
+**ملاحظتان بسيطتان باقيتان من التعديلات اليدوية:**
+- `Sidebar.jsx`: أسطر فاضية ومسافات بادئة غير منتظمة في قائمة المدير — تجميلي.
+- `AdminDashboard.jsx`: بطاقة «طلبات التسجيل» عنوان بلا رقم (`summary.total_points` معلّق عمدًا) — لو بدك رقم، استخدم `summary.pending_students`.
+
+**تم إصلاحه:** حوار «تحميل Excel» رجع قابل للوصول عبر شريط الوصول السريع، ونص إشعار نقاط التميز أُعيدت صياغته (كان فيه مسافتان).
+
+---
+
+## 8) قائمة الإصلاحات حسب الأولوية (من مراجعة 2026-07-25)
+
+### 🔴 أمان — عالي
+
+1. **تفعيل الحساب قابل للتخمين (brute force) → تصعيد صلاحيات لمدير.**
+   `POST /auth/register` (سطر 329) بيسمح للمستخدم يختار `role` بنفسه وضمنها `"admin"` (والواجهة `Register.jsx:47-51` بتعرض الخيار فعليًا). الحماية الوحيدة هي كود تفعيل **6 أرقام**. لكن `POST /auth/activate` (سطر 396):
+   - ما فيه أي حدّ لعدد المحاولات ولا rate limiting ولا قفل للحساب،
+   - وبيرجّع **توكن JWT جاهز** فورًا عند نجاح التفعيل.
+
+   يعني: أي شخص من برّا بقدر يسجّل حساب `admin` ويجرّب مليون كود لحتى يفتح حساب مدير كامل.
+   **الإصلاح:** عدّاد محاولات + قفل بعد ~5 محاولات، وrate limit على `/auth/activate` و`/auth/login`، وطوّل الكود (8+ خانات alphanumeric).
+
+2. **كود التفعيل مولَّد بـ `random` مش `secrets`.** سطر 346-347: `random.randint` (Mersenne Twister — مو تشفيري).
+   **الإصلاح:** `secrets.randbelow` أو `secrets.token_hex`.
+
+3. **مفتاح JWT له قيمة افتراضية مكشوفة.** `backend/auth.py:9` — `os.environ.get("JWT_SECRET", "hafiz-quran-secret-key-2024")`. الريبو عام على GitHub؛ إذا الإنتاج ما ضابط `JWT_SECRET` بيقدر أي حدا يزوّر توكن مدير.
+   **الإصلاح:** ارفع استثناء عند الإقلاع إذا `JWT_SECRET` مش مضبوط (بدون fallback).
+
+4. **`get_current_user` ما بتتحقق من قاعدة البيانات.** `auth.py:47-50` بترجّع حمولة الـ JWT كما هي. يعني مستخدم محذوف أو دوره تغيّر بيضلّ شغّال لحدّ **24 ساعة**.
+   **الإصلاح:** جيب المستخدم من `db.users` وتحقّق من `is_active`/`role` الحالي.
+
+5. **`/auth/register-with-code` فيه باب «أول مدير».** سطر 226-227: إذا `admin_count == 0` بينعمل مدير بلا كود. لو انحذف آخر مدير، الباب بيفتح للعالم.
+   **الإصلاح:** اربطه بمتغيّر بيئة `ALLOW_BOOTSTRAP_ADMIN` ينطفي بالإنتاج.
+
+### 🟠 أمان — متوسط
+
+6. **CORS مفتوح.** `server.py:8438-8444` — `allow_origins=os.environ.get('CORS_ORIGINS','*')` مع `allow_credentials=True`. التطبيق بيستخدم Bearer من sessionStorage (مش كوكيز) فالخطر محدود، بس لازم يتضبط `CORS_ORIGINS` بالإنتاج على الدومين بالضبط.
+
+7. **تعداد المستخدمين (user enumeration).** `/auth/activate` بيفرّق بالردود: 404 «البريد غير مسجل» / 400 «مفعل بالفعل» / 400 «كود غير صحيح».
+   **الإصلاح:** رسالة موحّدة.
+
+8. **ما في حدّ أدنى لكلمة المرور.** `models.py:89` `password: str` بدون تحقّق. حسابات الديمو `admin123` تدلّ على الواقع.
+   **الإصلاح:** `Field(min_length=8)` + منع كلمات المرور الشائعة.
+
+9. **`users.email` بلا فهرس فريد (unique).** `DB_INDEXES["users"]` فيه `[("email", 1)]` عادي. فحص «الإيميل موجود» ثم `insert_one` مش عملية ذرّية → ممكن حسابين بنفس الإيميل تحت التزامن، و`find_one({"email": ...})` بالدخول بترجّع واحد عشوائي منهم.
+   **الإصلاح:** `unique=True` على `email` + التقاط `DuplicateKeyError`.
+
+### 🟡 جودة / صيانة
+
+10. **`server.py` = 8448 سطر و193 endpoint بملف واحد.** أكبر عائق أمام أي تطوير. اقتراح: تقسيم لـ routers حسب المجال (`auth`, `students`, `recitations`, `tracking`, `fees`, `exams`, `chat`, `reports`) مع إبقاء نفس المسارات — تغيير ميكانيكي وآمن، بس لازم يصير على دفعة لحاله بدون تغييرات وظيفية معه.
+
+11. **`except:` عارية (4 مواضع).** بتبلع حتى `KeyboardInterrupt`/`SystemExit`. بدّلها بـ `except ValueError:` أو `except Exception:` حسب السياق.
+
+12. **`@app.on_event("startup")` مهجور** في FastAPI الحديث → بدّله بـ `lifespan` قبل ما يوصل FastAPI 1.0.
+
+13. **`.gitignore` مبعثر:** 16 كتلة مكرّرة من `-e` + `# Environment files` + `*.env` (ناتجة عن `echo -e` متكرّر)، وأسطر صريحة لملفات `node_modules/.cache/*.pack`. القواعد شغّالة (تأكّدنا: **ما في ولا ملف حسّاس متتبَّع** — 167 ملف متتبَّع، الريبو 6.3 MB) بس الملف بدّه تنظيف.
+
+14. **ما في اختبارات آلية تُشغَّل بسهولة** (مذكور بالقسم 5). أي إصلاح أمان من فوق لازم يجي معه اختبار يدوي موثّق على الأقل.
+
+### ✅ اللي طلع سليم
+
+- **تغطية الصلاحيات ممتازة:** من 193 endpoint، الوحيدة بلا `current_user` هي العامة فعلًا (`/health`, `/`, `/auth/*`, `/badges/available`).
+- **ما في `to_list(None)`** — يعني ما في استعلامات بلا حدّ.
+- **الفهارس شاملة** — 38 مجموعة مفهرسة بـ `DB_INDEXES`.
+- **ما في أسرار متتبَّعة بـ git** (لا `.env` ولا `.venv` ولا `node_modules`).
+- الملفات المعدّلة كلها بتعدّي `py_compile` و`esbuild` بدون أخطاء.

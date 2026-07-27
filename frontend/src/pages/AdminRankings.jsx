@@ -56,7 +56,6 @@ const AdminRankings = () => {
             <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الطلاب</th>
             <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>إجمالي النقاط</th>
             <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المتوسط</th>
-            <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الحضور</th>
           </tr>
         </thead>
         <tbody>
@@ -74,7 +73,6 @@ const AdminRankings = () => {
                 <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{item.student_count}</td>
                 <td className="px-4 py-3 text-emerald-400 font-bold">{item.total_points}</td>
                 <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{item.avg_points}</td>
-                <td className={`px-4 py-3 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{item.attendance_rate}%</td>
               </tr>
             );
           })}

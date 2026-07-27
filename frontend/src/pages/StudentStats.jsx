@@ -16,10 +16,19 @@ const SORT_FIELDS = [
   { key: 'new_memorization', label: 'الحفظ الجديد' },
   { key: 'review', label: 'المراجعة' },
   { key: 'attendance', label: 'أيام الحضور' },
-  { key: 'tracking', label: 'تسليم ورق المتابعة' },
+  { key: 'tracking', label: 'عدد أوراق المتابعة' },
+  { key: 'tracking_prayers', label: 'الصلوات' },
+  { key: 'tracking_sitting', label: 'الجلوس مع القرآن' },
   { key: 'age', label: 'العمر' },
   { key: 'grade', label: 'الصف' },
   { key: 'average', label: 'المعدل' },
+];
+
+// مدى احتساب أعمدة ورق المتابعة
+const TRACKING_PERIODS = [
+  { key: 'week', label: 'الأسبوع' },
+  { key: 'month', label: 'الشهر' },
+  { key: 'term', label: 'الفصل' },
 ];
 
 const StudentStats = () => {
@@ -31,6 +40,7 @@ const StudentStats = () => {
   const [minAverage, setMinAverage] = useState(''); // فلتر: المعدل من (الحد الأدنى)
   const [sortBy, setSortBy] = useState('total_memorization'); // الفلتر الثاني
   const [order, setOrder] = useState('desc');       // الفلتر الثالث
+  const [trackingPeriod, setTrackingPeriod] = useState('term'); // مدى أعمدة ورق المتابعة
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -41,7 +51,7 @@ const StudentStats = () => {
   useEffect(() => {
     fetchRows();
     // eslint-disable-next-line
-  }, [groupId, sortBy, order]);
+  }, [groupId, sortBy, order, trackingPeriod]);
 
   const params = (withStudent) => {
     const p = new URLSearchParams();
@@ -49,6 +59,7 @@ const StudentStats = () => {
     if (withStudent && studentId !== 'all') p.append('student_id', studentId);
     p.append('sort_by', sortBy);
     p.append('order', order);
+    p.append('tracking_period', trackingPeriod);
     return p.toString();
   };
 
@@ -142,6 +153,25 @@ const StudentStats = () => {
               {SORT_FIELDS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
             </select>
           </div>
+          {/* مدى أعمدة ورق المتابعة */}
+          <div>
+            <label className={`block text-xs mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>ورق المتابعة خلال</label>
+            <div className={`inline-flex rounded-lg border overflow-hidden ${isDark ? 'border-white/10' : 'border-slate-300'}`}>
+              {TRACKING_PERIODS.map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => setTrackingPeriod(p.key)}
+                  className={`px-3 py-2 text-sm transition-colors ${
+                    trackingPeriod === p.key
+                      ? 'bg-emerald-600 text-white'
+                      : isDark ? 'bg-slate-800 text-slate-300 hover:bg-white/5' : 'bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {/* الفلتر الثالث: تصاعدي/تنازلي */}
           <div>
             <label className={`block text-xs mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الاتجاه</label>
@@ -175,7 +205,10 @@ const StudentStats = () => {
                     <th className={`${th} ${activeCol('new_memorization')}`}>الحفظ الجديد</th>
                     <th className={`${th} ${activeCol('review')}`}>المراجعة</th>
                     <th className={`${th} ${activeCol('attendance')}`}>أيام الحضور</th>
-                    <th className={`${th} ${activeCol('tracking')}`}>تسليم المتابعة</th>
+                    <th className={`${th} ${activeCol('tracking')}`}>أوراق المتابعة</th>
+                    <th className={`${th} ${activeCol('tracking_prayers')}`}>🕌 الصلوات</th>
+                    <th className={`${th} ${activeCol('tracking_sitting')}`}>📖 الجلوس مع القرآن</th>
+                    <th className={th}>آخر ورقة</th>
                     <th className={`${th} ${activeCol('age')}`}>العمر</th>
                     <th className={`${th} ${activeCol('grade')}`}>الصف</th>
                     <th className={`${th} ${activeCol('average')}`}>المعدل</th>
@@ -192,6 +225,15 @@ const StudentStats = () => {
                       <td className={`p-2 ${activeCol('review')}`}>{r.review}</td>
                       <td className={`p-2 ${activeCol('attendance')}`}>{r.attendance} يوم</td>
                       <td className={`p-2 ${activeCol('tracking')}`}>{r.tracking}</td>
+                      <td className={`p-2 ${activeCol('tracking_prayers')}`}>{r.tracking_prayers ?? 0}</td>
+                      <td className={`p-2 ${activeCol('tracking_sitting')}`}>{r.tracking_sitting ?? 0}</td>
+                      <td className="p-2">
+                        {r.last_sheet?.week_start ? (
+                          <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{r.last_sheet.week_start}</span>
+                        ) : (
+                          <span className={isDark ? 'text-slate-600' : 'text-slate-400'}>لم يسلّم</span>
+                        )}
+                      </td>
                       <td className={`p-2 ${activeCol('age')}`}>{r.age ?? '—'}</td>
                       <td className={`p-2 ${activeCol('grade')}`}>{r.grade || '—'}</td>
                       <td className={`p-2 ${activeCol('average')}`}>{r.average != null ? `${r.average}%` : '—'}</td>
@@ -199,7 +241,12 @@ const StudentStats = () => {
                   ))}
                 </tbody>
               </table>
-              <p className={`text-xs mt-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>الأرقام بالصفحات (الحفظ الكلي/الجديد/المراجعة).</p>
+              <p className={`text-xs mt-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                الأرقام بالصفحات (الحفظ الكلي/الجديد/المراجعة).
+                {' '}أعمدة ورق المتابعة (الأوراق/الصلوات/الجلوس) محسوبة خلال{' '}
+                <strong>{TRACKING_PERIODS.find((p) => p.key === trackingPeriod)?.label}</strong>؛
+                عمود «آخر ورقة» بيعرض أسبوع آخر ورقة مُسلَّمة بغضّ النظر عن المدة.
+              </p>
             </div>
           )}
         </CardContent>

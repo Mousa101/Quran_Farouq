@@ -13,10 +13,11 @@ import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
 import {
   Users, Plus, Trash2, Edit, Search, UserPlus, UserMinus,
-  Loader2, UsersRound, User
+  Loader2, UsersRound, User, Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
 import BulkOperations from './BulkOperations';
+import StudentLink from '../components/StudentLink';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -169,9 +170,28 @@ const GroupManagement = () => {
     }
   };
 
+  // بعد أي عملية جماعية (نقل/تفعيل) — نحدّث المجموعات وقوائم الطلاب فوق
+  const handleBulkChanged = async () => {
+    await fetchData();
+    if (selectedGroup) {
+      try {
+        const res = await axios.get(`${API}/groups/${selectedGroup.id}/students`);
+        setGroupStudents(res.data);
+      } catch (error) {
+        console.error('Error refreshing group students:', error);
+      }
+    }
+  };
+
   const getSheikhName = (sheikhId) => {
     const sheikh = sheikhs.find(s => s.id === sheikhId);
     return sheikh?.name || 'غير معين';
+  };
+
+  // اسم المجموعة الحالية للطالب (يُعرض في قائمة الطلاب المتاحين)
+  const getGroupName = (groupId) => {
+    const group = groups.find(g => g.id === groupId);
+    return group?.name || 'مجموعة غير معروفة';
   };
 
   // Students not in selected group
@@ -433,20 +453,32 @@ const GroupManagement = () => {
                       key={student.id}
                       className="p-3 rounded-lg bg-slate-800/50 border border-white/5 flex items-center justify-between"
                     >
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
                           <span className="text-xs font-bold text-emerald-400">{student.name?.charAt(0)}</span>
                         </div>
-                        <span className="text-white text-sm">{student.name}</span>
+                        <StudentLink studentId={student.id} name={student.name} className="text-white text-sm" />
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                        onClick={() => handleRemoveStudentFromGroup(student.id)}
-                      >
-                        <UserMinus className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-slate-400 hover:text-emerald-400"
+                          onClick={() => navigate(`/student/${student.id}`)}
+                          title="فتح صفحة الطالب"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                          onClick={() => handleRemoveStudentFromGroup(student.id)}
+                          title="إخراج من المجموعة"
+                        >
+                          <UserMinus className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -466,27 +498,49 @@ const GroupManagement = () => {
                   availableStudents.map((student) => (
                     <div
                       key={student.id}
-                      className="p-3 rounded-lg bg-slate-800/50 border border-white/5 flex items-center justify-between"
+                      className="p-3 rounded-lg bg-slate-800/50 border border-white/5 flex items-center justify-between gap-2"
                     >
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
                           <span className="text-xs font-bold text-blue-400">{student.name?.charAt(0)}</span>
                         </div>
-                        <div>
-                          <span className="text-white text-sm">{student.name}</span>
-                          {student.group_id && (
-                            <p className="text-slate-400 text-xs">في مجموعة أخرى</p>
+                        <div className="min-w-0">
+                          <StudentLink
+                            studentId={student.id}
+                            name={student.name}
+                            className="text-white text-sm"
+                          />
+                          {/* المجموعة الحالية للطالب (إن كان بمجموعة) */}
+                          {student.group_id ? (
+                            <p className="text-amber-400 text-xs truncate flex items-center gap-1">
+                              <UsersRound className="w-3 h-3 flex-shrink-0" />
+                              {getGroupName(student.group_id)}
+                            </p>
+                          ) : (
+                            <p className="text-slate-500 text-xs">بدون مجموعة</p>
                           )}
                         </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
-                        onClick={() => handleAddStudentToGroup(student.id)}
-                      >
-                        <UserPlus className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-slate-400 hover:text-emerald-400"
+                          onClick={() => navigate(`/student/${student.id}`)}
+                          title="فتح صفحة الطالب"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                          onClick={() => handleAddStudentToGroup(student.id)}
+                          title={student.group_id ? 'نقل الطالب لهذه المجموعة' : 'إضافة الطالب للمجموعة'}
+                        >
+                          <UserPlus className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -500,9 +554,9 @@ const GroupManagement = () => {
         </DialogContent>
       </Dialog>
 
-      {/* #4 — العمليات الجماعية بنفس صفحة إدارة المجموعات */}
+      {/* #4 — العمليات الجماعية بنفس صفحة إدارة المجموعات (مربوطة: أي نقل بيحدّث القوائم فوق) */}
       <div className="mt-8 pt-6 border-t border-white/10">
-        <BulkOperations />
+        <BulkOperations onChanged={handleBulkChanged} />
       </div>
     </div>
   );

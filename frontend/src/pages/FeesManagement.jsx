@@ -26,9 +26,10 @@ const FEE_TYPES = [
 
 // حالات الدفع
 const PAYMENT_STATUS = {
-  pending: { label: 'قائم', color: 'bg-slate-500/20 text-slate-400', icon: Clock },  // لم يأتي وقت دفعه
   due: { label: 'مستحق', color: 'bg-amber-500/20 text-amber-400', icon: AlertCircle },  // مستحق الدفع
-  paid: { label: 'مدفوع', color: 'bg-emerald-500/20 text-emerald-400', icon: CheckCircle }  // تم الدفع
+  paid: { label: 'مدفوع', color: 'bg-emerald-500/20 text-emerald-400', icon: CheckCircle },  // تم الدفع
+    pending: { label: 'قائم', color: 'bg-slate-500/20 text-slate-400', icon: Clock },  // لم يأتي وقت دفعه
+
 };
 
 const FeesManagement = () => {
@@ -350,11 +351,11 @@ const FeesManagement = () => {
             <p className="text-xl font-bold text-blue-400">{stats.total.toFixed(2)}</p>
           </CardContent>
         </Card>
-        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+          <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
           <CardContent className="p-4 text-center">
-            <CheckCircle className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
-            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>مدفوع</p>
-            <p className="text-xl font-bold text-emerald-400">{stats.paid.toFixed(2)}</p>
+            <Clock className="w-8 h-8 mx-auto text-slate-400 mb-2" />
+            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>قائم</p>
+            <p className="text-xl font-bold text-slate-400">{stats.pending.toFixed(2)}</p>
           </CardContent>
         </Card>
         <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
@@ -366,11 +367,13 @@ const FeesManagement = () => {
         </Card>
         <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
           <CardContent className="p-4 text-center">
-            <Clock className="w-8 h-8 mx-auto text-slate-400 mb-2" />
-            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>قائم</p>
-            <p className="text-xl font-bold text-slate-400">{stats.pending.toFixed(2)}</p>
+            <CheckCircle className="w-8 h-8 mx-auto text-emerald-400 mb-2" />
+            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>مدفوع</p>
+            <p className="text-xl font-bold text-emerald-400">{stats.paid.toFixed(2)}</p>
           </CardContent>
         </Card>
+        
+      
       </div>
 
       {/* Filters */}

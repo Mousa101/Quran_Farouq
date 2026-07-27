@@ -8,12 +8,11 @@ import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import {
-  BookOpen, Users, Search, Eye, Trash2, Phone, Mail,
+  BookUser, Users, Search, Eye, Trash2, Phone, Mail,
   Calendar, Award, GraduationCap, AlertTriangle, X,
-  Briefcase, MapPin, Star, UserCheck, FileText, Key, Edit, Loader2
+  Briefcase, MapPin, Star, UserCheck, FileText, Key, Edit, Loader2, UserPlus
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { MOSQUES, MOSQUE_OTHER } from '../lib/constants';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -36,8 +35,48 @@ const SheikhManagement = () => {
   const [editOpen, setEditOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [editForm, setEditForm] = useState({});
-  const [mosqueOther, setMosqueOther] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // إضافة مشرف جديد
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({});
+  const [addingSheikh, setAddingSheikh] = useState(false);
+  const [groups, setGroups] = useState([]);
+
+  const openAddSheikh = () => {
+    setAddForm({
+      name: '', email: '', password: '', student_phone: '', mosque_name: '',
+      birth_date: '', specialization: '', experience_years: '', group_id: '',
+    });
+    setAddOpen(true);
+  };
+
+  const submitAddSheikh = async () => {
+    if (!addForm.name?.trim() || !addForm.email?.trim() || !addForm.password) {
+      toast.error('الاسم والبريد الإلكتروني وكلمة المرور مطلوبة');
+      return;
+    }
+    if (addForm.password.length < 6) {
+      toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
+      return;
+    }
+    setAddingSheikh(true);
+    try {
+      const payload = {
+        ...addForm,
+        experience_years: addForm.experience_years ? Number(addForm.experience_years) : null,
+        group_id: addForm.group_id || null,
+      };
+      await axios.post(`${API}/admin/sheikhs`, payload);
+      toast.success('تم إضافة المشرف بنجاح');
+      setAddOpen(false);
+      fetchSheikhs();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في إضافة المشرف');
+    } finally {
+      setAddingSheikh(false);
+    }
+  };
 
   const openEditSheikh = (sheikh) => {
     setEditTarget(sheikh);
@@ -46,7 +85,6 @@ const SheikhManagement = () => {
       birth_date: sheikh.birth_date || '', join_date: sheikh.join_date || '',
       specialization: sheikh.specialization || '', experience_years: sheikh.experience_years || '',
     });
-    setMosqueOther(!!(sheikh.mosque_name) && !MOSQUES.slice(0, -1).includes(sheikh.mosque_name));
     setEditOpen(true);
   };
 
@@ -66,6 +104,7 @@ const SheikhManagement = () => {
 
   useEffect(() => {
     fetchSheikhs();
+    fetchGroups();
   }, []);
 
   const fetchSheikhs = async () => {
@@ -76,6 +115,16 @@ const SheikhManagement = () => {
       toast.error('فشل في تحميل بيانات المشرفين');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchGroups = async () => {
+    try {
+      const res = await axios.get(`${API}/groups`);
+      setGroups(res.data || []);
+    } catch (error) {
+      // اختياري — الإسناد للمجموعة ممكن يتم لاحقًا من إدارة المجموعات
+      setGroups([]);
     }
   };
 
@@ -160,15 +209,21 @@ const SheikhManagement = () => {
               عرض وإدارة جميع المشرفين في المركز ({sheikhs.length} مشرف)
             </p>
           </div>
-          <div className="relative">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-            <Input
-              type="text"
-              placeholder="بحث بالاسم أو البريد..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={`pr-10 h-10 w-full md:w-64 ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}`}
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Input
+                type="text"
+                placeholder="بحث بالاسم أو البريد..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`pr-10 h-10 w-full md:w-64 ${isDark ? 'bg-slate-800/50 border-slate-700' : 'bg-white border-slate-200'}`}
+              />
+            </div>
+            <Button onClick={openAddSheikh} className="bg-blue-600 hover:bg-blue-700 h-10 whitespace-nowrap">
+              <UserPlus className="w-4 h-4 ml-1" />
+              إضافة مشرف
+            </Button>
           </div>
         </div>
       </div>
@@ -184,7 +239,7 @@ const SheikhManagement = () => {
                   <img src={sheikh.profile_image} alt={sheikh.name} className="w-14 h-14 rounded-xl object-cover border-2 border-blue-500/30" />
                 ) : (
                   <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                    <BookOpen className="w-7 h-7 text-blue-400" />
+                    <BookUser className="w-7 h-7 text-blue-400" />
                   </div>
                 )}
                 
@@ -251,7 +306,7 @@ const SheikhManagement = () => {
 
       {filteredSheikhs.length === 0 && (
         <div className={`text-center py-12 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
-          <BookOpen className="w-12 h-12 mx-auto text-slate-500 mb-3" />
+          <BookUser className="w-12 h-12 mx-auto text-slate-500 mb-3" />
           <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>لا يوجد مشرفين</p>
         </div>
       )}
@@ -261,7 +316,7 @@ const SheikhManagement = () => {
         <DialogContent className={`max-w-3xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}>
           <DialogHeader>
             <DialogTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : ''}`}>
-              <BookOpen className="w-5 h-5 text-blue-400" />
+              <BookUser className="w-5 h-5 text-blue-400" />
               تفاصيل المشرف
             </DialogTitle>
           </DialogHeader>
@@ -275,7 +330,7 @@ const SheikhManagement = () => {
                     <img src={sheikhDetails.sheikh.profile_image} alt={sheikhDetails.sheikh.name} className="w-20 h-20 rounded-xl object-cover" />
                   ) : (
                     <div className="w-20 h-20 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                      <BookOpen className="w-10 h-10 text-blue-400" />
+                      <BookUser className="w-10 h-10 text-blue-400" />
                     </div>
                   )}
                   <div className="flex-1">
@@ -399,6 +454,79 @@ const SheikhManagement = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Add Sheikh Modal */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className={`max-w-lg ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}>
+          <DialogHeader>
+            <DialogTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <UserPlus className="w-5 h-5 text-blue-400" />إضافة مشرف جديد
+            </DialogTitle>
+            <DialogDescription className={isDark ? 'text-slate-400' : 'text-slate-600'}>
+              الحساب بينفتح مفعّل مباشرة — المشرف بقدر يسجّل دخول فورًا.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 mt-2">
+            <div className="col-span-2">
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>الاسم *</Label>
+              <Input value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} placeholder="اسم المشرف" className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+            </div>
+            <div>
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>البريد الإلكتروني *</Label>
+              <Input value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} dir="ltr" placeholder="name@faruq.com" className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+            </div>
+            <div>
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>كلمة المرور *</Label>
+              <Input type="text" value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} dir="ltr" placeholder="6 أحرف على الأقل" className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+            </div>
+            <div>
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>الهاتف</Label>
+              <Input value={addForm.student_phone} onChange={(e) => setAddForm({ ...addForm, student_phone: e.target.value })} dir="ltr" className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+            </div>
+            <div>
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>تاريخ الميلاد</Label>
+              <Input type="date" value={addForm.birth_date} onChange={(e) => setAddForm({ ...addForm, birth_date: e.target.value })} className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+            </div>
+            <div className="col-span-2">
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>المسجد</Label>
+              <Input value={addForm.mosque_name} onChange={(e) => setAddForm({ ...addForm, mosque_name: e.target.value })} placeholder="اكتب اسم المسجد" className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+            </div>
+            <div>
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>التخصص</Label>
+              <Input value={addForm.specialization} onChange={(e) => setAddForm({ ...addForm, specialization: e.target.value })} placeholder="مثال: تجويد، حفظ" className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+            </div>
+            <div>
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>سنوات الخبرة</Label>
+              <Input type="number" min="0" value={addForm.experience_years} onChange={(e) => setAddForm({ ...addForm, experience_years: e.target.value })} className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+            </div>
+            <div className="col-span-2">
+              <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>إسناد مجموعة (اختياري)</Label>
+              <select
+                value={addForm.group_id}
+                onChange={(e) => setAddForm({ ...addForm, group_id: e.target.value })}
+                className={`w-full h-10 px-3 rounded-md border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-300'}`}
+              >
+                <option value="">بدون مجموعة</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>{g.name} — {g.sheikh_name || 'غير معين'}</option>
+                ))}
+              </select>
+              <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+                إذا كانت المجموعة مُسندة لمشرف آخر، رح تنتقل للمشرف الجديد.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 mt-4">
+            <Button variant="outline" onClick={() => setAddOpen(false)} className={isDark ? 'border-slate-700' : ''}>
+              إلغاء
+            </Button>
+            <Button onClick={submitAddSheikh} disabled={addingSheikh} className="bg-blue-600 hover:bg-blue-700">
+              {addingSheikh ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <UserPlus className="w-4 h-4 ml-1" />}
+              إضافة المشرف
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Sheikh Modal */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className={`max-w-lg ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}>
@@ -422,13 +550,7 @@ const SheikhManagement = () => {
             </div>
             <div className="col-span-2">
               <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>المسجد</Label>
-              <select value={mosqueOther ? MOSQUE_OTHER : editForm.mosque_name}
-                onChange={(e) => { const v = e.target.value; if (v === MOSQUE_OTHER) { setMosqueOther(true); setEditForm({ ...editForm, mosque_name: '' }); } else { setMosqueOther(false); setEditForm({ ...editForm, mosque_name: v }); } }}
-                className={`w-full h-10 px-3 rounded-md border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-300'}`}>
-                <option value="">اختر المسجد</option>
-                {MOSQUES.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
-              {mosqueOther && <Input value={editForm.mosque_name} onChange={(e) => setEditForm({ ...editForm, mosque_name: e.target.value })} placeholder="اكتب اسم المسجد" className={`mt-1 ${isDark ? 'bg-slate-800 border-slate-700 text-white' : ''}`} />}
+              <Input value={editForm.mosque_name} onChange={(e) => setEditForm({ ...editForm, mosque_name: e.target.value })} placeholder="اكتب اسم المسجد" className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
             </div>
             <div>
               <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>التخصص</Label>

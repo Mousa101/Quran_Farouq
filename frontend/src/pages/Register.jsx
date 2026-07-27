@@ -511,32 +511,45 @@ const Register = () => {
                     <Home className="w-3 h-3" />
                     المسجد
                   </Label>
-                  <select
-                    value={mosqueOther ? MOSQUE_OTHER : formData.mosqueName}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === MOSQUE_OTHER) {
-                        setMosqueOther(true);
-                        handleChange('mosqueName', '');
-                      } else {
-                        setMosqueOther(false);
-                        handleChange('mosqueName', val);
-                      }
-                    }}
-                    className="h-8 text-xs bg-slate-800/50 border border-slate-700 text-white rounded-md w-full px-2"
-                  >
-                    <option value="">اختر المسجد</option>
-                    {MOSQUES.map((m) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
-                  {mosqueOther && (
+                  {/* المشرف/المدير يكتب اسم المسجد يدويًا؛ الطالب يختار من القائمة */}
+                  {selectedRole === 'student' ? (
+                    <>
+                      <select
+                        value={mosqueOther ? MOSQUE_OTHER : formData.mosqueName}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === MOSQUE_OTHER) {
+                            setMosqueOther(true);
+                            handleChange('mosqueName', '');
+                          } else {
+                            setMosqueOther(false);
+                            handleChange('mosqueName', val);
+                          }
+                        }}
+                        className="h-8 text-xs bg-slate-800/50 border border-slate-700 text-white rounded-md w-full px-2"
+                      >
+                        <option value="">اختر المسجد</option>
+                        {MOSQUES.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                      {mosqueOther && (
+                        <Input
+                          type="text"
+                          placeholder="اكتب اسم مسجدك"
+                          value={formData.mosqueName}
+                          onChange={(e) => handleChange('mosqueName', e.target.value)}
+                          className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white mt-1"
+                        />
+                      )}
+                    </>
+                  ) : (
                     <Input
                       type="text"
-                      placeholder="اكتب اسم مسجدك"
+                      placeholder="اكتب اسم المسجد"
                       value={formData.mosqueName}
                       onChange={(e) => handleChange('mosqueName', e.target.value)}
-                      className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white mt-1"
+                      className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
                     />
                   )}
                 </div>

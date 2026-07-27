@@ -13,10 +13,32 @@ import { toast } from 'sonner';
 import { 
   Users, BookOpen, Calendar, Trophy, TrendingUp, 
   GraduationCap, UserCheck, Target, Eye, Medal,
-  ArrowUpRight, UserPlus, Clock, Archive, RefreshCw, Download, FileSpreadsheet, Edit
+  ArrowUpRight, UserPlus, Clock, Archive, RefreshCw, Download, FileSpreadsheet, Edit,
+  ChevronDown, ChevronUp, Loader2, BookUser
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+
+// شريط نسبة بسيط (يُستخدم لنسبتَي التسميع والحضور لكل مجموعة)
+const RateBar = ({ label, value, color, isDark }) => {
+  const pct = Math.max(0, Math.min(100, Number(value) || 0));
+  const colors = {
+    blue: { bar: 'bg-blue-500', text: 'text-blue-400' },
+    emerald: { bar: 'bg-emerald-500', text: 'text-emerald-400' },
+  };
+  const c = colors[color] || colors.blue;
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{label}</span>
+        <span className={`text-[11px] font-bold ${c.text}`}>{pct}%</span>
+      </div>
+      <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-slate-700' : 'bg-slate-200'}`}>
+        <div className={`h-full rounded-full ${c.bar}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+};
 
 const AdminDashboard = () => {
   const { isDark } = useTheme();
@@ -31,6 +53,11 @@ const AdminDashboard = () => {
   const [selectedTermId, setSelectedTermId] = useState('new');
   const [loadingTerms, setLoadingTerms] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  // قائمة الطلاب بالصفحة الرئيسية + تنزيل سجل التسميع
+  const [showWeekBreakdown, setShowWeekBreakdown] = useState(false);
+  const [showAllStudents, setShowAllStudents] = useState(false);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [downloadingStudent, setDownloadingStudent] = useState(null);
   const [selectedExportTermId, setSelectedExportTermId] = useState('');
   const [exporting, setExporting] = useState(false);
   // F2: قيم نظام النقاط من مصدر واحد بالخادم (مع قيم احتياطية صحيحة)
@@ -261,6 +288,31 @@ const AdminDashboard = () => {
     }
   };
 
+  // تنزيل سجل تسميع طالب واحد (الفصل الحالي أو كل الفصول)
+  const handleDownloadRecitations = async (student, scope) => {
+    setDownloadingStudent(`${student.student_id}:${scope}`);
+    try {
+      const res = await axios.get(
+        `${API}/export/student-recitations/${student.student_id}?scope=${scope}`,
+        { responseType: 'blob' }
+      );
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `سجل_تسميع_${student.student_name}_${scope === 'all' ? 'كل_الفصول' : 'الفصل_الحالي'}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(`تم تحميل سجل تسميع ${student.student_name}`);
+    } catch (error) {
+      console.error('Error downloading recitations:', error);
+      toast.error('فشل في تحميل سجل التسميع');
+    } finally {
+      setDownloadingStudent(null);
+    }
+  };
+
   const getRankBadge = (rank) => {
     if (rank === 1) return { bg: 'bg-amber-500/20', text: 'text-amber-400', icon: '🥇' };
     if (rank === 2) return { bg: 'bg-slate-400/20', text: 'text-slate-300', icon: '🥈' };
@@ -279,7 +331,20 @@ const AdminDashboard = () => {
   const summary = dashboardData?.summary || {};
   const topGroups = dashboardData?.top_groups || [];
   const topStudents = dashboardData?.top_students || [];
+  const allStudents = dashboardData?.all_students || [];
+  const weekGroups = dashboardData?.week_groups || [];
+  const totalGroupsPoints = dashboardData?.total_groups_points ?? 0;
+  const activeTermName = dashboardData?.active_term_name;
   const sheikhs = dashboardData?.sheikhs || [];
+
+  // قائمة الطلاب المعروضة: أول 5 أو الكل حسب زر «إظهار المزيد» + فلترة البحث
+  const searchedStudents = studentSearch.trim()
+    ? allStudents.filter((s) =>
+        s.student_name?.toLowerCase().includes(studentSearch.trim().toLowerCase()) ||
+        s.group_name?.toLowerCase().includes(studentSearch.trim().toLowerCase())
+      )
+    : allStudents;
+  const visibleStudents = showAllStudents ? searchedStudents : searchedStudents.slice(0, 5);
 
   return (
     <div className="space-y-4 md:space-y-6 animate-fadeIn">
@@ -296,7 +361,7 @@ const AdminDashboard = () => {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button 
+            {/* <Button 
               onClick={() => setExportDialogOpen(true)}
               variant="outline" 
               size="sm" 
@@ -304,40 +369,81 @@ const AdminDashboard = () => {
             >
               <FileSpreadsheet className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
               تحميل Excel
-            </Button>
-            <Button 
-              onClick={() => setTermDialogOpen(true)}
-              variant="outline" 
-              size="sm" 
-              className={`text-xs md:text-sm text-amber-400 border-amber-500/30 hover:bg-amber-500/10 ${isDark ? '' : 'border-amber-300'}`}
-            >
-              <Archive className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
-              إغلاق الفصل وبدء فصل جديد
-            </Button>
-            <Link to="/admin-rankings">
+            </Button> */}
+           
+            {/* <Link to="/admin-rankings">
               <Button variant="outline" size="sm" className={`text-xs md:text-sm ${isDark ? 'border-white/10 hover:bg-white/5' : ''}`}>
                 <TrendingUp className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
                 الترتيب التفصيلي
               </Button>
-            </Link>
-            <Link to="/pending-students">
+            </Link> */}
+            {/* <Link to="/pending-students">
               <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-xs md:text-sm">
-                <UserPlus className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
+
                 طلبات التسجيل
               </Button>
+            </Link> */}
+          </div>
+        </div>
+
+        {/* وصول سريع */}
+        <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+          <p className={`text-xs mb-2 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>وصول سريع</p>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/sheikh-management">
+              <Button variant="outline" size="sm" className={`text-xs text-blue-400 border-blue-500/30 hover:bg-blue-500/10 ${isDark ? '' : 'border-blue-300'}`}>
+                <UserPlus className="w-3 h-3 ml-1" />
+                إضافة مشرف
+              </Button>
             </Link>
+            <Link to="/tracking-settings">
+              <Button variant="outline" size="sm" className={`text-xs text-amber-400 border-amber-500/30 hover:bg-amber-500/10 ${isDark ? '' : 'border-amber-300'}`}>
+                <Trophy className="w-3 h-3 ml-1" />
+                إعدادات نقاط التميز
+              </Button>
+            </Link>
+            <Link to="/student-management">
+              <Button variant="outline" size="sm" className={`text-xs text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 ${isDark ? '' : 'border-emerald-300'}`}>
+                <GraduationCap className="w-3 h-3 ml-1" />
+                إدارة الطلاب
+              </Button>
+            </Link>
+            <Button
+              onClick={() => setExportDialogOpen(true)}
+              variant="outline"
+              size="sm"
+              className={`text-xs text-purple-400 border-purple-500/30 hover:bg-purple-500/10 ${isDark ? '' : 'border-purple-300'}`}
+            >
+              <FileSpreadsheet className="w-3 h-3 ml-1" />
+              تحميل Excel
+            </Button>
           </div>
         </div>
       </div>
 
       {/* Stats Grid — بطاقات مربوطة بصفحاتها */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
+        <Link to="/sheikh-management" className="block">
+          <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-blue-500/50 transition-colors cursor-pointer h-full`}>
+            <CardContent className="p-3 md:p-4">
+              <div className="flex items-center justify-between">
+                <div className="min-w-0">
+                  <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>إدارة المشرفين</p>
+                  <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_sheikhs}</p>
+                </div>
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                  <BookUser className="w-5 h-5 md:w-6 md:h-6 text-blue-400" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
         <Link to="/student-management" className="block">
           <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-emerald-500/50 transition-colors cursor-pointer h-full`}>
             <CardContent className="p-3 md:p-4">
               <div className="flex items-center justify-between">
                 <div className="min-w-0">
-                  <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الطلاب</p>
+                  <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>إدارة الطلاب</p>
                   <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_students}</p>
                 </div>
                 <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
@@ -348,28 +454,14 @@ const AdminDashboard = () => {
           </Card>
         </Link>
 
-        <Link to="/sheikh-management" className="block">
-          <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-blue-500/50 transition-colors cursor-pointer h-full`}>
-            <CardContent className="p-3 md:p-4">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0">
-                  <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المشرفين</p>
-                  <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_sheikhs}</p>
-                </div>
-                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-5 h-5 md:w-6 md:h-6 text-blue-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </Link>
+        
 
         <Link to="/group-management" className="block">
           <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-purple-500/50 transition-colors cursor-pointer h-full`}>
             <CardContent className="p-3 md:p-4">
               <div className="flex items-center justify-between">
                 <div className="min-w-0">
-                  <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المجموعات</p>
+                  <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>إدارة المجموعات</p>
                   <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_groups}</p>
                 </div>
                 <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
@@ -380,16 +472,26 @@ const AdminDashboard = () => {
           </Card>
         </Link>
 
-        <Link to="/statistics" className="block">
-          <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-amber-500/50 transition-colors cursor-pointer h-full`}>
+        <Link to="/pending-students" className="block">
+          <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-green-500/50 transition-colors cursor-pointer h-full`}>
             <CardContent className="p-3 md:p-4">
               <div className="flex items-center justify-between">
                 <div className="min-w-0">
-                  <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>إجمالي النقاط</p>
-                  <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.total_points}</p>
+                  <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>طلبات التسجيل</p>
+                  <p className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    {summary.pending_students ?? 0}
+                  </p>
+                  {summary.pending_students > 0 && (
+                    <p className="text-[10px] md:text-xs text-green-400">بانتظار الاعتماد</p>
+                  )}
                 </div>
-                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                  <Trophy className="w-5 h-5 md:w-6 md:h-6 text-amber-400" />
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0 relative">
+                   <UserPlus className="w-5 h-5 md:w-6 md:h-6 text-green-400" />
+                   {summary.pending_students > 0 && (
+                     <span className="absolute -top-1 -left-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                       {summary.pending_students}
+                     </span>
+                   )}
                 </div>
               </div>
             </CardContent>
@@ -397,48 +499,114 @@ const AdminDashboard = () => {
         </Link>
       </div>
 
-      {/* Weekly Averages — متوسطات الأسبوع (السبت→الجمعة)، مربوطة بالإحصائيات */}
+      {/* نِسَب الأسبوع (السبت→الجمعة) — «عرض المزيد» بيفتح تفريع بكل مجموعة */}
       <div className="grid grid-cols-2 gap-2 md:gap-4">
-        <Link to="/statistics" className="block">
-          <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-emerald-500/50 transition-colors cursor-pointer h-full`}>
-            <CardContent className="p-3 md:p-4">
-              <div className="flex items-center gap-2 md:gap-3">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
-                  <UserCheck className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
-                </div>
-                <div className="min-w-0">
-                  <p className={`text-[10px] md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>متوسط حضور الأسبوع</p>
-                  <p className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.week_attendance_avg ?? 0} <span className="text-xs font-normal">/ طالب</span></p>
-                  {summary.week_start && (
-                    <p className={`text-[9px] md:text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{summary.week_start} — {summary.week_end}</p>
-                  )}
-                </div>
+        <Card
+          onClick={() => setShowWeekBreakdown(!showWeekBreakdown)}
+          className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-emerald-500/50 transition-colors cursor-pointer h-full`}
+        >
+          <CardContent className="p-3 md:p-4">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                <UserCheck className="w-4 h-4 md:w-5 md:h-5 text-emerald-400" />
               </div>
-              <p className="text-[10px] md:text-xs text-emerald-400 mt-1 text-left">عرض المزيد ←</p>
-            </CardContent>
-          </Card>
-        </Link>
+              <div className="min-w-0">
+                <p className={`text-[10px] md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>نسبة حضور الأسبوع</p>
+                <p className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  {summary.week_attendance_rate ?? 0}<span className="text-xs font-normal">%</span>
+                </p>
+                {summary.week_start && (
+                  <p className={`text-[9px] md:text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{summary.week_start} — {summary.week_end}</p>
+                )}
+              </div>
+            </div>
+            <p className="text-[10px] md:text-xs text-emerald-400 mt-1 text-left flex items-center justify-end gap-1">
+              {showWeekBreakdown ? <>إخفاء التفريع <ChevronUp className="w-3 h-3" /></> : <>عرض المزيد <ChevronDown className="w-3 h-3" /></>}
+            </p>
+          </CardContent>
+        </Card>
 
-        <Link to="/statistics" className="block">
-          <Card className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-blue-500/50 transition-colors cursor-pointer h-full`}>
-            <CardContent className="p-3 md:p-4">
-              <div className="flex items-center gap-2 md:gap-3">
-                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                  <BookOpen className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
-                </div>
-                <div className="min-w-0">
-                  <p className={`text-[10px] md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>متوسط صفحات الأسبوع</p>
-                  <p className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{summary.week_pages_avg ?? 0} <span className="text-xs font-normal">ص / طالب</span></p>
-                  {summary.week_start && (
-                    <p className={`text-[9px] md:text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{summary.week_start} — {summary.week_end}</p>
-                  )}
-                </div>
+        <Card
+          onClick={() => setShowWeekBreakdown(!showWeekBreakdown)}
+          className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} hover:border-blue-500/50 transition-colors cursor-pointer h-full`}
+        >
+          <CardContent className="p-3 md:p-4">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
               </div>
-              <p className="text-[10px] md:text-xs text-blue-400 mt-1 text-left">عرض المزيد ←</p>
-            </CardContent>
-          </Card>
-        </Link>
+              <div className="min-w-0">
+                <p className={`text-[10px] md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>نسبة تسميع الأسبوع</p>
+                <p className={`text-lg md:text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  {summary.week_recitation_rate ?? 0}<span className="text-xs font-normal">%</span>
+                </p>
+                {summary.week_start && (
+                  <p className={`text-[9px] md:text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {summary.week_pages ?? 0} صفحة هذا الأسبوع
+                  </p>
+                )}
+              </div>
+            </div>
+            <p className="text-[10px] md:text-xs text-blue-400 mt-1 text-left flex items-center justify-end gap-1">
+              {showWeekBreakdown ? <>إخفاء التفريع <ChevronUp className="w-3 h-3" /></> : <>عرض المزيد <ChevronDown className="w-3 h-3" /></>}
+            </p>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* تفريع الأسبوع: كل مجموعة لحالها مع مشرفها ونسبتَيها */}
+      {showWeekBreakdown && (
+        <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+          <CardHeader className="p-3 md:p-6">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <CardTitle className={`flex items-center gap-2 text-sm md:text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <Users className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
+                تفريع الأسبوع حسب المجموعة
+              </CardTitle>
+              <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                {summary.week_start} — {summary.week_end}
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="p-3 md:p-6 pt-0">
+            {weekGroups.length === 0 ? (
+              <p className={`text-center py-4 text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا توجد مجموعات</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {weekGroups.map((g) => (
+                  <div
+                    key={g.group_id}
+                    className={`p-3 rounded-xl border ${isDark ? 'bg-slate-800/40 border-white/10' : 'bg-slate-50 border-slate-200'}`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                      <div className="min-w-0">
+                        <p className={`font-bold text-sm truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          {g.group_name}
+                        </p>
+                        <p className={`text-xs truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                          المشرف: {g.sheikh_name} • {g.students_count} طالب
+                        </p>
+                      </div>
+                      <Link to={`/statistics?group=${g.group_id}`}>
+                        <Button variant="ghost" size="sm" className="text-slate-400 hover:text-emerald-400 h-7">
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </Link>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <RateBar label="الحضور" value={g.attendance_rate} color="emerald" isDark={isDark} />
+                      <RateBar label="التسميع" value={g.recitation_rate} color="blue" isDark={isDark} />
+                    </div>
+                    <p className={`text-[10px] mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {g.attendance_records} سجل حضور • {g.recitation_records} سجل تسميع
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Top Groups */}
@@ -448,11 +616,18 @@ const AdminDashboard = () => {
               <Users className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
               ترتيب المجموعات
             </CardTitle>
-            <Link to="/admin-rankings?filter=groups">
-              <Button variant="ghost" size="sm" className="text-emerald-400 text-xs md:text-sm">
-                عرض الكل <ArrowUpRight className="w-4 h-4 mr-1" />
-              </Button>
-            </Link>
+            <div className="flex items-center gap-2">
+              {/* مجموع نقاط كل المجموعات */}
+              <div className={`px-3 py-1.5 rounded-lg text-center ${isDark ? 'bg-emerald-500/15 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
+                <p className={`text-[9px] leading-tight ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>مجموع النقاط</p>
+                <p className="text-sm md:text-base font-bold text-emerald-400 leading-tight">{totalGroupsPoints}</p>
+              </div>
+              <Link to="/admin-rankings?filter=groups">
+                <Button variant="ghost" size="sm" className="text-emerald-400 text-xs md:text-sm">
+                  عرض الكل <ArrowUpRight className="w-4 h-4 mr-1" />
+                </Button>
+              </Link>
+            </div>
           </CardHeader>
           <CardContent>
             {topGroups.length === 0 ? (
@@ -487,112 +662,210 @@ const AdminDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Top Students */}
+        {/* الطلاب — أول 5 مع «إظهار المزيد» وزر تنزيل سجل التسميع لكل طالب */}
         <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
               <Trophy className="w-5 h-5 text-amber-400" />
-              أفضل الطلاب
+              الطلاب
+              <span className={`text-xs font-normal ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                ({allStudents.length})
+              </span>
             </CardTitle>
             <Link to="/admin-rankings?filter=students">
               <Button variant="ghost" size="sm" className="text-emerald-400">
-                عرض الكل <ArrowUpRight className="w-4 h-4 mr-1" />
+                الترتيب <ArrowUpRight className="w-4 h-4 mr-1" />
               </Button>
             </Link>
           </CardHeader>
           <CardContent>
-            {topStudents.length === 0 ? (
+            {allStudents.length === 0 ? (
               <p className={`text-center py-4 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا يوجد طلاب</p>
             ) : (
-              <div className="space-y-3">
-                {topStudents.slice(0, 5).map((student, index) => {
-                  const badge = getRankBadge(index + 1);
-                  return (
-                    <div
-                      key={student.student_id}
-                      className={`p-3 rounded-lg flex items-center justify-between ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${badge.bg} ${badge.text}`}>
-                          {badge.icon}
-                        </span>
-                        <div>
-                          <StudentLink studentId={student.student_id} name={student.student_name} className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`} />
-                          <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{student.group_name}</p>
+              <>
+                {/* البحث يظهر فقط بعد توسيع القائمة */}
+                {showAllStudents && (
+                  <Input
+                    value={studentSearch}
+                    onChange={(e) => setStudentSearch(e.target.value)}
+                    placeholder="بحث باسم الطالب أو المجموعة..."
+                    className={`mb-3 h-9 text-sm ${isDark ? 'bg-slate-800 border-slate-700 text-white' : ''}`}
+                  />
+                )}
+
+                <div className={`space-y-3 ${showAllStudents ? 'max-h-[32rem] overflow-y-auto pl-1' : ''}`}>
+                  {visibleStudents.map((student, index) => {
+                    const badge = getRankBadge(index + 1);
+                    const busyCurrent = downloadingStudent === `${student.student_id}:current`;
+                    const busyAll = downloadingStudent === `${student.student_id}:all`;
+                    return (
+                      <div
+                        key={student.student_id}
+                        className={`p-3 rounded-lg ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}
+                      >
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold flex-shrink-0 ${badge.bg} ${badge.text}`}>
+                              {badge.icon}
+                            </span>
+                            <div className="min-w-0">
+                              <StudentLink studentId={student.student_id} name={student.student_name} className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`} />
+                              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{student.group_name}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <span className="text-emerald-400 font-bold text-sm">{student.total_points} نقطة</span>
+                            <Link to={`/student/${student.student_id}`}>
+                              <Button variant="ghost" size="sm" className="text-slate-400 hover:text-emerald-400" title="ملف الطالب">
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </Link>
+                          </div>
+                        </div>
+
+                        {/* تنزيل سجل التسميع */}
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <span className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+                            سجل التسميع:
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadRecitations(student, 'current')}
+                            disabled={busyCurrent || busyAll}
+                            className={`h-7 text-[11px] px-2 text-blue-400 border-blue-500/30 hover:bg-blue-500/10 ${isDark ? '' : 'border-blue-300'}`}
+                          >
+                            {busyCurrent
+                              ? <Loader2 className="w-3 h-3 ml-1 animate-spin" />
+                              : <Download className="w-3 h-3 ml-1" />}
+                            الفصل الحالي
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDownloadRecitations(student, 'all')}
+                            disabled={busyCurrent || busyAll}
+                            className={`h-7 text-[11px] px-2 text-purple-400 border-purple-500/30 hover:bg-purple-500/10 ${isDark ? '' : 'border-purple-300'}`}
+                          >
+                            {busyAll
+                              ? <Loader2 className="w-3 h-3 ml-1 animate-spin" />
+                              : <Download className="w-3 h-3 ml-1" />}
+                            كل الفصول
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-emerald-400 font-bold">{student.total_points} نقطة</span>
-                        <Link to={`/student/${student.student_id}`}>
-                          <Button variant="ghost" size="sm" className="text-slate-400 hover:text-emerald-400">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+
+                  {showAllStudents && searchedStudents.length === 0 && (
+                    <p className={`text-center py-4 text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                      ما في طالب مطابق للبحث
+                    </p>
+                  )}
+                </div>
+
+                {/* زر إظهار المزيد / أقل */}
+                {allStudents.length > 5 && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => { setShowAllStudents(!showAllStudents); setStudentSearch(''); }}
+                    className="w-full mt-3 text-emerald-400 hover:bg-emerald-500/10"
+                  >
+                    {showAllStudents ? (
+                      <><ChevronUp className="w-4 h-4 ml-1" />إظهار أقل</>
+                    ) : (
+                      <><ChevronDown className="w-4 h-4 ml-1" />إظهار المزيد ({allStudents.length - 5} طالب)</>
+                    )}
+                  </Button>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Sheikhs List */}
+      {/* أداء المشرفين والمجموعات خلال الفصل */}
       <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
         <CardHeader>
-          <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            <BookOpen className="w-5 h-5 text-blue-400" />
-            بيانات المشرفين
-          </CardTitle>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <BookUser className="w-5 h-5 text-blue-400" />
+              أداء المشرفين والمجموعات
+              {activeTermName && (
+                <span className={`text-xs font-normal ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  — {activeTermName}
+                </span>
+              )}
+            </CardTitle>
+            <Link to="/sheikh-management">
+              <Button variant="ghost" size="sm" className="text-emerald-400">
+                إدارة المشرفين <ArrowUpRight className="w-4 h-4 mr-1" />
+              </Button>
+            </Link>
+          </div>
         </CardHeader>
         <CardContent>
           {sheikhs.length === 0 ? (
             <p className={`text-center py-4 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا يوجد مشرفين</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className={`border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المشرف</th>
-                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>البريد</th>
-                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المجموعات</th>
-                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الطلاب</th>
-                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>التسميعات</th>
-                    <th className={`px-4 py-3 text-right text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sheikhs.map((sheikh) => (
-                    <tr key={sheikh.sheikh_id} className={`border-b ${isDark ? 'border-white/5 hover:bg-white/5' : 'border-slate-100 hover:bg-slate-50'}`}>
-                      <td className={`px-4 py-3 font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{sheikh.sheikh_name}</td>
-                      <td className={`px-4 py-3 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{sheikh.email}</td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-1 rounded-full text-xs bg-purple-500/20 text-purple-400">
-                          {sheikh.groups_count} مجموعة
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-1 rounded-full text-xs bg-emerald-500/20 text-emerald-400">
-                          {sheikh.students_count} طالب
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-1 rounded-full text-xs bg-blue-500/20 text-blue-400">
-                          {sheikh.recitations_count} تسميع
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Link to={`/users?sheikh=${sheikh.sheikh_id}`}>
-                          <Button variant="ghost" size="sm" className="text-emerald-400 hover:text-emerald-300">
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                        </Link>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {sheikhs.map((sheikh) => (
+                <div
+                  key={sheikh.sheikh_id}
+                  className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/40 border-white/10' : 'bg-slate-50 border-slate-200'}`}
+                >
+                  {/* رأس بطاقة المشرف */}
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-9 h-9 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                        <BookUser className="w-4 h-4 text-blue-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`font-bold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                          {sheikh.sheikh_name}
+                        </p>
+                        <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {sheikh.groups_count} مجموعة • {sheikh.students_count} طالب
+                        </p>
+                      </div>
+                    </div>
+                    <Link to={`/users?sheikh=${sheikh.sheikh_id}`}>
+                      <Button variant="ghost" size="sm" className="text-slate-400 hover:text-emerald-400">
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </Link>
+                  </div>
+
+                  {/* مجموعات المشرف */}
+                  {(!sheikh.groups || sheikh.groups.length === 0) ? (
+                    <p className={`text-xs text-center py-3 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+                      ما في مجموعات مُسندة لهذا المشرف
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {sheikh.groups.map((g) => (
+                        <div
+                          key={g.group_id}
+                          className={`p-3 rounded-lg ${isDark ? 'bg-slate-900/50' : 'bg-white border border-slate-200'}`}
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <span className={`text-sm font-medium truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                              {g.group_name}
+                            </span>
+                            <span className={`text-xs flex-shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                              {g.students_count} طالب
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <RateBar label="التسميع" value={g.recitation_rate} color="blue" isDark={isDark} />
+                            <RateBar label="الحضور" value={g.attendance_rate} color="emerald" isDark={isDark} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
@@ -605,6 +878,15 @@ const AdminDashboard = () => {
             <Calendar className="w-5 h-5 text-purple-400" />
             الفصول الدراسية
           </CardTitle>
+           <Button 
+              onClick={() => setTermDialogOpen(true)}
+              variant="outline" 
+              size="sm" 
+              className={`text-xs md:text-sm text-amber-400 border-amber-500/30 hover:bg-amber-500/10 ${isDark ? '' : 'border-amber-300'}`}
+            >
+              <Archive className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
+              إغلاق الفصل وبدء فصل جديد
+            </Button>
         </CardHeader>
         <CardContent>
           {loadingTerms ? (

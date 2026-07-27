@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -827,6 +828,32 @@ console.log(stats)
           {/* الفاصل */}
           <div className="border-t border-white/10 my-4"></div>
 
+          {/* هذا الشهر */}
+          <div>
+            <h4 className="text-sm font-bold text-purple-400 mb-3 flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              هذا الشهر
+            </h4>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-2 md:p-3 rounded-xl bg-emerald-500/10 text-center">
+                <Hand className="w-5 h-5 md:w-6 md:h-6 mx-auto text-emerald-400 mb-1" />
+                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.split?.month?.prayers || 0}</p>
+                <p className="text-emerald-400 text-[10px] md:text-xs">الصلوات</p>
+              </div>
+              <div className="p-2 md:p-3 rounded-xl bg-blue-500/10 text-center">
+                <BookMarked className="w-5 h-5 md:w-6 md:h-6 mx-auto text-blue-400 mb-1" />
+                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.split?.month?.sitting || 0}</p>
+                <p className="text-blue-400 text-[10px] md:text-xs">الجلوس مع القرآن</p>
+              </div>
+            </div>
+            <p className="mt-2 text-center text-xs text-slate-400">
+              عدد الأوراق هذا الشهر: {stats?.tracking?.split?.month?.sheets || 0}
+            </p>
+          </div>
+
+          {/* الفاصل */}
+          <div className="border-t border-white/10 my-4"></div>
+
           {/* المجموع الفصلي */}
           <div>
             <h4 className="text-sm font-bold text-amber-400 mb-3 flex items-center gap-2">
@@ -851,6 +878,27 @@ console.log(stats)
               </div>
             </div>
           </div>
+
+          {/* آخر ورقة متابعة سلّمها الطالب */}
+          <div className="border-t border-white/10 my-4"></div>
+          <div className={`p-3 rounded-xl ${stats?.tracking?.last_sheet ? 'bg-slate-800/50 border border-white/10' : 'bg-amber-500/10 border border-amber-500/20'}`}>
+            <h4 className="text-sm font-bold text-slate-300 mb-2 flex items-center gap-2">
+              <History className="w-4 h-4" />
+              آخر ورقة متابعة سلّمتها
+            </h4>
+            {!stats?.tracking?.last_sheet ? (
+              <p className="text-amber-400 text-sm">ما سلّمت ولا ورقة متابعة لحد الآن.</p>
+            ) : (
+              <div className="flex items-center justify-between gap-2 flex-wrap text-sm">
+                <span className="text-white font-medium">أسبوع {stats.tracking.last_sheet.week_start}</span>
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-emerald-400">🕌 {stats.tracking.last_sheet.prayers_count}</span>
+                  <span className="text-blue-400">📖 {stats.tracking.last_sheet.quran_sitting_days}</span>
+                  <span className="text-amber-400 font-bold">{stats.tracking.last_sheet.points_earned} نقطة</span>
+                </div>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -858,10 +906,15 @@ console.log(stats)
       {(stats?.warnings?.count > 0) && (
         <Card className="glass-card border-red-500/30">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-bold text-red-400 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
-              التنبيهات والإنذارات ({stats?.warnings?.count})
-            </CardTitle>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <CardTitle className="text-lg font-bold text-red-400 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" />
+                التنبيهات والإنذارات ({stats?.warnings?.count})
+              </CardTitle>
+              <Link to="/my-warnings" className="text-xs text-red-300 hover:text-red-200 underline">
+                عرض السجل الكامل
+              </Link>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">

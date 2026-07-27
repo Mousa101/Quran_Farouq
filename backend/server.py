@@ -1172,7 +1172,8 @@ DB_INDEXES = {
     "attendance_archives": [[("student_id", 1)], [("term_id", 1)]],
     "tracking_sheets": [[("student_id", 1)], [("sheikh_id", 1)],
                         [("student_id", 1), ("week_start", 1)]],
-    "tracking_items": [[("sheikh_id", 1)]],
+    "tracking_sheets_archives": [[("student_id", 1)], [("term_id", 1)]],
+    "tracking_items": [[("sheikh_id", 1)], [("is_global", 1)]],
     "student_points": [[("student_id", 1)]],
     "points_transactions": [[("student_id", 1)]],
     "groups": [[("id", 1)], [("sheikh_id", 1)]],
@@ -1190,7 +1191,8 @@ DB_INDEXES = {
     "activities": [[("id", 1)]],
     "announcements": [[("id", 1)]],
     "audit_logs": [[("action", 1)], [("created_at", -1)]],
-    "warnings": [[("student_id", 1)]],
+    "warnings": [[("student_id", 1)], [("student_id", 1), ("created_at", -1)]],
+    "admin_bonus_grants": [[("student_id", 1)], [("student_id", 1), ("created_at", -1)]],
     "curriculum": [[("id", 1)]],
     "curriculum_entries": [[("curriculum_id", 1)]],
     "schedules": [[("id", 1)], [("is_active", 1)]],
@@ -1214,6 +1216,34 @@ async def _ensure_indexes():
             except Exception as e:
                 logger.warning(f"index {collection}{keys} failed: {e}")
     logger.info("Database indexes ensured.")
+    await _cleanup_irrelevant_student_notifications()
+
+
+# عناوين إشعارات إدارية لا تخصّ الطالب — تُحذف من صناديق الطلاب
+IRRELEVANT_STUDENT_NOTIFICATION_TITLES = [
+    "بداية فصل دراسي جديد",
+    "بداية فصل جديد",
+    "إنشاء فصل جديد",
+]
+
+
+async def _cleanup_irrelevant_student_notifications():
+    """حذف الإشعارات الإدارية القديمة (بداية/إنشاء فصل) من صناديق الطلاب.
+    آمن للتكرار — بعد أول تشغيل ما بيضل إشي يُحذف."""
+    try:
+        student_ids = [s["id"] for s in await db.users.find(
+            {"role": "student"}, {"_id": 0, "id": 1}
+        ).to_list(100000)]
+        if not student_ids:
+            return
+        result = await db.notifications.delete_many({
+            "user_id": {"$in": student_ids},
+            "title": {"$in": IRRELEVANT_STUDENT_NOTIFICATION_TITLES},
+        })
+        if result.deleted_count:
+            logger.info(f"Removed {result.deleted_count} irrelevant student notifications.")
+    except Exception as e:
+        logger.warning(f"notification cleanup failed: {e}")
 
 
 class PointsConfigUpdate(BaseModel):
@@ -1844,7 +1874,8 @@ async def juz_classification_report(group_id: Optional[str] = None, current_user
 
 
 # ============== جدول إحصائيات الطلاب (فلاتر + ترتيب + تصدير) ==============
-STUDENT_STATS_NUMERIC = {"total_memorization", "new_memorization", "review", "attendance", "tracking", "age", "average"}
+STUDENT_STATS_NUMERIC = {"total_memorization", "new_memorization", "review", "attendance", "tracking",
+                         "tracking_prayers", "tracking_sitting", "age", "average"}
 
 
 def parse_average(val):
@@ -1875,8 +1906,50 @@ def _grade_sort_key(grade_value):
         return (1, g)  # القيم خارج القائمة تُرتَّب بعد المعروفة
 
 
+def _tracking_period_bounds(period: str):
+    """حدود المدة الزمنية لورق المتابعة: أسبوع / شهر / فصل (الفصل = بلا حدّ زمني).
+    يرجع (from_date, to_date) بصيغة YYYY-MM-DD أو (None, None) للفصل."""
+    if period == "week":
+        ws = get_current_week_start()
+        we = (datetime.strptime(ws, "%Y-%m-%d") + timedelta(days=6)).strftime("%Y-%m-%d")
+        return ws, we
+    if period == "month":
+        today = datetime.now(timezone.utc).date()
+        first = today.replace(day=1)
+        # آخر يوم في الشهر
+        nxt = (first + timedelta(days=32)).replace(day=1)
+        last = nxt - timedelta(days=1)
+        return first.isoformat(), last.isoformat()
+    return None, None  # term / all
+
+
+def _summarize_last_sheet(sheets: list) -> Optional[dict]:
+    """ملخّص آخر ورقة متابعة مُسلَّمة من قائمة أوراق (الأحدث حسب `week_start`)."""
+    if not sheets:
+        return None
+    latest = max(sheets, key=lambda s: (s.get("week_start") or "", str(s.get("created_at") or "")))
+    prayers, sitting = _sheet_prayers_sitting(latest)
+    return {
+        "week_start": latest.get("week_start"),
+        "points_earned": latest.get("points_earned") or 0,
+        "prayers_count": prayers,
+        "quran_sitting_days": sitting,
+        "created_at": str(latest.get("created_at") or ""),
+        "submitted_by_student": bool(latest.get("submitted_by_student")),
+    }
+
+
+def _sheet_prayers_sitting(sheet: dict) -> tuple:
+    """عدد الصلوات وعدد أيام الجلوس مع القرآن من ورقة متابعة (مع الحدّ الأقصى)."""
+    d = sheet.get("data") or {}
+    prayers = min(int(d.get("prayers_count") or 0), TRACKING_PRAYERS_MAX)
+    sitting = min(int(d.get("quran_sitting_days") or 0), TRACKING_SITTING_MAX)
+    return prayers, sitting
+
+
 async def _build_student_stats(current_user, group_id=None, student_id=None,
-                               term_id=None, sort_by="name", order="asc"):
+                               term_id=None, sort_by="name", order="asc",
+                               tracking_period="term"):
     uq = {"role": "student"}
     if current_user["role"] == "sheikh":
         gids = await _sheikh_group_ids(current_user["user_id"])
@@ -1902,15 +1975,41 @@ async def _build_student_stats(current_user, group_id=None, student_id=None,
     if term_id:
         att_q["term_id"] = track_q["term_id"] = term_id
     atts = await db.attendance.find(att_q, {"_id": 0, "student_id": 1, "status": 1}).to_list(200000)
-    tracks = await db.tracking_sheets.find(track_q, {"_id": 0, "student_id": 1}).to_list(200000)
+    tracks = await db.tracking_sheets.find(
+        track_q,
+        {"_id": 0, "student_id": 1, "week_start": 1, "data": 1, "points_earned": 1, "created_at": 1},
+    ).to_list(200000)
 
-    rec_by, att_by, track_by = {}, {}, {}
+    rec_by, att_by = {}, {}
     for r in recs:
         rec_by.setdefault(r["student_id"], []).append(r)
     for a in atts:
         att_by.setdefault(a["student_id"], []).append(a)
+
+    # ورق المتابعة: العدد + تفصيل الصلوات/الجلوس ضمن المدة المطلوبة + آخر ورقة مُسلَّمة
+    p_from, p_to = _tracking_period_bounds(tracking_period)
+    track_by, prayers_by, sitting_by, last_sheet_by = {}, {}, {}, {}
     for t in tracks:
-        track_by[t["student_id"]] = track_by.get(t["student_id"], 0) + 1
+        sid = t["student_id"]
+        ws = t.get("week_start") or ""
+        # آخر ورقة مُسلَّمة (بغضّ النظر عن فلتر المدة)
+        prev = last_sheet_by.get(sid)
+        if not prev or ws > (prev.get("week_start") or ""):
+            pr, si = _sheet_prayers_sitting(t)
+            last_sheet_by[sid] = {
+                "week_start": ws,
+                "points_earned": t.get("points_earned") or 0,
+                "prayers_count": pr,
+                "quran_sitting_days": si,
+                "created_at": str(t.get("created_at") or ""),
+            }
+        # ضمن المدة المطلوبة
+        if p_from and not (p_from <= ws <= p_to):
+            continue
+        track_by[sid] = track_by.get(sid, 0) + 1
+        pr, si = _sheet_prayers_sitting(t)
+        prayers_by[sid] = prayers_by.get(sid, 0) + pr
+        sitting_by[sid] = sitting_by.get(sid, 0) + si
 
     group_names = {}
     rows = []
@@ -1935,6 +2034,10 @@ async def _build_student_stats(current_user, group_id=None, student_id=None,
             "review": review_pages,
             "attendance": present,  # عدد أيام حضور الطالب خلال الفصل (بدل النسبة)
             "tracking": track_by.get(s["id"], 0),
+            # تقسيم ورق المتابعة: الصلوات + الجلوس مع القرآن ضمن المدة المختارة
+            "tracking_prayers": prayers_by.get(s["id"], 0),
+            "tracking_sitting": sitting_by.get(s["id"], 0),
+            "last_sheet": last_sheet_by.get(s["id"]),
             "age": age,
             "grade": s.get("school_grade") or "",
             "average": parse_average(s.get("school_average")),  # المعدّل الموحّد (رقم)
@@ -1958,20 +2061,32 @@ async def _build_student_stats(current_user, group_id=None, student_id=None,
 @api_router.get("/reports/student-stats")
 async def student_stats_report(group_id: Optional[str] = None, student_id: Optional[str] = None,
                                term_id: Optional[str] = None, sort_by: str = "name", order: str = "asc",
+                               tracking_period: str = "term",
                                current_user: dict = Depends(get_current_user)):
-    """جدول إحصائيات الطلاب: الحفظ الكلي/الجديد/المراجعة، الحضور، تسليم المتابعة، العمر، الصف — مع ترتيب."""
+    """جدول إحصائيات الطلاب: الحفظ الكلي/الجديد/المراجعة، الحضور، ورق المتابعة (صلوات + جلوس)، العمر، الصف.
+    tracking_period: week | month | term — يحدّد مدى احتساب أعمدة المتابعة."""
     ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
-    rows = await _build_student_stats(current_user, group_id, student_id, term_id, sort_by, order)
-    return {"count": len(rows), "sort_by": sort_by, "order": order, "rows": rows}
+    if tracking_period not in ("week", "month", "term"):
+        tracking_period = "term"
+    rows = await _build_student_stats(current_user, group_id, student_id, term_id, sort_by, order, tracking_period)
+    return {"count": len(rows), "sort_by": sort_by, "order": order,
+            "tracking_period": tracking_period, "rows": rows}
+
+
+TRACKING_PERIOD_LABELS = {"week": "الأسبوع الحالي", "month": "الشهر الحالي", "term": "الفصل"}
 
 
 @api_router.get("/export/student-stats")
 async def export_student_stats_excel(group_id: Optional[str] = None, student_id: Optional[str] = None,
                                      term_id: Optional[str] = None, sort_by: str = "name", order: str = "asc",
+                                     tracking_period: str = "term",
                                      current_user: dict = Depends(get_current_user)):
     """تصدير جدول إحصائيات الطلاب إلى Excel (بنفس الفلاتر والترتيب)."""
     ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
-    rows = await _build_student_stats(current_user, group_id, student_id, term_id, sort_by, order)
+    if tracking_period not in ("week", "month", "term"):
+        tracking_period = "term"
+    rows = await _build_student_stats(current_user, group_id, student_id, term_id, sort_by, order, tracking_period)
+    period_label = TRACKING_PERIOD_LABELS[tracking_period]
     output = io.BytesIO()
     wb = xlsxwriter.Workbook(output, {'in_memory': True})
     title_f = wb.add_format({'bold': True, 'font_size': 15, 'align': 'center', 'bg_color': '#0d9488', 'font_color': 'white'})
@@ -1979,14 +2094,17 @@ async def export_student_stats_excel(group_id: Optional[str] = None, student_id:
     cell_f = wb.add_format({'border': 1, 'align': 'center'})
     sh = wb.add_worksheet('إحصائيات الطلاب')
     sh.right_to_left()
-    sh.merge_range('A1:K1', 'جدول إحصائيات الطلاب', title_f)
+    sh.merge_range('A1:N1', f'جدول إحصائيات الطلاب — ورق المتابعة حسب: {period_label}', title_f)
     headers = ['#', 'الطالب', 'المجموعة', 'الحفظ الكلي (ص)', 'الحفظ الجديد (ص)', 'المراجعة (ص)',
-               'أيام الحضور', 'تسليم المتابعة', 'العمر', 'الصف', 'المعدل %']
+               'أيام الحضور', 'أوراق المتابعة', 'الصلوات', 'الجلوس مع القرآن', 'آخر ورقة',
+               'العمر', 'الصف', 'المعدل %']
     for c, h in enumerate(headers):
         sh.write(2, c, h, head_f)
-    sh.set_column('A:A', 5); sh.set_column('B:B', 22); sh.set_column('C:C', 16); sh.set_column('D:K', 13)
+    sh.set_column('A:A', 5); sh.set_column('B:B', 22); sh.set_column('C:C', 16)
+    sh.set_column('D:J', 14); sh.set_column('K:K', 14); sh.set_column('L:N', 12)
     for i, r in enumerate(rows, 1):
         row = i + 2
+        last = r.get("last_sheet") or {}
         sh.write(row, 0, i, cell_f)
         sh.write(row, 1, r["name"], cell_f)
         sh.write(row, 2, r["group_name"], cell_f)
@@ -1995,9 +2113,12 @@ async def export_student_stats_excel(group_id: Optional[str] = None, student_id:
         sh.write(row, 5, r["review"], cell_f)
         sh.write(row, 6, r["attendance"], cell_f)
         sh.write(row, 7, r["tracking"], cell_f)
-        sh.write(row, 8, r["age"] if r["age"] is not None else "", cell_f)
-        sh.write(row, 9, r["grade"], cell_f)
-        sh.write(row, 10, f"{r['average']}%" if r.get("average") is not None else "", cell_f)
+        sh.write(row, 8, r.get("tracking_prayers", 0), cell_f)
+        sh.write(row, 9, r.get("tracking_sitting", 0), cell_f)
+        sh.write(row, 10, last.get("week_start") or "لم يسلّم", cell_f)
+        sh.write(row, 11, r["age"] if r["age"] is not None else "", cell_f)
+        sh.write(row, 12, r["grade"], cell_f)
+        sh.write(row, 13, f"{r['average']}%" if r.get("average") is not None else "", cell_f)
     wb.close()
     return _xlsx_response(output, f"student_stats_{datetime.now().strftime('%Y%m%d')}.xlsx")
 
@@ -2433,35 +2554,51 @@ async def get_sheikh_id_for_student(student_id: str) -> Optional[str]:
     group = await db.groups.find_one({"id": student["group_id"]}, {"sheikh_id": 1, "_id": 0})
     return group.get("sheikh_id") if group else None
 
+async def resolve_recording_sheikh_id(current_user: dict, student_id: str) -> str:
+    """المشرف الذي يُنسب إليه السجل عند تسجيل تسميع/حضور.
+    المشرف يسجّل باسمه؛ المدير يسجّل نيابةً عن مشرف مجموعة الطالب
+    (وإن لم يكن للطالب مجموعة/مشرف، يُنسب السجل للمدير نفسه)."""
+    if current_user["role"] == "sheikh":
+        return current_user["user_id"]
+    return await get_sheikh_id_for_student(student_id) or current_user["user_id"]
+
+
 async def get_tracking_items_for_sheikh(sheikh_id: str) -> list:
-    if not sheikh_id:
-        return []
+    """بنود المتابعة الفعّالة لمشرف: البنود العامة (اللي أضافها المدير للجميع) + بنود المشرف نفسه."""
+    scope = [{"is_global": True}]
+    if sheikh_id:
+        scope.append({"sheikh_id": sheikh_id})
     return await db.tracking_items.find(
-        {"sheikh_id": sheikh_id, "active": {"$ne": False}}, {"_id": 0}
+        {"$or": scope, "active": {"$ne": False}}, {"_id": 0}
     ).sort("created_at", 1).to_list(100)
 
 @api_router.post("/tracking-items")
 async def create_tracking_item(data: TrackingItemCreate, current_user: dict = Depends(get_current_user)):
-    """إضافة بند متابعة مخصص (المشرف لنفسه، أو المدير لمشرف محدّد)"""
+    """إضافة بند متابعة مخصص.
+    - المشرف: البند خاص بطلابه (والمدير يقدر يشوفه).
+    - المدير بدون تحديد مشرف: **بند عام** يظهر عند كل المشرفين وطلابهم.
+    - المدير مع تحديد مشرف: بند خاص بذلك المشرف."""
     ensure_role(current_user, ["sheikh", "admin"], "فقط المشرف أو المدير يمكنه إضافة بنود المتابعة")
     if not data.name.strip():
         raise HTTPException(status_code=400, detail="اسم البند مطلوب")
     if data.max_points <= 0:
         raise HTTPException(status_code=400, detail="نقاط البند يجب أن تكون أكبر من صفر")
-    # المشرف يضيف لنفسه؛ المدير يجب أن يحدّد المشرف
+
     if current_user["role"] == "sheikh":
-        target_sheikh = current_user["user_id"]
+        target_sheikh, is_global = current_user["user_id"], False
     else:
-        target_sheikh = data.sheikh_id
-        if not target_sheikh:
-            raise HTTPException(status_code=400, detail="على المدير تحديد المشرف لإضافة البند")
+        target_sheikh = data.sheikh_id or None
+        is_global = target_sheikh is None
+
     item = {
         "id": str(uuid.uuid4()),
         "sheikh_id": target_sheikh,
+        "is_global": is_global,
         "name": data.name.strip(),
         "max_points": int(data.max_points),
         "icon": (data.icon or "⭐").strip() or "⭐",
         "active": True,
+        "created_by": current_user["user_id"],
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     await db.tracking_items.insert_one(dict(item))
@@ -2469,7 +2606,9 @@ async def create_tracking_item(data: TrackingItemCreate, current_user: dict = De
 
 @api_router.get("/tracking-items")
 async def list_tracking_items(sheikh_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
-    """بنود المتابعة — المشرف يرى بنوده، الطالب يرى بنود مشرفه، المدير يرى بنود أي مشرف عبر sheikh_id"""
+    """بنود المتابعة — الكل يرى البنود العامة، بالإضافة إلى:
+    المشرف بنوده، الطالب بنود مشرفه، المدير بنود المشرف المحدّد عبر sheikh_id
+    (وبدون sheikh_id يرى البنود العامة فقط)."""
     if current_user["role"] == "sheikh":
         target = current_user["user_id"]
     elif current_user["role"] == "student":
@@ -2653,6 +2792,61 @@ async def get_tracking_sheets(
 
     sheets = await db.tracking_sheets.find(query, {"_id": 0}).sort("week_start", -1).to_list(1000)
     return sheets
+
+@api_router.get("/tracking-sheets/last-per-student")
+async def last_tracking_sheet_per_student(
+    group_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """آخر ورقة متابعة مُسلَّمة لكل طالب — يشمل الطلاب اللي ما سلّموا ولا ورقة.
+    المشرف يرى طلاب مجموعاته؛ المدير يرى الكل (أو مجموعة محدّدة)."""
+    ensure_role(current_user, ["sheikh", "admin"], "غير مصرح لك")
+
+    uq = {"role": "student"}
+    if current_user["role"] == "sheikh":
+        gids = await _sheikh_group_ids(current_user["user_id"])
+        uq["group_id"] = group_id if (group_id and group_id in gids) else {"$in": gids}
+    elif group_id:
+        uq["group_id"] = group_id
+
+    students = await db.users.find(uq, {"_id": 0, "id": 1, "name": 1, "group_id": 1}).to_list(5000)
+    sids = [s["id"] for s in students]
+
+    sheets = await db.tracking_sheets.find(
+        {"student_id": {"$in": sids}},
+        {"_id": 0, "student_id": 1, "week_start": 1, "data": 1, "points_earned": 1,
+         "created_at": 1, "submitted_by_student": 1},
+    ).to_list(200000)
+
+    by_student = {}
+    for sh in sheets:
+        by_student.setdefault(sh["student_id"], []).append(sh)
+
+    group_names = {g["id"]: g["name"] for g in
+                   await db.groups.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(3000)}
+
+    rows = []
+    for s in students:
+        rows.append({
+            "student_id": s["id"],
+            "student_name": s.get("name") or "",
+            "group_name": group_names.get(s.get("group_id"), "بدون مجموعة"),
+            "last_sheet": _summarize_last_sheet(by_student.get(s["id"], [])),
+        })
+    # اللي ما سلّموا بالآخر، والباقي بالأحدث أولًا
+    rows.sort(key=lambda r: (r["last_sheet"] is None, -_week_sort_key(r["last_sheet"])))
+    return rows
+
+
+def _week_sort_key(last_sheet) -> int:
+    """مفتاح ترتيب رقمي من `week_start` (YYYY-MM-DD → YYYYMMDD)."""
+    if not last_sheet or not last_sheet.get("week_start"):
+        return 0
+    try:
+        return int(last_sheet["week_start"].replace("-", ""))
+    except (ValueError, AttributeError):
+        return 0
+
 
 class TrackingSheetUpdate(BaseModel):
     """تعديل ورقة المتابعة من المشرف"""
@@ -2842,8 +3036,11 @@ async def get_tracking_stats(student_id: str, current_user: dict = Depends(get_c
 
 @api_router.post("/recitations")
 async def create_recitation(recitation_data: RecitationCreate, current_user: dict = Depends(get_current_user)):
-    ensure_role(current_user, "sheikh", "فقط المشرف يمكنه تسجيل التسميع")
-    
+    ensure_role(current_user, ["sheikh", "admin"], "فقط المشرف أو المدير يمكنه تسجيل التسميع")
+
+    # المدير يسجّل نيابةً عن مشرف مجموعة الطالب
+    recording_sheikh_id = await resolve_recording_sheikh_id(current_user, recitation_data.student_id)
+
     # الحصول على الفصل النشط
     active_term_id = await get_active_term_id()
     
@@ -2883,7 +3080,7 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     if recitation_data.did_not_recite:
         recitation = Recitation(
             student_id=recitation_data.student_id,
-            sheikh_id=current_user["user_id"],
+            sheikh_id=recording_sheikh_id,
             term_id=active_term_id,
             recitation_type="did_not_recite",
             record_date=record_date,
@@ -2950,7 +3147,7 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     
     recitation = Recitation(
         student_id=recitation_data.student_id,
-        sheikh_id=current_user["user_id"],
+        sheikh_id=recording_sheikh_id,
         term_id=active_term_id,
         recitation_type=recitation_data.recitation_type,
         record_date=record_date,
@@ -3229,7 +3426,7 @@ async def get_quran_juz(current_user: dict = Depends(get_current_user)):
 
 @api_router.post("/attendance")
 async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict = Depends(get_current_user)):
-    ensure_role(current_user, "sheikh", "فقط المشرف يمكنه تسجيل الحضور")
+    ensure_role(current_user, ["sheikh", "admin"], "فقط المشرف أو المدير يمكنه تسجيل الحضور")
 
     # #6 — التحقق أن اليوم من أيام الدوام حسب الجدول المرتبط بالفصل الحالي
     await ensure_lesson_day(attendance_data.date, "الدوام")
@@ -3261,7 +3458,8 @@ async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict 
     
     attendance = Attendance(
         student_id=attendance_data.student_id,
-        sheikh_id=current_user["user_id"],
+        # المدير يسجّل نيابةً عن مشرف مجموعة الطالب
+        sheikh_id=await resolve_recording_sheikh_id(current_user, attendance_data.student_id),
         group_id=student.get("group_id") or "",
         term_id=active_term_id,
         date=attendance_data.date,
@@ -3371,7 +3569,7 @@ class BulkAttendanceRequest(BaseModel):
 @api_router.post("/attendance/bulk")
 async def bulk_attendance(data: BulkAttendanceRequest, current_user: dict = Depends(get_current_user)):
     """T2 — تسجيل حضور مجموعة كاملة دفعةً واحدة (حاضر افتراضيًا مع استثناء الغائبين)."""
-    ensure_role(current_user, "sheikh", "فقط المشرف يمكنه تسجيل الحضور")
+    ensure_role(current_user, ["sheikh", "admin"], "فقط المشرف أو المدير يمكنه تسجيل الحضور")
     # #6 — تحقق مرة واحدة من أن اليوم من أيام الدوام حسب الجدول
     await ensure_lesson_day(data.date, "الدوام")
     count = 0
@@ -3810,6 +4008,21 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
     total_prayers = sum(t["data"].get("prayers_count", 0) for t in tracking)
     total_quran_time = sum(t["data"].get("quran_sitting_minutes", 0) for t in tracking)
     total_family_recitation = sum(t["data"].get("family_recitation_count", 0) for t in tracking)
+
+    # تقسيم ورق المتابعة (صلوات / جلوس مع القرآن) حسب المدة + آخر ورقة مُسلَّمة
+    tracking_split = {}
+    for period in ("week", "month", "term"):
+        p_from, p_to = _tracking_period_bounds(period)
+        scoped = [t for t in tracking
+                  if not p_from or (p_from <= (t.get("week_start") or "") <= p_to)]
+        pr = si = 0
+        for t in scoped:
+            a, b = _sheet_prayers_sitting(t)
+            pr += a
+            si += b
+        tracking_split[period] = {"sheets": len(scoped), "prayers": pr, "sitting": si}
+
+    last_tracking_sheet = _summarize_last_sheet(tracking)
     
     # Detailed tracking breakdown
     total_adhkar = sum(t["data"].get("adhkar_after_prayer", 0) for t in tracking)
@@ -3959,7 +4172,10 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
             "total_prayers": total_prayers,
             "total_quran_time": total_quran_time,
             "total_family_recitation": total_family_recitation,
-            "sheets_count": len(tracking)
+            "sheets_count": len(tracking),
+            # تقسيم الصلوات/الجلوس حسب المدة (أسبوع/شهر/فصل) + آخر ورقة مُسلَّمة
+            "split": tracking_split,
+            "last_sheet": last_tracking_sheet,
         },
         "recitation": {
             "total_new_pages": total_new_pages,
@@ -4165,7 +4381,10 @@ async def get_student_profile(student_id: str, current_user: dict = Depends(get_
         {"student_id": student_id},
         {"_id": 0}
     ).sort("created_at", -1).to_list(100)
-    
+
+    # آخر ورقة متابعة مُسلَّمة (الأحدث حسب أسبوعها)
+    last_tracking_sheet = _summarize_last_sheet(tracking_sheets)
+
     # Get warnings
     warnings = await db.warnings.find(
         {"student_id": student_id},
@@ -4202,6 +4421,7 @@ async def get_student_profile(student_id: str, current_user: dict = Depends(get_
         "attendance_records": attendance,
         "recitation_records": recitations,
         "tracking_sheets": tracking_sheets,
+        "last_tracking_sheet": last_tracking_sheet,
         "warnings": warnings
     }
 
@@ -4271,17 +4491,23 @@ async def delete_student(student_id: str, current_user: dict = Depends(get_curre
     return {"message": "تم حذف الطالب وجميع بياناته بنجاح"}
 
 @api_router.post("/students/{student_id}/change-group")
-async def change_student_group(student_id: str, group_id: str, move_data: bool = True, current_user: dict = Depends(get_current_user)):
-    """Change student's group (Admin only). move_data: نقل بيانات الطالب لمشرف المجموعة الجديدة أو إبقاؤها للقديمة."""
+async def change_student_group(student_id: str, group_id: str, move_data: bool = True,
+                               mode: Optional[str] = None,
+                               current_user: dict = Depends(get_current_user)):
+    """نقل طالب لمجموعة (المدير فقط).
+    mode: with_data (نقل البيانات لمشرف المجموعة الجديدة) | keep_old (تبقى مع القديم) |
+    fresh_start (أرشفة البيانات وتصفيرها ليبدأ من جديد). `move_data` مدعوم للتوافق الخلفي."""
     ensure_role(current_user, "admin", "فقط المدير يمكنه نقل الطالب")
-    
+
+    effective_mode = mode or ("with_data" if move_data else "keep_old")
+    if effective_mode not in TRANSFER_MODES:
+        raise HTTPException(status_code=400, detail="وضع النقل غير صحيح")
+
     # Check if student exists
     student = await db.users.find_one({"id": student_id, "role": "student"})
     if not student:
         raise HTTPException(status_code=404, detail="الطالب غير موجود")
-    
-    old_group_id = student.get("group_id")
-    
+
     # Check if group exists (if not empty)
     new_sheikh_id = None
     if group_id:
@@ -4289,13 +4515,14 @@ async def change_student_group(student_id: str, group_id: str, move_data: bool =
         if not group:
             raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
         new_sheikh_id = group.get("sheikh_id")
-    
+
     # Update student's group
     new_group_id = group_id if group_id else None
     await db.users.update_one({"id": student_id}, {"$set": {"group_id": new_group_id}})
-    
-    # نقل بيانات الطالب (التسميع/المتابعة) لمشرف المجموعة الجديدة — فقط إذا اختير ذلك
-    if move_data and new_sheikh_id:
+
+    archived = None
+    if effective_mode == "with_data" and new_sheikh_id:
+        # نقل السجلات لمشرف المجموعة الجديدة
         await db.tracking_sheets.update_many(
             {"student_id": student_id},
             {"$set": {"sheikh_id": new_sheikh_id}}
@@ -4304,14 +4531,24 @@ async def change_student_group(student_id: str, group_id: str, move_data: bool =
             {"student_id": student_id},
             {"$set": {"sheikh_id": new_sheikh_id}}
         )
+    elif effective_mode == "fresh_start":
+        archived = await archive_and_reset_student(student_id, "نقل لمجموعة جديدة (بدء بيانات جديدة)")
+        await log_admin_action(
+            current_user, "transfer_fresh_start", "student", student_id, student.get("name"),
+            f"أرشفة وتصفير: {archived['recitations']} تسميع، {archived['attendance']} حضور، "
+            f"{archived['tracking_sheets']} ورقة متابعة"
+        )
 
     # Create notification for student
-    note = ("تم نقلك إلى مجموعة أخرى. جميع بياناتك السابقة (التسميعات، ورق المتابعة، الحضور) محفوظة."
-            if move_data else
-            "تم نقلك إلى مجموعة أخرى. بياناتك السابقة تبقى مسجّلة مع مجموعتك القديمة.")
-    await create_notification_internal(student_id, "تم نقلك إلى مجموعة جديدة", note, "info")
+    await create_notification_internal(
+        student_id, "تم نقلك إلى مجموعة جديدة", TRANSFER_NOTES[effective_mode], "info"
+    )
 
-    return {"message": "تم نقل الطالب بنجاح" + ("" if move_data else " (بدون نقل البيانات القديمة)")}
+    return {
+        "message": "تم نقل الطالب بنجاح",
+        "mode": effective_mode,
+        "archived": archived,
+    }
 
 
 # ============== N4 - العمليات الجماعية ==============
@@ -4322,7 +4559,8 @@ class BulkIdsRequest(BaseModel):
 class BulkGroupRequest(BaseModel):
     student_ids: List[str]
     group_id: Optional[str] = None
-    move_data: bool = True  # نقل بيانات الطالب (التسميع/المتابعة) لمشرف المجموعة الجديدة أو إبقاؤها للقديمة
+    move_data: bool = True  # (قديم — للتوافق الخلفي) يُترجم إلى with_data / keep_old
+    mode: Optional[str] = None  # with_data | keep_old | fresh_start
 
 
 class BulkNotifyRequest(BaseModel):
@@ -4344,28 +4582,127 @@ async def bulk_activate(data: BulkIdsRequest, current_user: dict = Depends(get_c
     return {"message": f"تم تفعيل {result.modified_count} حساب", "count": result.modified_count}
 
 
+# أوضاع نقل الطالب بين المجموعات
+TRANSFER_MODES = ("with_data", "keep_old", "fresh_start")
+
+TRANSFER_NOTES = {
+    "with_data": "تم نقلك إلى مجموعة أخرى مع الحفاظ على جميع بياناتك.",
+    "keep_old": "تم نقلك إلى مجموعة أخرى (بياناتك السابقة تبقى مع مجموعتك القديمة).",
+    "fresh_start": "تم نقلك إلى مجموعة أخرى وبدأت بصفحة جديدة — بياناتك السابقة مؤرشفة لدى الإدارة.",
+}
+
+
+async def archive_and_reset_student(student_id: str, reason: str = "نقل لمجموعة جديدة") -> dict:
+    """أرشفة بيانات الطالب (تسميع/حضور/متابعة) ثم تصفيرها ليبدأ من الصفر.
+    البيانات تنتقل لمجموعات الأرشيف ولا تُحذف — قابلة للاسترجاع."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    active_term_id = await get_active_term_id()
+
+    counts = {"recitations": 0, "attendance": 0, "tracking_sheets": 0}
+
+    # 1) التسميع
+    recs = await db.recitations.find({"student_id": student_id}, {"_id": 0}).to_list(100000)
+    if recs:
+        for r in recs:
+            r["archived_at"] = now_iso
+            r["archive_reason"] = reason
+            r.setdefault("term_id", active_term_id)
+        await db.recitations_archives.insert_many(recs)
+        await db.recitations.delete_many({"student_id": student_id})
+        counts["recitations"] = len(recs)
+
+    # 2) الحضور
+    atts = await db.attendance.find({"student_id": student_id}, {"_id": 0}).to_list(100000)
+    if atts:
+        for a in atts:
+            a["archived_at"] = now_iso
+            a["archive_reason"] = reason
+            a.setdefault("term_id", active_term_id)
+        await db.attendance_archives.insert_many(atts)
+        await db.attendance.delete_many({"student_id": student_id})
+        counts["attendance"] = len(atts)
+
+    # 3) ورق المتابعة
+    sheets = await db.tracking_sheets.find({"student_id": student_id}, {"_id": 0}).to_list(100000)
+    if sheets:
+        for s in sheets:
+            s["archived_at"] = now_iso
+            s["archive_reason"] = reason
+            s.setdefault("term_id", active_term_id)
+        await db.tracking_sheets_archives.insert_many(sheets)
+        await db.tracking_sheets.delete_many({"student_id": student_id})
+        counts["tracking_sheets"] = len(sheets)
+
+    # 4) تصفير النقاط
+    await db.student_points.update_one(
+        {"student_id": student_id},
+        {"$set": {
+            "total_points": 0, "current_term_points": 0, "attendance_points": 0,
+            "recitation_points": 0, "tracking_points": 0, "bonus_points": 0,
+            "interaction_points": 0, "admin_bonus_points": 0,
+        }},
+        upsert=True,
+    )
+    await db.points_transactions.delete_many({"student_id": student_id})
+
+    return counts
+
+
 @api_router.post("/admin/bulk/change-group")
 async def bulk_change_group(data: BulkGroupRequest, current_user: dict = Depends(get_current_user)):
-    """N4 — نقل عدة طلاب إلى مجموعة واحدة دفعةً واحدة."""
+    """N4 — نقل عدة طلاب إلى مجموعة واحدة دفعةً واحدة.
+    الأوضاع: with_data (نقل البيانات للمشرف الجديد) / keep_old (تبقى مع القديم) /
+    fresh_start (أرشفة البيانات وتصفيرها ليبدأ الطالب من جديد)."""
     ensure_role(current_user, "admin", "غير مصرح لك")
+
+    # وضع النقل — مع دعم الحقل القديم move_data للتوافق الخلفي
+    mode = data.mode or ("with_data" if data.move_data else "keep_old")
+    if mode not in TRANSFER_MODES:
+        raise HTTPException(status_code=400, detail="وضع النقل غير صحيح")
+
     new_sheikh_id = None
     if data.group_id:
         group = await db.groups.find_one({"id": data.group_id}, {"_id": 0, "sheikh_id": 1})
         if not group:
             raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
         new_sheikh_id = group.get("sheikh_id")
+
     result = await db.users.update_many(
         {"id": {"$in": data.student_ids}, "role": "student"},
         {"$set": {"group_id": data.group_id}},
     )
-    # نقل البيانات (سجل التسميع والمتابعة) لمشرف المجموعة الجديدة — فقط إذا اختير ذلك
-    if data.move_data and new_sheikh_id:
+
+    archived_totals = {"recitations": 0, "attendance": 0, "tracking_sheets": 0}
+
+    if mode == "with_data" and new_sheikh_id:
+        # نقل السجلات لمشرف المجموعة الجديدة
         await db.tracking_sheets.update_many({"student_id": {"$in": data.student_ids}}, {"$set": {"sheikh_id": new_sheikh_id}})
         await db.recitations.update_many({"student_id": {"$in": data.student_ids}}, {"$set": {"sheikh_id": new_sheikh_id}})
-    note = "تم نقلك إلى مجموعة أخرى مع الحفاظ على جميع بياناتك." if data.move_data else "تم نقلك إلى مجموعة أخرى (بياناتك السابقة تبقى مع مجموعتك القديمة)."
+    elif mode == "fresh_start":
+        # أرشفة ثم تصفير لكل طالب
+        for sid in data.student_ids:
+            c = await archive_and_reset_student(sid, "نقل لمجموعة جديدة (بدء بيانات جديدة)")
+            for k in archived_totals:
+                archived_totals[k] += c[k]
+
+    note = TRANSFER_NOTES[mode]
     for sid in data.student_ids:
         await create_notification_internal(sid, "تم نقلك إلى مجموعة جديدة", note, "info")
-    return {"message": f"تم نقل {result.modified_count} طالب", "count": result.modified_count}
+
+    if mode == "fresh_start":
+        await log_admin_action(
+            current_user, "transfer_fresh_start", "student", None, None,
+            f"نقل {result.modified_count} طالب مع أرشفة وتصفير — "
+            f"{archived_totals['recitations']} تسميع، {archived_totals['attendance']} حضور، "
+            f"{archived_totals['tracking_sheets']} ورقة متابعة"
+        )
+
+    return {
+        "message": f"تم نقل {result.modified_count} طالب",
+        "count": result.modified_count,
+        "mode": mode,
+        "archived": archived_totals if mode == "fresh_start" else None,
+    }
 
 
 @api_router.post("/admin/bulk/notify")
@@ -4654,6 +4991,76 @@ async def admin_create_student(data: AdminCreateStudent, current_user: dict = De
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"فشل في إضافة الطالب: {str(e)}")
 
+class AdminCreateSheikh(BaseModel):
+    email: str
+    name: str
+    password: str
+    student_phone: Optional[str] = None   # هاتف المشرف (نفس الحقل المستخدم في نماذج المشرف)
+    mosque_name: Optional[str] = None      # يُكتب يدويًا
+    birth_date: Optional[str] = None
+    specialization: Optional[str] = None
+    experience_years: Optional[int] = None
+    profile_image: Optional[str] = None
+    group_id: Optional[str] = None         # ربط اختياري بمجموعة موجودة
+
+
+@api_router.post("/admin/sheikhs")
+async def admin_create_sheikh(data: AdminCreateSheikh, current_user: dict = Depends(get_current_user)):
+    """إضافة مشرف جديد (المدير فقط) — الحساب مفعّل مباشرة."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إضافة مشرف")
+
+    if not data.email or not data.name or not data.password:
+        raise HTTPException(status_code=400, detail="الاسم والبريد الإلكتروني وكلمة المرور مطلوبة")
+
+    if len(data.password) < 4:
+        raise HTTPException(status_code=400, detail="كلمة المرور يجب أن تكون 4 أحرف على الأقل")
+
+    existing = await db.users.find_one({"email": data.email})
+    if existing:
+        raise HTTPException(status_code=400, detail="البريد الإلكتروني مسجل مسبقاً")
+
+    # التحقق من المجموعة قبل الإنشاء (إن اختيرت)
+    group = None
+    if data.group_id:
+        group = await db.groups.find_one({"id": data.group_id}, {"_id": 0, "id": 1, "name": 1})
+        if not group:
+            raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
+
+    user = User(
+        email=data.email,
+        name=data.name,
+        role="sheikh",
+        mosque_name=data.mosque_name,
+        birth_date=data.birth_date,
+        profile_image=data.profile_image,
+        student_phone=data.student_phone,
+        is_active=True,
+        is_activated=True
+    )
+
+    user_dict = user.model_dump()
+    user_dict["password_hash"] = get_password_hash(data.password)
+    user_dict["created_at"] = user_dict["created_at"].isoformat()
+    user_dict["registration_date"] = user_dict["registration_date"].isoformat()
+    user_dict["specialization"] = data.specialization
+    user_dict["experience_years"] = data.experience_years
+
+    await db.users.insert_one(user_dict)
+
+    # إسناد المجموعة للمشرف الجديد إن اختيرت
+    if group:
+        await db.groups.update_one({"id": group["id"]}, {"$set": {"sheikh_id": user.id}})
+
+    await log_admin_action(current_user, "create", "sheikh", user.id, user.name,
+                           f"إضافة مشرف جديد{' وإسناد مجموعة ' + group['name'] if group else ''}")
+
+    return {
+        "message": "تم إضافة المشرف بنجاح",
+        "sheikh_id": user.id,
+        "sheikh_name": user.name
+    }
+
+
 # ============== WARNING SYSTEM ==============
 
 class WarningCreate(BaseModel):
@@ -4716,17 +5123,53 @@ async def get_all_warnings(
     warnings = await db.warnings.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
     return warnings
 
+# تسميات أنواع الإنذارات — تشمل الصيغة الإنجليزية (إنذار المدير) والعربية (الإنذار التلقائي)
+WARNING_TYPE_LABELS = {
+    "absence": "غياب متكرر",
+    "غياب": "غياب متكرر",
+    "no_recitation": "عدم التسميع",
+    "behavior": "سلوك سلبي",
+}
+
+WARNING_SEVERITY_LABELS = {"low": "خفيف", "medium": "متوسط", "high": "شديد"}
+
+
 @api_router.get("/students/{student_id}/warnings")
 async def get_student_warnings(student_id: str, current_user: dict = Depends(get_current_user)):
-    """Get warnings for a specific student"""
+    """سجل إنذارات الطالب مع التفاصيل (النوع، الشدّة، مصدر الإنذار، التاريخ)."""
     # Verify access
     if current_user["role"] == "student" and current_user["user_id"] != student_id:
         raise HTTPException(status_code=403, detail="غير مصرح لك")
-    
+
     warnings = await db.warnings.find(
         {"student_id": student_id},
         {"_id": 0}
-    ).sort("created_at", -1).to_list(50)
+    ).sort("created_at", -1).to_list(200)
+
+    # أسماء مُصدري الإنذارات (دفعة واحدة — بدون N+1)
+    issuer_ids = {w.get("admin_id") or w.get("sheikh_id") for w in warnings}
+    issuer_ids.discard(None)
+    issuer_names = {}
+    if issuer_ids:
+        issuer_names = {
+            u["id"]: u.get("name", "")
+            for u in await db.users.find(
+                {"id": {"$in": list(issuer_ids)}}, {"_id": 0, "id": 1, "name": 1}
+            ).to_list(500)
+        }
+
+    for w in warnings:
+        raw_type = w.get("type", "")
+        w["type_label"] = WARNING_TYPE_LABELS.get(raw_type, raw_type or "إنذار")
+        w["severity_label"] = WARNING_SEVERITY_LABELS.get(w.get("severity"), "")
+        issuer_id = w.get("admin_id") or w.get("sheikh_id")
+        if w.get("auto_generated"):
+            w["issued_by"] = "تلقائي (النظام)"
+        else:
+            w["issued_by"] = issuer_names.get(issuer_id, "الإدارة")
+        # تاريخ موحّد للعرض
+        w["display_date"] = w.get("date") or str(w.get("created_at") or "")[:10]
+
     return warnings
 
 @api_router.delete("/admin/warnings/{warning_id}")
@@ -5788,18 +6231,17 @@ async def get_admin_dashboard_stats(current_user: dict = Depends(get_current_use
     week_start = get_current_week_start()  # السبت
     week_end = (datetime.strptime(week_start, "%Y-%m-%d") + timedelta(days=6)).strftime("%Y-%m-%d")
 
-    week_attendance = await db.attendance.count_documents({"date": {"$gte": week_start}, "status": "present"})
+    week_attendance = await db.attendance.count_documents({
+        "date": {"$gte": week_start, "$lte": week_end}, "status": "present"
+    })
 
     # Recitation stats
     total_recitations = await db.recitations.count_documents({})
-    week_recitations = await db.recitations.find({"created_at": {"$gte": week_start}}, {"_id": 0}).to_list(100000)
+    week_recitations = await db.recitations.find(
+        {"record_date": {"$gte": week_start, "$lte": week_end}}, {"_id": 0}
+    ).to_list(100000)
     week_pages = sum(_new_pages_of(r) for r in week_recitations)  # يشمل combined + new_pages
 
-    # المتوسطات لكل طالب هذا الأسبوع
-    students_divisor = max(total_students, 1)
-    week_attendance_avg = round(week_attendance / students_divisor, 1)
-    week_pages_avg = round(week_pages / students_divisor, 1)
-    
     # Top groups by points
     groups = await db.groups.find({}, {"_id": 0}).to_list(100)
     group_stats = []
@@ -5828,47 +6270,170 @@ async def get_admin_dashboard_stats(current_user: dict = Depends(get_current_use
     
     group_stats.sort(key=lambda x: x["total_points"], reverse=True)
     
-    # Top students
+    # قائمة الطلاب كاملةً (مرتّبة بالنقاط) — بدون N+1
     students = await db.users.find(
         {"role": "student", "is_active": True},
         {"_id": 0, "id": 1, "name": 1, "group_id": 1}
-    ).to_list(1000)
-    
-    top_students = []
-    for student in students:
-        points_data = await db.student_points.find_one({"student_id": student["id"]}, {"_id": 0})
-        total = points_data.get("total_points", 0) if points_data else 0
-        
-        group = await db.groups.find_one({"id": student.get("group_id")}, {"_id": 0, "name": 1})
-        
-        top_students.append({
-            "student_id": student["id"],
-            "student_name": student["name"],
-            "group_name": group["name"] if group else "بدون مجموعة",
-            "total_points": total
-        })
-    
-    top_students.sort(key=lambda x: x["total_points"], reverse=True)
-    
-    # Sheikhs list with stats
-    sheikhs = await db.users.find({"role": "sheikh"}, {"_id": 0, "password_hash": 0}).to_list(100)
+    ).to_list(5000)
+    student_ids_all = [s["id"] for s in students]
+
+    points_map = {
+        p["student_id"]: p.get("total_points", 0)
+        for p in await db.student_points.find(
+            {"student_id": {"$in": student_ids_all}},
+            {"_id": 0, "student_id": 1, "total_points": 1}
+        ).to_list(5000)
+    }
+    group_name_map = {g["id"]: g["name"] for g in groups}
+
+    all_students = [{
+        "student_id": s["id"],
+        "student_name": s["name"],
+        "group_id": s.get("group_id"),
+        "group_name": group_name_map.get(s.get("group_id"), "بدون مجموعة"),
+        "total_points": points_map.get(s["id"], 0),
+    } for s in students]
+    all_students.sort(key=lambda x: x["total_points"], reverse=True)
+    top_students = all_students
+
+    # ── إحصائيات المشرفين: كل مشرف لحاله مع مجموعاته ونسبتَي التسميع والحضور خلال الفصل ──
+    active_term = await db.terms.find_one({"is_active": True}, {"_id": 0, "id": 1, "name": 1})
+    term_filter_id = active_term["id"] if active_term else None
+
+    def _term_scoped(q: dict) -> dict:
+        """قصر الاستعلام على الفصل النشط (مع تضمين السجلات بلا term_id)."""
+        if term_filter_id:
+            q["$or"] = [{"term_id": term_filter_id}, {"term_id": None}, {"term_id": {"$exists": False}}]
+        return q
+
+    atts = await db.attendance.find(
+        _term_scoped({"student_id": {"$in": student_ids_all}}),
+        {"_id": 0, "student_id": 1, "status": 1}
+    ).to_list(200000)
+    recs = await db.recitations.find(
+        _term_scoped({"student_id": {"$in": student_ids_all}}),
+        {"_id": 0, "student_id": 1, "did_not_recite": 1}
+    ).to_list(200000)
+
+    student_group = {s["id"]: s.get("group_id") for s in students}
+    per_group = {g["id"]: {"present": 0, "att_total": 0, "recited": 0, "rec_total": 0, "students": 0}
+                 for g in groups}
+
+    for s in students:
+        gid = s.get("group_id")
+        if gid in per_group:
+            per_group[gid]["students"] += 1
+    for a in atts:
+        gid = student_group.get(a["student_id"])
+        if gid in per_group:
+            per_group[gid]["att_total"] += 1
+            if a.get("status") == "present":
+                per_group[gid]["present"] += 1
+    for r in recs:
+        gid = student_group.get(r["student_id"])
+        if gid in per_group:
+            per_group[gid]["rec_total"] += 1
+            if not r.get("did_not_recite"):
+                per_group[gid]["recited"] += 1
+
+    def _rate(n: int, d: int) -> float:
+        return round(n / d * 100, 1) if d else 0.0
+
+    sheikhs = await db.users.find(
+        {"role": "sheikh"}, {"_id": 0, "id": 1, "name": 1, "email": 1}
+    ).to_list(500)
+
+    empty_stat = {"present": 0, "att_total": 0, "recited": 0, "rec_total": 0, "students": 0}
     sheikh_stats = []
     for sheikh in sheikhs:
-        sheikh_groups = await db.groups.find({"sheikh_id": sheikh["id"]}, {"_id": 0}).to_list(20)
-        group_ids = [g["id"] for g in sheikh_groups]
-        
-        students_count = await db.users.count_documents({"group_id": {"$in": group_ids}, "role": "student"})
-        recitations_count = await db.recitations.count_documents({"sheikh_id": sheikh["id"]})
-        
+        sheikh_groups = [g for g in groups if g.get("sheikh_id") == sheikh["id"]]
+        group_rows = []
+        t_present = t_att = t_recited = t_rec = t_students = 0
+
+        for g in sheikh_groups:
+            st = per_group.get(g["id"], empty_stat)
+            group_rows.append({
+                "group_id": g["id"],
+                "group_name": g["name"],
+                "students_count": st["students"],
+                "attendance_rate": _rate(st["present"], st["att_total"]),
+                "recitation_rate": _rate(st["recited"], st["rec_total"]),
+            })
+            t_present += st["present"]
+            t_att += st["att_total"]
+            t_recited += st["recited"]
+            t_rec += st["rec_total"]
+            t_students += st["students"]
+
         sheikh_stats.append({
             "sheikh_id": sheikh["id"],
             "sheikh_name": sheikh["name"],
-            "email": sheikh["email"],
+            "email": sheikh.get("email", ""),
             "groups_count": len(sheikh_groups),
-            "students_count": students_count,
-            "recitations_count": recitations_count
+            "students_count": t_students,
+            "recitations_count": t_rec,
+            "attendance_rate": _rate(t_present, t_att),
+            "recitation_rate": _rate(t_recited, t_rec),
+            "groups": group_rows,
         })
-    
+
+    sheikh_stats.sort(key=lambda x: x["recitation_rate"], reverse=True)
+
+    # ── نِسَب هذا الأسبوع (مئوية) + تفريع لكل مجموعة ──
+    sheikh_name_map = {s["id"]: s["name"] for s in sheikhs}
+
+    week_atts = await db.attendance.find(
+        {"student_id": {"$in": student_ids_all}, "date": {"$gte": week_start, "$lte": week_end}},
+        {"_id": 0, "student_id": 1, "status": 1}
+    ).to_list(200000)
+    week_recs = await db.recitations.find(
+        {"student_id": {"$in": student_ids_all}, "record_date": {"$gte": week_start, "$lte": week_end}},
+        {"_id": 0, "student_id": 1, "did_not_recite": 1}
+    ).to_list(200000)
+
+    week_per_group = {g["id"]: {"present": 0, "att_total": 0, "recited": 0, "rec_total": 0, "students": 0}
+                      for g in groups}
+    for s in students:
+        gid = s.get("group_id")
+        if gid in week_per_group:
+            week_per_group[gid]["students"] += 1
+    for a in week_atts:
+        gid = student_group.get(a["student_id"])
+        if gid in week_per_group:
+            week_per_group[gid]["att_total"] += 1
+            if a.get("status") == "present":
+                week_per_group[gid]["present"] += 1
+    for r in week_recs:
+        gid = student_group.get(r["student_id"])
+        if gid in week_per_group:
+            week_per_group[gid]["rec_total"] += 1
+            if not r.get("did_not_recite"):
+                week_per_group[gid]["recited"] += 1
+
+    week_groups = []
+    for g in groups:
+        st = week_per_group.get(g["id"], empty_stat)
+        week_groups.append({
+            "group_id": g["id"],
+            "group_name": g["name"],
+            "sheikh_name": sheikh_name_map.get(g.get("sheikh_id"), "غير معين"),
+            "students_count": st["students"],
+            "attendance_rate": _rate(st["present"], st["att_total"]),
+            "recitation_rate": _rate(st["recited"], st["rec_total"]),
+            "attendance_records": st["att_total"],
+            "recitation_records": st["rec_total"],
+        })
+    week_groups.sort(key=lambda x: x["attendance_rate"], reverse=True)
+
+    # الإجماليات الأسبوعية كنسب مئوية
+    week_present_total = sum(1 for a in week_atts if a.get("status") == "present")
+    week_att_records = len(week_atts)
+    week_recited_total = sum(1 for r in week_recs if not r.get("did_not_recite"))
+    week_rec_records = len(week_recs)
+
+    week_attendance_rate = _rate(week_present_total, week_att_records)
+    week_recitation_rate = _rate(week_recited_total, week_rec_records)
+
     return {
         "summary": {
             "total_students": total_students,
@@ -5879,14 +6444,21 @@ async def get_admin_dashboard_stats(current_user: dict = Depends(get_current_use
             "week_attendance": week_attendance,
             "total_recitations": total_recitations,
             "week_pages": week_pages,
-            # المتوسطات + مدى الأسبوع (للبطاقات الجديدة)
-            "week_attendance_avg": week_attendance_avg,
-            "week_pages_avg": week_pages_avg,
+            # نِسَب الأسبوع المئوية + مدى الأسبوع (للبطاقتين)
+            "week_attendance_rate": week_attendance_rate,
+            "week_recitation_rate": week_recitation_rate,
+            "week_attendance_records": week_att_records,
+            "week_recitation_records": week_rec_records,
             "week_start": week_start,
             "week_end": week_end,
         },
+        # مجموع نقاط كل المجموعات (مش أول 5 فقط)
+        "total_groups_points": sum(g["total_points"] for g in group_stats),
         "top_groups": group_stats[:5],
         "top_students": top_students[:10],
+        "all_students": all_students,
+        "week_groups": week_groups,
+        "active_term_name": active_term["name"] if active_term else None,
         "sheikhs": sheikh_stats
     }
 
@@ -6329,41 +6901,79 @@ async def grant_interaction_badge(data: InteractionGrantCreate, current_user: di
 class AdminBonusCreate(BaseModel):
     student_id: str
     reason: Optional[str] = None
+    points: Optional[int] = None  # تجاوز اختياري لمقدار النقاط الافتراضي
+
+
+# ---- إعدادات نقاط التميز (المقدار + كل كم يوم) ----
+EXCELLENCE_DEFAULTS = {"points": 50, "period_days": 7}
+
+
+async def get_excellence_config() -> dict:
+    """إعدادات نقاط التميز من مجموعة settings (مع قيم افتراضية آمنة)."""
+    doc = await db.settings.find_one({"key": "excellence_points"}, {"_id": 0}) or {}
+    points = doc.get("points", EXCELLENCE_DEFAULTS["points"])
+    period_days = doc.get("period_days", EXCELLENCE_DEFAULTS["period_days"])
+    try:
+        points = max(1, min(1000, int(points)))
+    except (TypeError, ValueError):
+        points = EXCELLENCE_DEFAULTS["points"]
+    try:
+        period_days = max(0, min(365, int(period_days)))  # 0 = بدون تقييد
+    except (TypeError, ValueError):
+        period_days = EXCELLENCE_DEFAULTS["period_days"]
+    return {"points": points, "period_days": period_days}
+
 
 @api_router.post("/badges/admin-bonus")
 async def grant_admin_bonus(data: AdminBonusCreate, current_user: dict = Depends(get_current_user)):
-    """منح النقاط الإدارية للتميز - للمدير فقط (50 نقطة مرة واحدة في الأسبوع)"""
+    """منح نقاط التميز - للمدير فقط. المقدار والمدة من إعدادات `excellence_points`."""
     ensure_role(current_user, "admin", "فقط المدير يمكنه منح النقاط الإدارية")
-    
+
+    cfg = await get_excellence_config()
+    period_days = cfg["period_days"]
+
+    # مقدار النقاط: تجاوز المدير إن وُجد، وإلا الإعداد العام
+    points_value = cfg["points"]
+    if data.points is not None:
+        try:
+            points_value = max(1, min(1000, int(data.points)))
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="مقدار النقاط غير صحيح")
+
+    now = datetime.now(timezone.utc)
     week_start = get_current_week_start()
-    
-    # التحقق من عدم منح النقاط الإدارية مسبقاً لهذا الأسبوع
-    existing = await db.admin_bonus_grants.find_one({
-        "student_id": data.student_id,
-        "week_start": week_start
-    })
-    
-    if existing:
-        raise HTTPException(status_code=400, detail="تم منح النقاط الإدارية لهذا الطالب هذا الأسبوع مسبقاً")
-    
+
+    # التحقق من المدة: هل مُنِح الطالب نقاط تميز خلال آخر period_days يوم؟
+    if period_days > 0:
+        cutoff = (now - timedelta(days=period_days)).isoformat()
+        existing = await db.admin_bonus_grants.find_one({
+            "student_id": data.student_id,
+            "created_at": {"$gte": cutoff}
+        })
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"تم منح نقاط التميز لهذا الطالب خلال آخر {period_days} يوم"
+            )
+
     # إنشاء سجل النقاط الإدارية
     bonus = {
         "id": str(uuid.uuid4()),
         "student_id": data.student_id,
         "admin_id": current_user["user_id"],
-        "points": 50,
+        "points": points_value,
         "week_start": week_start,
         "reason": data.reason,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "created_at": now.isoformat()
     }
-    
+
     await db.admin_bonus_grants.insert_one(bonus)
-    
+
     # منح النقاط (مع الحد الأقصى 1000)
     student_points = await db.student_points.find_one({"student_id": data.student_id})
     current_total = student_points.get("total_points", 0) if student_points else 0
-    points_to_add = min(50, 1000 - current_total)
-    
+    points_to_add = min(points_value, 1000 - current_total)
+
     if points_to_add > 0:
         await add_points(data.student_id, points_to_add, "admin_bonus", data.reason or "نقاط إدارية للتميز")
         await db.student_points.update_one(
@@ -6371,16 +6981,20 @@ async def grant_admin_bonus(data: AdminBonusCreate, current_user: dict = Depends
             {"$inc": {"admin_bonus_points": points_to_add}},
             upsert=True
         )
-    
-    # إشعار الطالب
+
+    # إشعار الطالب — مع سبب المنح إن كُتِب
+    reason_txt = (data.reason or "").strip()
+    msg = f"حصلت على {points_to_add} نقطة تميز"
+    if reason_txt:
+        msg += f" — السبب: {reason_txt}"
     await create_notification_internal(
         data.student_id,
         "🏆 نقاط التميز",
-        f"حصلت على {points_to_add} نقطة إدارية للتميز من المدير!",
+        msg,
         "success"
     )
-    
-    return {"message": "تم منح النقاط الإدارية بنجاح", "points_added": points_to_add}
+
+    return {"message": "تم منح نقاط التميز بنجاح", "points_added": points_to_add}
 
 @api_router.get("/badges/student/{student_id}")
 async def get_student_badges(student_id: str, current_user: dict = Depends(get_current_user)):
@@ -7196,6 +7810,45 @@ async def update_tracking_submission_settings(data: TrackingSettingsUpdate, curr
         "settings": settings
     }
 
+class ExcellenceSettingsUpdate(BaseModel):
+    points: Optional[int] = None
+    period_days: Optional[int] = None
+
+
+@api_router.get("/settings/excellence-points")
+async def get_excellence_points_settings(current_user: dict = Depends(get_current_user)):
+    """إعدادات نقاط التميز: المقدار + كل كم يوم يُسمح بالمنح (0 = بدون تقييد)."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    return await get_excellence_config()
+
+
+@api_router.put("/settings/excellence-points")
+async def update_excellence_points_settings(data: ExcellenceSettingsUpdate,
+                                            current_user: dict = Depends(get_current_user)):
+    """تحديث إعدادات نقاط التميز (المدير فقط)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل إعدادات نقاط التميز")
+
+    update_data = {"updated_at": datetime.now(timezone.utc).isoformat()}
+
+    if data.points is not None:
+        if data.points < 1 or data.points > 1000:
+            raise HTTPException(status_code=400, detail="مقدار النقاط يجب أن يكون بين 1 و 1000")
+        update_data["points"] = int(data.points)
+
+    if data.period_days is not None:
+        if data.period_days < 0 or data.period_days > 365:
+            raise HTTPException(status_code=400, detail="المدة يجب أن تكون بين 0 و 365 يوم (0 = بدون تقييد)")
+        update_data["period_days"] = int(data.period_days)
+
+    await db.settings.update_one(
+        {"key": "excellence_points"},
+        {"$set": update_data},
+        upsert=True
+    )
+
+    return {"message": "تم تحديث إعدادات نقاط التميز بنجاح", "settings": await get_excellence_config()}
+
+
 @api_router.get("/settings/tracking-submission/check")
 async def check_tracking_submission_window(current_user: dict = Depends(get_current_user)):
     """فحص هل يمكن تسليم ورق المتابعة الآن"""
@@ -7467,15 +8120,9 @@ async def close_term_and_start_new(data: TermCreateRequest, current_user: dict =
         new_term_dict["created_at"] = new_term_dict["created_at"].isoformat()
         await db.terms.insert_one(new_term_dict)
         
-        # 8. إشعار جميع الطلاب
-        for student in students:
-            await create_notification_internal(
-                student["id"],
-                "بداية فصل دراسي جديد",
-                f"تم بدء الفصل الجديد: {data.name}. تم أرشفة بياناتك السابقة.",
-                "info"
-            )
-        
+        # 8. (أُزيل) إشعار الطلاب ببداية فصل جديد — عملية إدارية لا تخصّ الطالب.
+        #    يُسجَّل في سجل العمليات للمدير فقط.
+
         await log_admin_action(current_user, "term_reset", "term", term_id, term_name,
                                f"إغلاق الفصل وبدء «{data.name}» — أُرشِف {len(archives)} طالب")
 
@@ -7613,15 +8260,9 @@ async def admin_reset_term(data: TermCreateRequest, current_user: dict = Depends
         new_term_dict["created_at"] = new_term_dict["created_at"].isoformat()
         await db.terms.insert_one(new_term_dict)
         
-        # 8. إشعار جميع الطلاب
-        for student in students:
-            await create_notification_internal(
-                student["id"],
-                "بداية فصل دراسي جديد",
-                f"تم بدء الفصل الجديد: {data.name}. تم أرشفة بياناتك السابقة وتصفير النقاط.",
-                "info"
-            )
-        
+        # 8. (أُزيل) إشعار الطلاب ببداية فصل جديد — عملية إدارية لا تخصّ الطالب.
+        #    يُسجَّل في سجل العمليات للمدير فقط.
+
         await log_admin_action(current_user, "term_reset", "term", term_id, term_name,
                                f"إعادة تعيين الفصل وبدء «{data.name}» — أُرشِف {len(archives)} طالب")
 
@@ -8425,6 +9066,194 @@ async def export_student_excel(student_id: str, term_id: Optional[str] = None, c
     
     filename = f"hafiz_student_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+ARABIC_WEEKDAYS = ["الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"]
+
+
+def _weekday_ar(date_str: str) -> str:
+    """اسم اليوم بالعربي من تاريخ YYYY-MM-DD."""
+    try:
+        return ARABIC_WEEKDAYS[datetime.strptime(date_str[:10], "%Y-%m-%d").weekday()]
+    except (ValueError, TypeError, IndexError):
+        return ""
+
+
+def _recitation_summary_ar(rec: dict) -> str:
+    """وصف نصّي لما سمّعه الطالب في اليوم (حفظ جديد + مراجعة)."""
+    if rec.get("did_not_recite"):
+        return "لم يسمّع"
+
+    parts = []
+
+    # الحفظ الجديد
+    juz = rec.get("juz_number")
+    p_from, p_to = rec.get("page_from"), rec.get("page_to")
+    new_pages = rec.get("new_pages") or 0
+    if juz and p_from and p_to:
+        parts.append(f"حفظ: جزء {juz} — صفحات {p_from}-{p_to}")
+    elif juz and new_pages:
+        parts.append(f"حفظ: جزء {juz} — {new_pages} صفحة")
+    elif new_pages:
+        parts.append(f"حفظ: {new_pages} صفحة")
+
+    # المراجعة
+    review_juz = rec.get("review_juz") or []
+    if review_juz:
+        parts.append("مراجعة: أجزاء " + "، ".join(str(j) for j in review_juz))
+    partial_juz = rec.get("partial_review_juz")
+    partial_pages = rec.get("partial_review_pages") or 0
+    if partial_juz:
+        parts.append(f"مراجعة جزئية: جزء {partial_juz}" + (f" ({partial_pages} صفحة)" if partial_pages else ""))
+    elif not review_juz and (rec.get("review_pages") or 0):
+        parts.append(f"مراجعة: {rec.get('review_pages')} صفحة")
+
+    # احتياط للسجلات القديمة
+    if not parts and (rec.get("pages_count") or 0):
+        parts.append(f"{rec.get('pages_count')} صفحة")
+
+    return " + ".join(parts) if parts else "—"
+
+
+@api_router.get("/export/student-recitations/{student_id}")
+async def export_student_recitations_excel(
+    student_id: str,
+    scope: str = "current",
+    current_user: dict = Depends(get_current_user)
+):
+    """تنزيل سجل تسميع طالب واحد (اليوم + التاريخ + التسميع).
+    scope=current → الفصل الحالي فقط، scope=all → كل الفصول (مع الأرشيف)."""
+    if current_user["role"] == "student" and current_user["user_id"] != student_id:
+        raise HTTPException(status_code=403, detail="لا يمكنك تحميل بيانات طالب آخر")
+
+    student = await db.users.find_one({"id": student_id, "role": "student"}, {"_id": 0})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+
+    all_terms = scope == "all"
+    active_term = await db.terms.find_one({"is_active": True}, {"_id": 0})
+
+    # سجلات الفصل الحالي
+    rec_query = {"student_id": student_id}
+    if not all_terms and active_term:
+        rec_query["$or"] = [
+            {"term_id": active_term["id"]},
+            {"term_id": None},
+            {"term_id": {"$exists": False}},
+        ]
+    recitations = await db.recitations.find(rec_query, {"_id": 0}).to_list(20000)
+
+    # الأرشيف عند طلب كل الفصول
+    if all_terms:
+        archived = await db.recitations_archives.find(
+            {"student_id": student_id}, {"_id": 0}
+        ).to_list(20000)
+        recitations.extend(archived)
+
+    recitations.sort(key=lambda r: (r.get("record_date") or "", str(r.get("created_at") or "")), reverse=True)
+
+    scope_label = "جميع الفصول" if all_terms else (active_term["name"] if active_term else "الفصل الحالي")
+
+    # أسماء الفصول (لعمود الفصل عند تصدير الكل)
+    term_names = {}
+    if all_terms:
+        for t in await db.terms.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(500):
+            term_names[t["id"]] = t["name"]
+
+    group_name = ""
+    if student.get("group_id"):
+        group = await db.groups.find_one({"id": student["group_id"]}, {"_id": 0, "name": 1})
+        group_name = group["name"] if group else ""
+
+    output = io.BytesIO()
+    workbook = xlsxwriter.Workbook(output, {'in_memory': True})
+
+    title_format = workbook.add_format({
+        'bold': True, 'font_size': 16, 'align': 'center', 'valign': 'vcenter',
+        'bg_color': '#0d9488', 'font_color': 'white'
+    })
+    header_format = workbook.add_format({
+        'bold': True, 'bg_color': '#1e3a5f', 'font_color': 'white',
+        'border': 1, 'align': 'center', 'valign': 'vcenter', 'font_size': 12
+    })
+    cell_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'valign': 'vcenter', 'font_size': 11
+    })
+    text_format = workbook.add_format({
+        'border': 1, 'align': 'right', 'valign': 'vcenter', 'font_size': 11
+    })
+    success_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'bg_color': '#d1fae5', 'font_color': '#065f46'
+    })
+    warning_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'bg_color': '#fef3c7', 'font_color': '#92400e'
+    })
+    danger_format = workbook.add_format({
+        'border': 1, 'align': 'center', 'bg_color': '#fee2e2', 'font_color': '#991b1b'
+    })
+
+    sheet = workbook.add_worksheet('سجل التسميع')
+    sheet.right_to_left()
+
+    last_col = 6 if all_terms else 5
+    sheet.merge_range(0, 0, 0, last_col, f'سجل تسميع: {student.get("name", "")} — {scope_label}', title_format)
+
+    sheet.write(2, 0, 'الاسم:', header_format)
+    sheet.write(2, 1, student.get("name", ""), cell_format)
+    sheet.write(2, 2, 'المجموعة:', header_format)
+    sheet.write(2, 3, group_name, cell_format)
+    sheet.write(2, 4, 'عدد السجلات:', header_format)
+    sheet.write(2, 5, len(recitations), cell_format)
+
+    headers = ['#', 'اليوم', 'التاريخ', 'التسميع', 'الحالة', 'ملاحظات']
+    if all_terms:
+        headers.append('الفصل')
+    for col, h in enumerate(headers):
+        sheet.write(4, col, h, header_format)
+
+    row = 5
+    for i, rec in enumerate(recitations, 1):
+        date_str = rec.get("record_date") or str(rec.get("created_at") or "")[:10]
+        sheet.write(row, 0, i, cell_format)
+        sheet.write(row, 1, _weekday_ar(date_str), cell_format)
+        sheet.write(row, 2, date_str, cell_format)
+        sheet.write(row, 3, _recitation_summary_ar(rec), text_format)
+
+        if rec.get("did_not_recite"):
+            status_text, fmt = "لم يسمّع", danger_format
+        elif rec.get("passed_minimum") or rec.get("passed_review_minimum"):
+            status_text, fmt = "اجتاز", success_format
+        else:
+            status_text, fmt = "لم يجتز", warning_format
+        sheet.write(row, 4, status_text, fmt)
+        sheet.write(row, 5, rec.get("notes", "") or "", text_format)
+
+        if all_terms:
+            tname = rec.get("term_name") or term_names.get(rec.get("term_id"), "")
+            sheet.write(row, 6, tname, cell_format)
+        row += 1
+
+    if not recitations:
+        sheet.merge_range(5, 0, 5, last_col, 'لا توجد سجلات تسميع', cell_format)
+
+    sheet.set_column('A:A', 5)
+    sheet.set_column('B:B', 12)
+    sheet.set_column('C:C', 14)
+    sheet.set_column('D:D', 45)
+    sheet.set_column('E:E', 12)
+    sheet.set_column('F:F', 30)
+    sheet.set_column('G:G', 18)
+
+    workbook.close()
+    output.seek(0)
+
+    filename = f"recitations_{student_id[:8]}_{'all' if all_terms else 'current'}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+
     return StreamingResponse(
         output,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

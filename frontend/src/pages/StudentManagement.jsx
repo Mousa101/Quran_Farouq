@@ -36,6 +36,8 @@ const StudentManagement = () => {
   const [submitting, setSubmitting] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [bonusReason, setBonusReason] = useState('');
+  // إعدادات نقاط التميز (تُضبط من إعدادات ورق المتابعة)
+  const [excellence, setExcellence] = useState({ points: 50, period_days: 7 });
 
   const [newStudentData, setNewStudentData] = useState({
     email: '',
@@ -62,6 +64,9 @@ const StudentManagement = () => {
       return;
     }
     fetchData();
+    axios.get(`${API}/settings/excellence-points`)
+      .then((r) => setExcellence({ points: r.data.points, period_days: r.data.period_days }))
+      .catch(() => {}); // القيم الافتراضية كافية إذا فشل الجلب
   }, [user]);
 
   const fetchData = async () => {
@@ -187,11 +192,11 @@ const StudentManagement = () => {
     if (!selectedStudent) return;
     setSubmitting(true);
     try {
-      await axios.post(`${API}/badges/admin-bonus`, {
+      const res = await axios.post(`${API}/badges/admin-bonus`, {
         student_id: selectedStudent.id,
         reason: bonusReason
       });
-      toast.success(`تم منح 50 نقطة تميز للطالب ${selectedStudent.name}`);
+      toast.success(`تم منح ${res.data?.points_added ?? excellence.points} نقطة تميز للطالب ${selectedStudent.name}`);
       setBonusDialogOpen(false);
       setSelectedStudent(null);
       setBonusReason('');
@@ -464,7 +469,7 @@ const StudentManagement = () => {
                             setBonusReason('');
                             setBonusDialogOpen(true);
                           }}
-                          title="منح نقاط التميز (50 نقطة)"
+                          title={`منح نقاط التميز (${excellence.points} نقطة)`}
                         >
                           <Award className="w-4 h-4" />
                         </Button>
@@ -643,8 +648,10 @@ const StudentManagement = () => {
           <div className="space-y-4 mt-4">
             <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center">
               <p className="text-amber-400 text-lg font-bold">{selectedStudent?.name}</p>
-              <p className="text-slate-400 text-sm mt-1">سيحصل على 🏆 50 نقطة تميز</p>
-              <p className="text-slate-500 text-xs mt-1">(مرة واحدة في الأسبوع)</p>
+              <p className="text-slate-400 text-sm mt-1">سيحصل على 🏆 {excellence.points} نقطة تميز</p>
+              {excellence.period_days > 0 && (
+                <p className="text-slate-500 text-xs mt-1">(مرة كل {excellence.period_days} يوم لكل طالب)</p>
+              )}
             </div>
             
             <div className="space-y-2">

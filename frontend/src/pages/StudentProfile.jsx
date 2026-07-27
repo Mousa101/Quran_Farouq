@@ -141,7 +141,7 @@ const StudentProfile = () => {
     );
   }
 
-  const { student, group, points, attendance_summary, recitation_summary, attendance_records, recitation_records, warnings } = profileData;
+  const { student, group, points, attendance_summary, recitation_summary, attendance_records, recitation_records, warnings, last_tracking_sheet } = profileData;
 
   return (
     <div className="space-y-6 animate-fadeIn" data-testid="student-profile-page">
@@ -448,6 +448,40 @@ const StudentProfile = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* آخر ورقة متابعة مُسلَّمة */}
+      <Card className="glass-card border-purple-500/30">
+        <CardHeader>
+          <CardTitle className="text-lg text-purple-400 flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            آخر ورقة متابعة مُسلَّمة
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!last_tracking_sheet ? (
+            <p className="text-slate-400 text-center py-4">لم يسلّم الطالب أي ورقة متابعة بعد</p>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="p-3 rounded-lg bg-slate-800/50 text-center">
+                <p className="text-slate-400 text-xs">أسبوع الورقة</p>
+                <p className="text-white font-bold">{last_tracking_sheet.week_start}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-emerald-500/10 text-center">
+                <p className="text-slate-400 text-xs">🕌 الصلوات</p>
+                <p className="text-emerald-400 font-bold text-lg">{last_tracking_sheet.prayers_count}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-blue-500/10 text-center">
+                <p className="text-slate-400 text-xs">📖 الجلوس مع القرآن</p>
+                <p className="text-blue-400 font-bold text-lg">{last_tracking_sheet.quran_sitting_days}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-amber-500/10 text-center">
+                <p className="text-slate-400 text-xs">النقاط</p>
+                <p className="text-amber-400 font-bold text-lg">{last_tracking_sheet.points_earned}</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Warnings Section */}
       {warnings && warnings.length > 0 && (
