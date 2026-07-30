@@ -100,6 +100,7 @@ const Sidebar = () => {
         { to: '/attendance', icon: UserCheck, label: 'تسجيل الحضور' },
         { to: '/recitations', icon: BookOpen, label: 'تسجيل التسميع' },
         { to: '/statistics', icon: Table2, label: 'إحصائيات الطلاب' },
+        { to: '/points-manager', icon: Star, label: 'إدارة النقاط' },
         { to: '/struggling-students', icon: AlertTriangle, label: 'الطلاب المتعثّرون' },
         
         { to: '/fees', icon: DollarSign, label: 'الرسوم المالية' },
@@ -132,6 +133,7 @@ const Sidebar = () => {
         { to: '/sheikh-analytics', icon: BarChart3, label: 'تحليلاتي' },
         { to: '/sheikh-message', icon: MessageSquare, label: 'مراسلة الطلاب' },
         { to: '/student-stats', icon: Table2, label: 'إحصائيات الطلاب' },
+        { to: '/points-manager', icon: Star, label: 'إدارة النقاط' },
         { to: '/struggling-students', icon: AlertTriangle, label: 'الطلاب المتعثّرون' },
         { to: '/tracking-settings', icon: Settings, label: 'إعدادات ورق المتابعة' },
         { to: '/curriculum', icon: BookMarked, label: 'عرض المنهج' },

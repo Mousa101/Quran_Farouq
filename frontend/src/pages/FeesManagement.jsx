@@ -10,6 +10,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
 import { toast } from 'sonner';
 import { DollarSign, Plus, Trash2, Clock, CheckCircle, AlertCircle, Calendar, Search, FileDown } from 'lucide-react';
+import AdminFeesBoard from '../components/AdminFeesBoard';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -189,6 +190,15 @@ const FeesManagement = () => {
     due: filteredFees.filter(f => getPaymentStatus(f) === 'due').reduce((sum, f) => sum + (f.amount || 0), 0),
     pending: filteredFees.filter(f => getPaymentStatus(f) === 'pending').reduce((sum, f) => sum + (f.amount || 0), 0)
   };
+
+  // المدير: لوحة مبسّطة (جدول طلاب × أشهر). الطالب: العرض الشخصي أدناه.
+  if (isAdmin) {
+    return (
+      <div className="animate-fadeIn">
+        <AdminFeesBoard />
+      </div>
+    );
+  }
 
   if (loading) {
     return (

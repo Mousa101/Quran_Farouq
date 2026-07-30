@@ -14,7 +14,7 @@ import {
   Users, BookOpen, Calendar, Trophy, TrendingUp, 
   GraduationCap, UserCheck, Target, Eye, Medal,
   ArrowUpRight, UserPlus, Clock, Archive, RefreshCw, Download, FileSpreadsheet, Edit,
-  ChevronDown, ChevronUp, Loader2, BookUser
+  ChevronDown, ChevronUp, Loader2, BookUser, AlertTriangle, Bell
 } from 'lucide-react';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -55,6 +55,9 @@ const AdminDashboard = () => {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   // قائمة الطلاب بالصفحة الرئيسية + تنزيل سجل التسميع
   const [showWeekBreakdown, setShowWeekBreakdown] = useState(false);
+  // المشرفون المتأخرون في تسجيل الحضور
+  const [lateSheikhs, setLateSheikhs] = useState([]);
+  const [alertingLate, setAlertingLate] = useState(false);
   const [showAllStudents, setShowAllStudents] = useState(false);
   const [studentSearch, setStudentSearch] = useState('');
   const [downloadingStudent, setDownloadingStudent] = useState(null);
@@ -73,6 +76,7 @@ const AdminDashboard = () => {
     fetchActiveTerm();
     fetchAllTerms();
     fetchPointsConfig();
+    fetchLateSheikhs();
   }, []);
 
   const fetchPointsConfig = async () => {
@@ -285,6 +289,28 @@ const AdminDashboard = () => {
       toast.error('فشل في تحميل الأرشيف');
     } finally {
       setExporting(false);
+    }
+  };
+
+  const fetchLateSheikhs = async () => {
+    try {
+      const res = await axios.get(`${API}/reports/late-sheikhs`);
+      setLateSheikhs(res.data?.sheikhs || []);
+    } catch (error) {
+      console.error('Error loading late sheikhs:', error);
+    }
+  };
+
+  const alertLateSheikhs = async (ids) => {
+    if (!ids.length) return;
+    setAlertingLate(true);
+    try {
+      const res = await axios.post(`${API}/reports/late-sheikhs/alert`, { sheikh_ids: ids });
+      toast.success(res.data.message || 'تم إرسال التنبيه');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل في إرسال التنبيه');
+    } finally {
+      setAlertingLate(false);
     }
   };
 
@@ -783,6 +809,58 @@ const AdminDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* المشرفون المتأخرون في تسجيل الحضور */}
+      {lateSheikhs.length > 0 && (
+        <Card className={`${isDark ? 'glass-card' : 'bg-white'} border-amber-500/40`}>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <CardTitle className={`flex items-center gap-2 text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+                مشرفون متأخّرون في تسجيل الحضور
+                <span className="text-xs font-normal text-amber-400">({lateSheikhs.length})</span>
+              </CardTitle>
+              <Button
+                size="sm"
+                onClick={() => alertLateSheikhs(lateSheikhs.map((s) => s.sheikh_id))}
+                disabled={alertingLate}
+                className="bg-amber-600 hover:bg-amber-700 text-xs"
+              >
+                {alertingLate ? <Loader2 className="w-3 h-3 ml-1 animate-spin" /> : <Bell className="w-3 h-3 ml-1" />}
+                تنبيه الكل
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {lateSheikhs.map((s) => (
+                <div key={s.sheikh_id} className={`p-3 rounded-lg flex items-center justify-between gap-2 flex-wrap ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+                  <div className="min-w-0">
+                    <p className={`font-medium text-sm truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{s.sheikh_name}</p>
+                    <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {s.students_count} طالب · {s.groups.join('، ') || 'بدون مجموعات'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-400">
+                      {s.days_since === null ? 'لم يسجّل مطلقًا' : `${s.days_since} يوم`}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => alertLateSheikhs([s.sheikh_id])}
+                      className="text-amber-400 hover:bg-amber-500/10"
+                      title="إرسال تنبيه"
+                    >
+                      <Bell className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* أداء المشرفين والمجموعات خلال الفصل */}
       <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>

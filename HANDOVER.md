@@ -8,6 +8,11 @@
 > - **بنود المتابعة صار إلها نطاقان:** حقل `is_global` — بند المدير بدون `sheikh_id` عام للجميع، وبند المشرف خاص بطلابه. `get_tracking_items_for_sheikh()` بترجّع الاتنين معًا.
 > - **جدول الإحصائيات صار فيه `tracking_period`** (week/month/term) وأعمدة `tracking_prayers` و`tracking_sitting` و`last_sheet`.
 > - **endpoint جديد:** `GET /tracking-sheets/last-per-student` — آخر ورقة لكل طالب بما فيهم اللي ما سلّموا.
+> - **المحادثة صارت ثلاثية:** غرفة كل طالب فيها الطالب + مشرفه + **المدير (يكتب مش بس يقرأ)**، وزيادة محادثات ثنائية `kind: "admin_sheikh"`. علامات القراءة صارت `read_by_student/sheikh/admin`.
+> - **الرسوم:** `fees_config` (مبلغ شهري افتراضي + توليد تلقائي) و`GET /admin/fees/overview` (جدول طالب × 12 شهر). الطالب الجديد بيتولّدله 12 شهر تلقائيًا.
+> - **التعثّر:** `struggling_criteria` (4 مقاييس يضبطها المدير) و`/reports/struggling-students?category=&period=`.
+> - ⚠️ **النقاط اليدوية صارت مبنية من سجلّها:** مجموعة `points_adjustments` (إضافة/خصم/تجميد) و`recompute_student_points` بيبني منها `manual_points` و`frozen_points`. **لا تعدّل هالحقول يدويًا في `student_points`** — أضف/احذف من `points_adjustments` وخلّي recompute يشتغل. `available_points = total_points − frozen_points`.
+> - **سجل النقاط** `GET /points/ledger/{id}` مبني من الخام مباشرةً (مش من `points_transactions` اللي بينمسح عند الأرشفة).
 > - **المدير صار يقدر يسجّل تسميع وحضور** — `POST /recitations` و`/attendance` و`/attendance/bulk` صاروا `["sheikh","admin"]`. المدير بيسجّل **نيابةً عن مشرف مجموعة الطالب** عبر `resolve_recording_sheikh_id()` — فلا تعتمد على أن `sheikh_id` في السجل = من ضغط الزر.
 > - **نقل الطالب صار بثلاثة أوضاع** (`with_data` / `keep_old` / `fresh_start`). `fresh_start` بيأرشف ويصفّر عبر `archive_and_reset_student()`. الحقل القديم `move_data` لسّا مدعوم.
 > - **بطاقتا لوحة المدير صارتا نِسَبًا مئوية** — `week_attendance_avg` و`week_pages_avg` **أُزيلا**؛ استخدم `week_attendance_rate` و`week_recitation_rate` و`week_groups`.

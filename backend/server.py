@@ -1176,12 +1176,14 @@ DB_INDEXES = {
     "tracking_items": [[("sheikh_id", 1)], [("is_global", 1)]],
     "student_points": [[("student_id", 1)]],
     "points_transactions": [[("student_id", 1)]],
+    "points_adjustments": [[("student_id", 1)], [("student_id", 1), ("type", 1)],
+                           [("type", 1), ("active", 1)], [("created_at", -1)]],
+    "points_adjustments_archives": [[("student_id", 1)]],
     "groups": [[("id", 1)], [("sheikh_id", 1)]],
     "notifications": [[("user_id", 1)], [("user_id", 1), ("created_at", -1)]],
     "terms": [[("id", 1)], [("is_active", 1)]],
     "term_archives": [[("student_id", 1)], [("term_id", 1)]],
     "assessments": [[("student_id", 1)], [("term_id", 1)]],
-    "fees": [[("student_id", 1)]],
     "homework": [[("id", 1)]],
     "homework_submissions": [[("homework_id", 1)], [("student_id", 1)]],
     "admin_exams": [[("student_id", 1)]],
@@ -1202,7 +1204,11 @@ DB_INDEXES = {
     "weekly_badges": [[("student_id", 1)]],
     "badge_types": [[("id", 1)]],
     "settings": [[("key", 1)]],
-    "chat_messages": [[("student_id", 1), ("created_at", 1)], [("sheikh_id", 1)], [("student_id", 1), ("sheikh_id", 1)]],
+    "chat_messages": [[("student_id", 1), ("created_at", 1)], [("sheikh_id", 1)],
+                      [("student_id", 1), ("sheikh_id", 1)],
+                      [("kind", 1), ("sheikh_id", 1), ("created_at", 1)]],
+    "fees": [[("student_id", 1)], [("year", 1), ("month", 1)],
+             [("student_id", 1), ("year", 1), ("month", 1)]],
 }
 
 
@@ -1293,8 +1299,82 @@ async def analytics_timeseries(term_id: Optional[str] = None, group_id: Optional
     )
 
 
-# ============== A4 - تقرير الطلاب المتعثّرين (انقطاع عن التسميع) ==============
-STRUGGLING_DEFAULT_DAYS = 2  # المدة الافتراضية قبل اعتبار الطالب متعثّرًا
+# ============== A4 - تقرير الطلاب المتعثّرين ==============
+STRUGGLING_DEFAULT_DAYS = 2  # المدة الافتراضية قبل اعتبار الطالب متعثّرًا في التسميع
+
+# أقسام التعثّر ومقاييسها الافتراضية (المدير يقدر يعدّلها من الإعدادات)
+STRUGGLING_CRITERIA_DEFAULTS = {
+    "recitation_days": STRUGGLING_DEFAULT_DAYS,  # متعثّر إن مرّ هذا العدد من الأيام بلا تسميع
+    "prayers_min": 25,        # الحد الأدنى لعدد الصلوات في ورق المتابعة خلال المدة
+    "sitting_min": 20,        # الحد الأدنى لأيام الجلوس مع القرآن خلال المدة
+    "attendance_min_rate": 70,  # الحد الأدنى لنسبة الحضور % خلال المدة
+}
+
+STRUGGLING_CATEGORIES = ("recitation", "prayers", "sitting", "attendance", "all")
+
+STRUGGLING_CATEGORY_LABELS = {
+    "recitation": "التسميع",
+    "prayers": "الصلوات",
+    "sitting": "الجلوس مع القرآن",
+    "attendance": "الحضور",
+}
+
+
+async def get_struggling_criteria() -> dict:
+    """مقاييس التعثّر من الإعدادات مع قيم افتراضية آمنة."""
+    doc = await db.settings.find_one({"key": "struggling_criteria"}, {"_id": 0}) or {}
+    out = {}
+    for k, default in STRUGGLING_CRITERIA_DEFAULTS.items():
+        try:
+            val = int(doc.get(k, default))
+        except (TypeError, ValueError):
+            val = default
+        out[k] = max(0, val)
+    # نسبة الحضور لا تتجاوز 100
+    out["attendance_min_rate"] = min(out["attendance_min_rate"], 100)
+    return out
+
+
+class StrugglingCriteriaUpdate(BaseModel):
+    recitation_days: Optional[int] = None
+    prayers_min: Optional[int] = None
+    sitting_min: Optional[int] = None
+    attendance_min_rate: Optional[int] = None
+
+
+@api_router.get("/settings/struggling-criteria")
+async def get_struggling_criteria_settings(current_user: dict = Depends(get_current_user)):
+    """مقاييس تحديد الطالب المتعثّر في كل قسم."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    return await get_struggling_criteria()
+
+
+@api_router.put("/settings/struggling-criteria")
+async def update_struggling_criteria_settings(data: StrugglingCriteriaUpdate,
+                                              current_user: dict = Depends(get_current_user)):
+    """تعديل مقاييس التعثّر (المدير فقط)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل مقاييس التعثّر")
+
+    update = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    if data.recitation_days is not None:
+        if not 1 <= data.recitation_days <= 365:
+            raise HTTPException(status_code=400, detail="مدة انقطاع التسميع يجب أن تكون بين 1 و 365 يوم")
+        update["recitation_days"] = int(data.recitation_days)
+    if data.prayers_min is not None:
+        if not 0 <= data.prayers_min <= 1000:
+            raise HTTPException(status_code=400, detail="حد الصلوات يجب أن يكون بين 0 و 1000")
+        update["prayers_min"] = int(data.prayers_min)
+    if data.sitting_min is not None:
+        if not 0 <= data.sitting_min <= 1000:
+            raise HTTPException(status_code=400, detail="حد الجلوس مع القرآن يجب أن يكون بين 0 و 1000")
+        update["sitting_min"] = int(data.sitting_min)
+    if data.attendance_min_rate is not None:
+        if not 0 <= data.attendance_min_rate <= 100:
+            raise HTTPException(status_code=400, detail="نسبة الحضور يجب أن تكون بين 0 و 100")
+        update["attendance_min_rate"] = int(data.attendance_min_rate)
+
+    await db.settings.update_one({"key": "struggling_criteria"}, {"$set": update}, upsert=True)
+    return {"message": "تم تحديث مقاييس التعثّر", "criteria": await get_struggling_criteria()}
 
 
 async def _sheikh_group_ids(sheikh_id):
@@ -1305,10 +1385,21 @@ async def _sheikh_group_ids(sheikh_id):
 @api_router.get("/reports/struggling-students")
 async def struggling_students_report(days: Optional[int] = None, group_id: Optional[str] = None,
                                      term_id: Optional[str] = None,
+                                     category: str = "recitation",
+                                     period: str = "week",
                                      current_user: dict = Depends(get_current_user)):
-    """A4 — الطلاب الذين مرّ عليهم (days) دون تسميع. المدير يرى الجميع، والمشرف مجموعاته فقط.
-    إن لم يُمرّر days تُستخدم مدة كل مجموعة (recitation_alert_days) أو الافتراضي."""
+    """A4 — الطلاب المتعثّرون حسب القسم المطلوب.
+    category: recitation | prayers | sitting | attendance | all
+    period: week | month | term — مدى قياس الصلوات/الجلوس/الحضور (التسميع دائمًا بالأيام).
+    المدير يرى الجميع، والمشرف مجموعاته فقط."""
     ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك بعرض هذا التقرير")
+
+    if category not in STRUGGLING_CATEGORIES:
+        category = "recitation"
+    if period not in ("week", "month", "term"):
+        period = "week"
+
+    criteria = await get_struggling_criteria()
 
     user_query = {"role": "student"}
     if current_user["role"] == "sheikh":
@@ -1322,53 +1413,154 @@ async def struggling_students_report(days: Optional[int] = None, group_id: Optio
 
     students = await db.users.find(
         user_query, {"_id": 0, "id": 1, "name": 1, "group_id": 1}
-    ).to_list(3000)
+    ).to_list(5000)
+    sids = [s["id"] for s in students]
+
+    # أسماء المجموعات ومدد التنبيه (دفعة واحدة — بدون N+1)
+    groups = await db.groups.find({}, {"_id": 0, "id": 1, "name": 1, "recitation_alert_days": 1}).to_list(3000)
+    group_info = {g["id"]: {"name": g["name"], "days": g.get("recitation_alert_days") or criteria["recitation_days"]}
+                  for g in groups}
 
     today = datetime.now(timezone.utc).date()
-    group_cache = {}
+    p_from, p_to = _tracking_period_bounds(period)
+
+    # ── آخر تسميع لكل طالب ──
+    rq = {"student_id": {"$in": sids}, "did_not_recite": {"$ne": True}}
+    if term_id:
+        rq["term_id"] = term_id
+    recs = await db.recitations.find(rq, {"_id": 0, "student_id": 1, "record_date": 1}).to_list(200000)
+    last_rec = {}
+    for r in recs:
+        rd = r.get("record_date") or ""
+        if rd > last_rec.get(r["student_id"], ""):
+            last_rec[r["student_id"]] = rd
+
+    # ── ورق المتابعة ضمن المدة (صلوات + جلوس) ──
+    sheets = await db.tracking_sheets.find(
+        {"student_id": {"$in": sids}}, {"_id": 0, "student_id": 1, "week_start": 1, "data": 1}
+    ).to_list(200000)
+    prayers_by, sitting_by, sheets_by = {}, {}, {}
+    for sh in sheets:
+        ws = sh.get("week_start") or ""
+        if p_from and not (p_from <= ws <= p_to):
+            continue
+        sid = sh["student_id"]
+        pr, si = _sheet_prayers_sitting(sh)
+        prayers_by[sid] = prayers_by.get(sid, 0) + pr
+        sitting_by[sid] = sitting_by.get(sid, 0) + si
+        sheets_by[sid] = sheets_by.get(sid, 0) + 1
+
+    # ── الحضور ضمن المدة ──
+    aq = {"student_id": {"$in": sids}}
+    if p_from:
+        aq["date"] = {"$gte": p_from, "$lte": p_to}
+    elif term_id:
+        aq["term_id"] = term_id
+    atts = await db.attendance.find(aq, {"_id": 0, "student_id": 1, "status": 1}).to_list(200000)
+    att_present, att_total = {}, {}
+    for a in atts:
+        sid = a["student_id"]
+        att_total[sid] = att_total.get(sid, 0) + 1
+        if a.get("status") == "present":
+            att_present[sid] = att_present.get(sid, 0) + 1
+
     results = []
     for s in students:
+        sid = s["id"]
         gid = s.get("group_id")
-        if gid not in group_cache:
-            g = await db.groups.find_one(
-                {"id": gid}, {"_id": 0, "name": 1, "recitation_alert_days": 1}
-            ) if gid else None
-            group_cache[gid] = {
-                "name": g["name"] if g else "بدون مجموعة",
-                "days": (g or {}).get("recitation_alert_days") or STRUGGLING_DEFAULT_DAYS,
-            }
-        threshold = days if days is not None else group_cache[gid]["days"]
+        ginfo = group_info.get(gid, {"name": "بدون مجموعة", "days": criteria["recitation_days"]})
+        rec_threshold = days if days is not None else ginfo["days"]
 
-        rq = {"student_id": s["id"], "did_not_recite": {"$ne": True}}
-        if term_id:
-            rq["term_id"] = term_id
-        last = await db.recitations.find(
-            rq, {"_id": 0, "record_date": 1}
-        ).sort("record_date", -1).limit(1).to_list(1)
-
-        last_date, days_since = None, None
-        if last:
-            last_date = last[0].get("record_date")
+        # التسميع: كم يوم مرّ بلا تسميع
+        last_date = last_rec.get(sid) or None
+        days_since = None
+        if last_date:
             try:
-                d = datetime.strptime(str(last_date)[:10], "%Y-%m-%d").date()
-                days_since = (today - d).days
+                days_since = (today - datetime.strptime(str(last_date)[:10], "%Y-%m-%d").date()).days
             except (ValueError, TypeError):
                 last_date, days_since = None, None
 
-        if days_since is None or days_since >= threshold:
-            results.append({
-                "student_id": s["id"],
-                "name": s["name"],
-                "group_id": gid,
-                "group_name": group_cache[gid]["name"],
-                "last_recitation": last_date,
-                "days_since": days_since,
-                "threshold": threshold,
-            })
+        prayers = prayers_by.get(sid, 0)
+        sitting = sitting_by.get(sid, 0)
+        present = att_present.get(sid, 0)
+        total_att = att_total.get(sid, 0)
+        att_rate = round(present / total_att * 100, 1) if total_att else 0.0
 
-    # الأكثر انقطاعًا أولًا (ومن لم يسمّع مطلقًا في القمة)
-    results.sort(key=lambda r: (10 ** 9 if r["days_since"] is None else r["days_since"]), reverse=True)
-    return {"default_days": STRUGGLING_DEFAULT_DAYS, "count": len(results), "students": results}
+        # فحص كل قسم
+        fails = {
+            "recitation": days_since is None or days_since >= rec_threshold,
+            "prayers": prayers < criteria["prayers_min"],
+            "sitting": sitting < criteria["sitting_min"],
+            "attendance": att_rate < criteria["attendance_min_rate"],
+        }
+
+        if category == "all":
+            # متعثّر في كل شيء = فاشل في الأقسام الأربعة
+            matched = all(fails.values())
+        else:
+            matched = fails[category]
+        if not matched:
+            continue
+
+        reasons = [STRUGGLING_CATEGORY_LABELS[k] for k, v in fails.items() if v]
+        results.append({
+            "student_id": sid,
+            "name": s["name"],
+            "group_id": gid,
+            "group_name": ginfo["name"],
+            # التسميع
+            "last_recitation": last_date,
+            "days_since": days_since,
+            "threshold": rec_threshold,
+            # ورق المتابعة والحضور ضمن المدة
+            "prayers": prayers,
+            "sitting": sitting,
+            "sheets_count": sheets_by.get(sid, 0),
+            "attendance_rate": att_rate,
+            "attendance_present": present,
+            "attendance_total": total_att,
+            # ملخّص
+            "failed_categories": [k for k, v in fails.items() if v],
+            "reasons": reasons,
+            "failed_count": sum(1 for v in fails.values() if v),
+        })
+
+    # الترتيب: حسب القسم المطلوب (الأسوأ أولًا)
+    if category == "recitation":
+        results.sort(key=lambda r: (10 ** 9 if r["days_since"] is None else r["days_since"]), reverse=True)
+    elif category == "prayers":
+        results.sort(key=lambda r: r["prayers"])
+    elif category == "sitting":
+        results.sort(key=lambda r: r["sitting"])
+    elif category == "attendance":
+        results.sort(key=lambda r: r["attendance_rate"])
+    else:  # all — الأكثر تعثّرًا ثم الأطول انقطاعًا
+        results.sort(key=lambda r: (r["failed_count"],
+                                    10 ** 9 if r["days_since"] is None else r["days_since"]), reverse=True)
+
+    return {
+        "default_days": STRUGGLING_DEFAULT_DAYS,
+        "criteria": criteria,
+        "category": category,
+        "period": period,
+        "period_label": TRACKING_PERIOD_LABELS.get(period, period),
+        "count": len(results),
+        "students": results,
+    }
+
+
+@api_router.get("/reports/struggling-students/summary")
+async def struggling_students_summary(group_id: Optional[str] = None, period: str = "week",
+                                      current_user: dict = Depends(get_current_user)):
+    """عدد المتعثّرين في كل قسم — لعرض التبويبات بأعدادها."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    counts = {}
+    for cat in STRUGGLING_CATEGORIES:
+        rep = await struggling_students_report(
+            group_id=group_id, category=cat, period=period, current_user=current_user
+        )
+        counts[cat] = rep["count"]
+    return {"period": period, "counts": counts, "criteria": await get_struggling_criteria()}
 
 
 class GroupAlertDays(BaseModel):
@@ -1394,12 +1586,28 @@ async def set_group_alert_days(group_id: str, data: GroupAlertDays,
 class StrugglingAlertRequest(BaseModel):
     student_ids: List[str]
     message: Optional[str] = None
+    category: Optional[str] = None  # recitation | prayers | sitting | attendance | all
+
+
+# نص التنبيه الافتراضي لكل قسم من أقسام التعثّر
+STRUGGLING_ALERT_TEXTS = {
+    "recitation": ("تنبيه: انقطاع عن التسميع",
+                   "لم يُسجَّل لك تسميع منذ عدة أيام. يرجى الحضور والتسميع لمشرفك."),
+    "prayers": ("تنبيه: تقصير في الصلوات",
+                "عدد الصلوات المسجّلة في ورقة متابعتك أقل من المطلوب. حافظ على صلواتك."),
+    "sitting": ("تنبيه: الجلوس مع القرآن",
+                "أيام الجلوس مع القرآن أقل من المطلوب. خصّص وقتًا يوميًا لكتاب الله."),
+    "attendance": ("تنبيه: ضعف الحضور",
+                   "نسبة حضورك أقل من الحد المطلوب. يرجى الالتزام بالحضور."),
+    "all": ("تنبيه: تعثّر عام",
+            "لاحظنا تراجعًا في التسميع والصلوات والجلوس مع القرآن والحضور. يرجى المتابعة مع مشرفك."),
+}
 
 
 @api_router.post("/reports/struggling-students/alert")
 async def send_struggling_alerts(data: StrugglingAlertRequest,
                                  current_user: dict = Depends(get_current_user)):
-    """A4 — إرسال تنبيه للطلاب المنقطعين عن التسميع."""
+    """A4 — إرسال تنبيه للطلاب المتعثّرين (نص افتراضي حسب قسم التعثّر)."""
     ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك بإرسال التنبيهات")
     allowed = None
     if current_user["role"] == "sheikh":
@@ -1408,17 +1616,108 @@ async def send_struggling_alerts(data: StrugglingAlertRequest,
             {"role": "student", "group_id": {"$in": gids}}, {"_id": 0, "id": 1}
         ).to_list(3000)
         allowed = {d["id"] for d in allowed_docs}
+
+    cat = data.category if data.category in STRUGGLING_ALERT_TEXTS else "recitation"
+    title, default_body = STRUGGLING_ALERT_TEXTS[cat]
+
     sent = 0
     for sid in data.student_ids:
         if allowed is not None and sid not in allowed:
             continue
         await create_notification_internal(
             sid,
-            "تنبيه: انقطاع عن التسميع",
-            data.message or "لم يُسجَّل لك تسميع منذ عدة أيام. يرجى الحضور والتسميع لمشرفك.",
+            title,
+            data.message or default_body,
             "warning",
         )
         sent += 1
+    return {"message": f"تم إرسال {sent} تنبيه", "count": sent}
+
+
+# ============== المشرفون المتأخرون في تسجيل الحضور ==============
+LATE_ATTENDANCE_DEFAULT_DAYS = 2
+
+
+@api_router.get("/reports/late-sheikhs")
+async def late_sheikhs_report(days: int = LATE_ATTENDANCE_DEFAULT_DAYS,
+                              current_user: dict = Depends(get_current_user)):
+    """المشرفون اللي ما سجّلوا حضور لطلابهم من (days) يوم أو أكثر (المدير فقط)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه عرض هذا التقرير")
+    days = max(1, min(365, days))
+
+    sheikhs = await db.users.find({"role": "sheikh"}, {"_id": 0, "id": 1, "name": 1, "email": 1}).to_list(500)
+    groups = await db.groups.find({}, {"_id": 0, "id": 1, "name": 1, "sheikh_id": 1}).to_list(3000)
+    students = await db.users.find({"role": "student"}, {"_id": 0, "id": 1, "group_id": 1}).to_list(5000)
+
+    group_sheikh = {g["id"]: g.get("sheikh_id") for g in groups}
+    student_sheikh = {s["id"]: group_sheikh.get(s.get("group_id")) for s in students}
+
+    # آخر تاريخ حضور مسجَّل لكل مشرف (عبر طلابه)
+    atts = await db.attendance.find({}, {"_id": 0, "student_id": 1, "date": 1}).to_list(200000)
+    last_by_sheikh = {}
+    for a in atts:
+        shid = student_sheikh.get(a["student_id"])
+        if not shid:
+            continue
+        d = a.get("date") or ""
+        if d > last_by_sheikh.get(shid, ""):
+            last_by_sheikh[shid] = d
+
+    today = datetime.now(timezone.utc).date()
+    rows = []
+    for sh in sheikhs:
+        sh_groups = [g for g in groups if g.get("sheikh_id") == sh["id"]]
+        students_count = sum(1 for s in students if group_sheikh.get(s.get("group_id")) == sh["id"])
+        last_date = last_by_sheikh.get(sh["id"]) or None
+
+        days_since = None
+        if last_date:
+            try:
+                days_since = (today - datetime.strptime(str(last_date)[:10], "%Y-%m-%d").date()).days
+            except (ValueError, TypeError):
+                last_date, days_since = None, None
+
+        # المشرف بلا طلاب ما بينحسب متأخّر
+        if students_count == 0:
+            continue
+        if days_since is not None and days_since < days:
+            continue
+
+        rows.append({
+            "sheikh_id": sh["id"],
+            "sheikh_name": sh["name"],
+            "email": sh.get("email", ""),
+            "groups": [g["name"] for g in sh_groups],
+            "students_count": students_count,
+            "last_attendance": last_date,
+            "days_since": days_since,
+        })
+
+    rows.sort(key=lambda r: (10 ** 9 if r["days_since"] is None else r["days_since"]), reverse=True)
+    return {"days": days, "count": len(rows), "sheikhs": rows}
+
+
+class LateSheikhAlertRequest(BaseModel):
+    sheikh_ids: List[str]
+    message: Optional[str] = None
+
+
+@api_router.post("/reports/late-sheikhs/alert")
+async def alert_late_sheikhs(data: LateSheikhAlertRequest,
+                             current_user: dict = Depends(get_current_user)):
+    """إرسال تنبيه للمشرفين المتأخرين في تسجيل الحضور (المدير فقط)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إرسال هذا التنبيه")
+    sent = 0
+    for shid in data.sheikh_ids:
+        await create_notification_internal(
+            shid,
+            "تنبيه: تأخّر في تسجيل الحضور",
+            data.message or "لم يُسجَّل حضور لطلابك منذ عدة أيام. يرجى تسجيل الحضور في أقرب وقت.",
+            "warning",
+        )
+        sent += 1
+    await log_admin_action(current_user, "alert", "sheikh", None, None,
+                           f"تنبيه تأخّر تسجيل الحضور لـ {sent} مشرف")
     return {"message": f"تم إرسال {sent} تنبيه", "count": sent}
 
 
@@ -2561,6 +2860,22 @@ async def resolve_recording_sheikh_id(current_user: dict, student_id: str) -> st
     if current_user["role"] == "sheikh":
         return current_user["user_id"]
     return await get_sheikh_id_for_student(student_id) or current_user["user_id"]
+
+
+async def auto_generate_fees_for_new_student(student_id: str, created_by: str) -> int:
+    """توليد رسوم السنة الحالية لطالب جديد — إن كان التوليد التلقائي مُفعَّلًا.
+    آمن للفشل: خطأ هنا ما بيكسر إنشاء الطالب."""
+    try:
+        cfg = await get_fees_config()
+        if not cfg["auto_generate"]:
+            return 0
+        year = datetime.now(timezone.utc).year
+        return await generate_year_fees_for_students(
+            [student_id], year, cfg["monthly_amount"], cfg["fee_type"], created_by
+        )
+    except Exception as e:
+        logger.warning(f"auto fee generation failed for {student_id}: {e}")
+        return 0
 
 
 async def get_tracking_items_for_sheikh(sheikh_id: str) -> list:
@@ -4483,6 +4798,7 @@ async def delete_student(student_id: str, current_user: dict = Depends(get_curre
     await db.tracking_sheets.delete_many({"student_id": student_id})
     await db.student_points.delete_many({"student_id": student_id})
     await db.points_transactions.delete_many({"student_id": student_id})
+    await db.points_adjustments.delete_many({"student_id": student_id})
     await db.notifications.delete_many({"user_id": student_id})
 
     await log_admin_action(current_user, "user_delete", "student", student_id, student.get("name"),
@@ -4579,7 +4895,17 @@ async def bulk_activate(data: BulkIdsRequest, current_user: dict = Depends(get_c
     )
     for uid in data.user_ids:
         await create_notification_internal(uid, "تم تفعيل حسابك", "تم اعتماد حسابك من الإدارة. يمكنك استخدام النظام الآن.", "success")
-    return {"message": f"تم تفعيل {result.modified_count} حساب", "count": result.modified_count}
+
+    # توليد رسوم السنة للطلاب الذين تم اعتمادهم للتو
+    activated_students = await db.users.find(
+        {"id": {"$in": data.user_ids}, "role": "student"}, {"_id": 0, "id": 1}
+    ).to_list(10000)
+    fees_created = 0
+    for s in activated_students:
+        fees_created += await auto_generate_fees_for_new_student(s["id"], current_user["user_id"])
+
+    return {"message": f"تم تفعيل {result.modified_count} حساب", "count": result.modified_count,
+            "fees_created": fees_created}
 
 
 # أوضاع نقل الطالب بين المجموعات
@@ -4598,7 +4924,7 @@ async def archive_and_reset_student(student_id: str, reason: str = "نقل لم�
     now_iso = datetime.now(timezone.utc).isoformat()
     active_term_id = await get_active_term_id()
 
-    counts = {"recitations": 0, "attendance": 0, "tracking_sheets": 0}
+    counts = {"recitations": 0, "attendance": 0, "tracking_sheets": 0, "points_adjustments": 0}
 
     # 1) التسميع
     recs = await db.recitations.find({"student_id": student_id}, {"_id": 0}).to_list(100000)
@@ -4633,13 +4959,24 @@ async def archive_and_reset_student(student_id: str, reason: str = "نقل لم�
         await db.tracking_sheets.delete_many({"student_id": student_id})
         counts["tracking_sheets"] = len(sheets)
 
-    # 4) تصفير النقاط
+    # 4) أرشفة التعديلات اليدوية على النقاط ثم إزالتها (وإلا رجّعها recompute)
+    adjustments = await db.points_adjustments.find({"student_id": student_id}, {"_id": 0}).to_list(100000)
+    if adjustments:
+        for a in adjustments:
+            a["archived_at"] = now_iso
+            a["archive_reason"] = reason
+        await db.points_adjustments_archives.insert_many(adjustments)
+        await db.points_adjustments.delete_many({"student_id": student_id})
+        counts["points_adjustments"] = len(adjustments)
+
+    # 5) تصفير النقاط
     await db.student_points.update_one(
         {"student_id": student_id},
         {"$set": {
             "total_points": 0, "current_term_points": 0, "attendance_points": 0,
             "recitation_points": 0, "tracking_points": 0, "bonus_points": 0,
             "interaction_points": 0, "admin_bonus_points": 0,
+            "manual_points": 0, "frozen_points": 0, "available_points": 0,
         }},
         upsert=True,
     )
@@ -4743,109 +5080,235 @@ async def sheikh_message_students(data: SheikhMessageRequest, current_user: dict
     return {"message": f"تم إرسال الرسالة إلى {len(students)} طالب", "count": len(students)}
 
 
-# ============== محادثة الطالب والمشرف (chat) ==============
+# ============== المحادثات ==============
+# نوعان من المحادثات:
+#  1) محادثة الطالب: غرفة ثلاثية — الطالب + مشرفه + المدير. الثلاثة يقرأون ويكتبون.
+#  2) محادثة مدير↔مشرف: ثنائية مباشرة.
+# الرسائل كلها في `chat_messages`؛ الرسائل القديمة (طالب↔مشرف) تبقى شغّالة
+# لأن `student_id` موجود فيها والغرفة الثلاثية مبنية على نفس المفتاح.
+
 class ChatSendRequest(BaseModel):
     text: str
-    student_id: Optional[str] = None  # يحدّده المشرف؛ الطالب يستخدم نفسه
+    student_id: Optional[str] = None  # لمحادثة الطالب (الطالب يستخدم نفسه تلقائيًا)
+    sheikh_id: Optional[str] = None   # لمحادثة المدير↔المشرف المباشرة
 
 
-async def _conversation_pair(current_user, student_id_param):
-    """يحدّد (student_id, sheikh_id) للمحادثة حسب دور المستخدم."""
+async def _student_room(current_user: dict, student_id_param: Optional[str]):
+    """يحدّد (student_id, sheikh_id) لغرفة الطالب الثلاثية حسب دور المستخدم."""
     role = current_user["role"]
     if role == "student":
         sid = current_user["user_id"]
-        shid = await get_sheikh_id_for_student(sid)
-        return sid, shid
+        return sid, await get_sheikh_id_for_student(sid)
     if role == "sheikh":
         if not student_id_param:
             return None, None
-        # تأكد أن الطالب ضمن مجموعات المشرف
         gids = await _sheikh_group_ids(current_user["user_id"])
         stu = await db.users.find_one({"id": student_id_param, "role": "student"}, {"_id": 0, "group_id": 1})
         if not stu or stu.get("group_id") not in gids:
             raise HTTPException(status_code=403, detail="هذا الطالب ليس ضمن مجموعاتك")
         return student_id_param, current_user["user_id"]
-    # admin: قراءة فقط لأي محادثة
     if role == "admin" and student_id_param:
-        shid = await get_sheikh_id_for_student(student_id_param)
-        return student_id_param, shid
+        return student_id_param, await get_sheikh_id_for_student(student_id_param)
     return None, None
+
+
+def _read_flag(role: str) -> str:
+    return {"student": "read_by_student", "sheikh": "read_by_sheikh", "admin": "read_by_admin"}[role]
 
 
 @api_router.post("/chat/send")
 async def chat_send(data: ChatSendRequest, current_user: dict = Depends(get_current_user)):
-    """إرسال رسالة في محادثة الطالب/المشرف (الطالب لمشرفه، أو المشرف لطالبه)."""
-    ensure_role(current_user, ["student", "sheikh"], "غير مصرح لك")
-    if not data.text.strip():
+    """إرسال رسالة. المدير يقدر يكتب في غرفة أي طالب، أو يفتح محادثة مباشرة مع مشرف."""
+    ensure_role(current_user, ["student", "sheikh", "admin"], "غير مصرح لك")
+    text = data.text.strip()
+    if not text:
         raise HTTPException(status_code=400, detail="النص مطلوب")
-    sid, shid = await _conversation_pair(current_user, data.student_id)
-    if not sid or not shid:
-        raise HTTPException(status_code=400, detail="لا يمكن تحديد المحادثة (تأكد من ربط الطالب بمجموعة لها مشرف)")
+
+    role = current_user["role"]
     now = datetime.now(timezone.utc).isoformat()
+    sender_name = current_user.get("name") or ""
+
+    # ── محادثة مدير↔مشرف المباشرة ──
+    if data.sheikh_id and not data.student_id and role in ("admin", "sheikh"):
+        target_sheikh = data.sheikh_id if role == "admin" else current_user["user_id"]
+        sh = await db.users.find_one({"id": target_sheikh, "role": "sheikh"}, {"_id": 0, "id": 1, "name": 1})
+        if not sh:
+            raise HTTPException(status_code=404, detail="المشرف غير موجود")
+        msg = {
+            "id": str(uuid.uuid4()),
+            "kind": "admin_sheikh",
+            "student_id": None,
+            "sheikh_id": target_sheikh,
+            "sender_role": role,
+            "sender_id": current_user["user_id"],
+            "sender_name": sender_name,
+            "text": text,
+            "created_at": now,
+            "read_by_sheikh": role == "sheikh",
+            "read_by_admin": role == "admin",
+        }
+        await db.chat_messages.insert_one(dict(msg))
+        if role == "admin":
+            await create_notification_internal(target_sheikh, "رسالة من الإدارة", text[:80], "info")
+        else:
+            for adm in await db.users.find({"role": "admin"}, {"_id": 0, "id": 1}).to_list(100):
+                await create_notification_internal(adm["id"], f"رسالة من المشرف {sender_name}", text[:80], "info")
+        msg.pop("_id", None)
+        return {"message": "تم الإرسال", "chat": msg}
+
+    # ── غرفة الطالب الثلاثية ──
+    sid, shid = await _student_room(current_user, data.student_id)
+    if not sid:
+        raise HTTPException(status_code=400, detail="لا يمكن تحديد المحادثة")
+
     msg = {
         "id": str(uuid.uuid4()),
+        "kind": "student_room",
         "student_id": sid,
         "sheikh_id": shid,
-        "sender_role": current_user["role"],
+        "sender_role": role,
         "sender_id": current_user["user_id"],
-        "text": data.text.strip(),
+        "sender_name": sender_name,
+        "text": text,
         "created_at": now,
-        "read_by_student": current_user["role"] == "student",
-        "read_by_sheikh": current_user["role"] == "sheikh",
+        "read_by_student": role == "student",
+        "read_by_sheikh": role == "sheikh",
+        "read_by_admin": role == "admin",
     }
     await db.chat_messages.insert_one(dict(msg))
-    # إشعار للطرف الآخر
-    if current_user["role"] == "student":
-        stu = await db.users.find_one({"id": sid}, {"_id": 0, "name": 1})
-        await create_notification_internal(shid, f"رسالة من الطالب {stu.get('name') if stu else ''}", data.text.strip()[:80], "info")
-    else:
-        await create_notification_internal(sid, "رسالة من مشرفك", data.text.strip()[:80], "info")
+
+    # إشعار لبقية أطراف الغرفة
+    stu = await db.users.find_one({"id": sid}, {"_id": 0, "name": 1})
+    stu_name = (stu or {}).get("name", "")
+    if role == "student":
+        if shid:
+            await create_notification_internal(shid, f"رسالة من الطالب {stu_name}", text[:80], "info")
+        for adm in await db.users.find({"role": "admin"}, {"_id": 0, "id": 1}).to_list(100):
+            await create_notification_internal(adm["id"], f"رسالة من الطالب {stu_name}", text[:80], "info")
+    elif role == "sheikh":
+        await create_notification_internal(sid, "رسالة من مشرفك", text[:80], "info")
+        for adm in await db.users.find({"role": "admin"}, {"_id": 0, "id": 1}).to_list(100):
+            await create_notification_internal(adm["id"], f"رسالة من المشرف {sender_name} (محادثة {stu_name})", text[:80], "info")
+    else:  # admin
+        await create_notification_internal(sid, "رسالة من الإدارة", text[:80], "info")
+        if shid:
+            await create_notification_internal(shid, f"رسالة من الإدارة (محادثة {stu_name})", text[:80], "info")
+
     msg.pop("_id", None)
     return {"message": "تم الإرسال", "chat": msg}
 
 
 @api_router.get("/chat/messages")
-async def chat_messages(student_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
-    """رسائل المحادثة. الطالب: محادثته مع مشرفه. المشرف: مع طالب محدّد. المدير: أي محادثة (قراءة)."""
+async def chat_messages(student_id: Optional[str] = None, sheikh_id: Optional[str] = None,
+                        current_user: dict = Depends(get_current_user)):
+    """رسائل محادثة. مع `sheikh_id` وبدون `student_id` = محادثة مدير↔مشرف؛
+    غير ذلك = غرفة الطالب الثلاثية."""
     ensure_role(current_user, ["student", "sheikh", "admin"], "غير مصرح لك")
-    sid, shid = await _conversation_pair(current_user, student_id)
+    role = current_user["role"]
+
+    # محادثة مدير↔مشرف
+    if sheikh_id and not student_id and role in ("admin", "sheikh"):
+        target = sheikh_id if role == "admin" else current_user["user_id"]
+        q = {"kind": "admin_sheikh", "sheikh_id": target}
+        msgs = await db.chat_messages.find(q, {"_id": 0}).sort("created_at", 1).to_list(2000)
+        await db.chat_messages.update_many(
+            {**q, _read_flag(role): {"$ne": True}}, {"$set": {_read_flag(role): True}}
+        )
+        return {"messages": msgs, "student_id": None, "sheikh_id": target, "kind": "admin_sheikh"}
+
+    # غرفة الطالب
+    sid, shid = await _student_room(current_user, student_id)
     if not sid:
-        return {"messages": [], "student_id": None, "sheikh_id": None}
-    q = {"student_id": sid, "sheikh_id": shid} if shid else {"student_id": sid}
+        return {"messages": [], "student_id": None, "sheikh_id": None, "kind": "student_room"}
+
+    # كل رسائل الطالب (بما فيها القديمة اللي بلا kind)
+    q = {"student_id": sid, "kind": {"$ne": "admin_sheikh"}}
     msgs = await db.chat_messages.find(q, {"_id": 0}).sort("created_at", 1).to_list(2000)
-    # علّم رسائل الطرف الآخر كمقروءة
-    if current_user["role"] == "student":
-        await db.chat_messages.update_many({"student_id": sid, "read_by_student": False}, {"$set": {"read_by_student": True}})
-    elif current_user["role"] == "sheikh":
-        await db.chat_messages.update_many({"student_id": sid, "sheikh_id": shid, "read_by_sheikh": False}, {"$set": {"read_by_sheikh": True}})
-    return {"messages": msgs, "student_id": sid, "sheikh_id": shid}
+    await db.chat_messages.update_many(
+        {**q, _read_flag(role): {"$ne": True}}, {"$set": {_read_flag(role): True}}
+    )
+    return {"messages": msgs, "student_id": sid, "sheikh_id": shid, "kind": "student_room"}
 
 
 @api_router.get("/chat/conversations")
 async def chat_conversations(current_user: dict = Depends(get_current_user)):
-    """قائمة المحادثات. المشرف: طلابه مع آخر رسالة وعدد غير المقروء. المدير: كل المحادثات (طالب↔مشرف)."""
+    """قائمة المحادثات. المشرف: طلابه + محادثته مع الإدارة.
+    المدير: كل غرف الطلاب + محادثة مع كل مشرف."""
     ensure_role(current_user, ["sheikh", "admin"], "غير مصرح لك")
-    if current_user["role"] == "sheikh":
+    role = current_user["role"]
+    flag = _read_flag(role)
+
+    if role == "sheikh":
         gids = await _sheikh_group_ids(current_user["user_id"])
-        students = await db.users.find({"role": "student", "group_id": {"$in": gids}}, {"_id": 0, "id": 1, "name": 1}).to_list(5000)
-    else:  # admin — كل الطلاب الذين لديهم محادثات
-        students = await db.users.find({"role": "student"}, {"_id": 0, "id": 1, "name": 1, "group_id": 1}).to_list(10000)
+        students = await db.users.find(
+            {"role": "student", "group_id": {"$in": gids}}, {"_id": 0, "id": 1, "name": 1}
+        ).to_list(5000)
+    else:
+        students = await db.users.find(
+            {"role": "student"}, {"_id": 0, "id": 1, "name": 1, "group_id": 1}
+        ).to_list(10000)
+    sids = [s["id"] for s in students]
+
+    # كل رسائل غرف الطلاب دفعة واحدة (بدون N+1)
+    msgs = await db.chat_messages.find(
+        {"student_id": {"$in": sids}, "kind": {"$ne": "admin_sheikh"}},
+        {"_id": 0, "student_id": 1, "text": 1, "created_at": 1, "sender_role": 1, flag: 1},
+    ).to_list(200000)
+
+    last_by, unread_by = {}, {}
+    for m in msgs:
+        sid = m["student_id"]
+        if m.get("created_at", "") > (last_by.get(sid, {}).get("created_at") or ""):
+            last_by[sid] = m
+        # غير المقروء = رسائل الآخرين اللي ما قرأها هذا الدور
+        if m.get("sender_role") != role and not m.get(flag):
+            unread_by[sid] = unread_by.get(sid, 0) + 1
+
     convos = []
     for s in students:
-        msgs = await db.chat_messages.find({"student_id": s["id"]}, {"_id": 0}).sort("created_at", -1).to_list(1)
-        if current_user["role"] == "sheikh" and not msgs:
-            # اعرض الطالب حتى لو بلا رسائل ليبدأ المشرف المحادثة
-            convos.append({"student_id": s["id"], "student_name": s["name"], "last_text": "", "last_at": None, "unread": 0})
-            continue
-        if not msgs:
-            continue
-        last = msgs[0]
-        if current_user["role"] == "sheikh":
-            unread = await db.chat_messages.count_documents({"student_id": s["id"], "sheikh_id": current_user["user_id"], "sender_role": "student", "read_by_sheikh": False})
-        else:
-            unread = 0
-        convos.append({"student_id": s["id"], "student_name": s["name"],
-                       "last_text": last.get("text", ""), "last_at": last.get("created_at"), "unread": unread})
+        last = last_by.get(s["id"])
+        if role == "admin" and not last:
+            continue  # المدير يرى الغرف اللي فيها رسائل فقط
+        convos.append({
+            "type": "student_room",
+            "student_id": s["id"],
+            "student_name": s["name"],
+            "last_text": (last or {}).get("text", ""),
+            "last_at": (last or {}).get("created_at"),
+            "unread": unread_by.get(s["id"], 0),
+        })
+
+    # محادثات مدير↔مشرف
+    if role == "admin":
+        sheikhs = await db.users.find({"role": "sheikh"}, {"_id": 0, "id": 1, "name": 1}).to_list(500)
+    else:
+        sheikhs = [{"id": current_user["user_id"], "name": "الإدارة"}]
+
+    sh_ids = [s["id"] for s in sheikhs]
+    sh_msgs = await db.chat_messages.find(
+        {"kind": "admin_sheikh", "sheikh_id": {"$in": sh_ids}},
+        {"_id": 0, "sheikh_id": 1, "text": 1, "created_at": 1, "sender_role": 1, flag: 1},
+    ).to_list(100000)
+
+    sh_last, sh_unread = {}, {}
+    for m in sh_msgs:
+        k = m["sheikh_id"]
+        if m.get("created_at", "") > (sh_last.get(k, {}).get("created_at") or ""):
+            sh_last[k] = m
+        if m.get("sender_role") != role and not m.get(flag):
+            sh_unread[k] = sh_unread.get(k, 0) + 1
+
+    for sh in sheikhs:
+        last = sh_last.get(sh["id"])
+        convos.append({
+            "type": "admin_sheikh",
+            "sheikh_id": sh["id"],
+            "sheikh_name": sh["name"] if role == "admin" else "الإدارة",
+            "last_text": (last or {}).get("text", ""),
+            "last_at": (last or {}).get("created_at"),
+            "unread": sh_unread.get(sh["id"], 0),
+        })
+
     convos.sort(key=lambda c: (c["last_at"] or ""), reverse=True)
     return {"conversations": convos}
 
@@ -4853,12 +5316,31 @@ async def chat_conversations(current_user: dict = Depends(get_current_user)):
 @api_router.get("/chat/unread-count")
 async def chat_unread_count(current_user: dict = Depends(get_current_user)):
     """عدد الرسائل غير المقروءة للمستخدم (للزر العائم)."""
-    if current_user["role"] == "student":
-        n = await db.chat_messages.count_documents({"student_id": current_user["user_id"], "sender_role": "sheikh", "read_by_student": False})
-    elif current_user["role"] == "sheikh":
-        n = await db.chat_messages.count_documents({"sheikh_id": current_user["user_id"], "sender_role": "student", "read_by_sheikh": False})
-    else:
-        n = 0
+    role = current_user["role"]
+    uid = current_user["user_id"]
+    flag = _read_flag(role)
+
+    if role == "student":
+        n = await db.chat_messages.count_documents({
+            "student_id": uid, "kind": {"$ne": "admin_sheikh"},
+            "sender_role": {"$ne": "student"}, flag: {"$ne": True},
+        })
+    elif role == "sheikh":
+        gids = await _sheikh_group_ids(uid)
+        sids = [u["id"] for u in await db.users.find(
+            {"role": "student", "group_id": {"$in": gids}}, {"_id": 0, "id": 1}
+        ).to_list(10000)]
+        n = await db.chat_messages.count_documents({
+            "$or": [
+                {"student_id": {"$in": sids}, "kind": {"$ne": "admin_sheikh"}},
+                {"kind": "admin_sheikh", "sheikh_id": uid},
+            ],
+            "sender_role": {"$ne": "sheikh"}, flag: {"$ne": True},
+        })
+    else:  # admin
+        n = await db.chat_messages.count_documents({
+            "sender_role": {"$ne": "admin"}, flag: {"$ne": True},
+        })
     return {"unread": n}
 
 
@@ -4982,11 +5464,15 @@ async def admin_create_student(data: AdminCreateStudent, current_user: dict = De
             "bonus_points": 0,
             "level": 1
         })
-        
+
+        # توليد رسوم السنة الحالية تلقائيًا (إن كان مُفعَّلًا في الإعدادات)
+        fees_created = await auto_generate_fees_for_new_student(user.id, current_user["user_id"])
+
         return {
             "message": "تم إضافة الطالب بنجاح",
             "student_id": user.id,
-            "student_name": user.name
+            "student_name": user.name,
+            "fees_created": fees_created
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"فشل في إضافة الطالب: {str(e)}")
@@ -5294,8 +5780,28 @@ async def add_points(student_id: str, points: int, category: str, description: s
     return {"points_added": points, "total_points": update_dict["total_points"], "level": new_level, "new_badges": new_badges}
 
 
+async def sum_manual_adjustments(student_id: str) -> dict:
+    """مجاميع تعديلات النقاط اليدوية من سجلّها (المصدر الموثوق).
+    manual = الإضافات الخارجية ناقص الخصومات. frozen = مجموع التجميدات السارية."""
+    adjustments = await db.points_adjustments.find(
+        {"student_id": student_id}, {"_id": 0, "type": 1, "points": 1, "active": 1}
+    ).to_list(100000)
+
+    manual = frozen = 0
+    for a in adjustments:
+        pts = int(a.get("points") or 0)
+        if a["type"] == "bonus":
+            manual += pts
+        elif a["type"] == "deduction":
+            manual -= pts
+        elif a["type"] == "freeze" and a.get("active"):
+            frozen += pts
+    return {"manual_points": manual, "frozen_points": frozen}
+
+
 async def recompute_student_points(student_id: str) -> dict:
     """يعيد بناء نقاط الطالب من البيانات الخام (حضور + تسميع + متابعة) — مصدر موثوق واحد.
+    التعديلات اليدوية والتجميد يُبنَيان من `points_adjustments` فما بيضيعوا مع إعادة الاحتساب.
     يحافظ على نقاط التفاعل والإداري (غير مشتقّة من الخام)."""
     present = await db.attendance.count_documents({"student_id": student_id, "status": "present"})
     attendance_points = present * ATTENDANCE_POINTS
@@ -5311,7 +5817,14 @@ async def recompute_student_points(student_id: str) -> dict:
     existing = await db.student_points.find_one({"student_id": student_id}, {"_id": 0}) or {}
     interaction = existing.get("interaction_points", 0) or 0
     admin_bonus = existing.get("admin_bonus_points", 0) or 0
-    total = attendance_points + recitation_points + tracking_points + interaction + admin_bonus
+
+    adj = await sum_manual_adjustments(student_id)
+    manual = adj["manual_points"]
+    frozen = adj["frozen_points"]
+
+    # الرصيد لا ينزل تحت الصفر مهما بلغت الخصومات
+    total = max(0, attendance_points + recitation_points + tracking_points + interaction + admin_bonus + manual)
+    available = max(0, total - frozen)
 
     await db.student_points.update_one(
         {"student_id": student_id},
@@ -5323,6 +5836,9 @@ async def recompute_student_points(student_id: str) -> dict:
             "tracking_points": tracking_points,
             "interaction_points": interaction,
             "admin_bonus_points": admin_bonus,
+            "manual_points": manual,
+            "frozen_points": frozen,
+            "available_points": available,
             "level": calculate_level(total),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }, "$setOnInsert": {"id": str(uuid.uuid4()), "badges": []}},
@@ -5330,7 +5846,343 @@ async def recompute_student_points(student_id: str) -> dict:
     )
     return {"student_id": student_id, "total_points": total,
             "attendance_points": attendance_points, "recitation_points": recitation_points,
-            "tracking_points": tracking_points}
+            "tracking_points": tracking_points, "manual_points": manual,
+            "frozen_points": frozen, "available_points": available}
+
+
+# ============== إدارة النقاط: إضافة خارجية / خصم / تجميد + السجل ==============
+ADJUSTMENT_TYPES = ("bonus", "deduction", "freeze")
+
+ADJUSTMENT_LABELS = {
+    "bonus": "نقاط إضافية",
+    "deduction": "خصم نقاط",
+    "freeze": "تجميد نقاط",
+}
+
+# صيغة الفعل لرسالة النجاح (اللافتة وحدها بتطلع ركيكة: «تم نقاط إضافية»)
+ADJUSTMENT_DONE_TEXTS = {
+    "bonus": "تمت إضافة النقاط بنجاح",
+    "deduction": "تم خصم النقاط بنجاح",
+    "freeze": "تم تجميد النقاط بنجاح",
+}
+
+# تسميات مصادر النقاط في السجل
+LEDGER_SOURCE_LABELS = {
+    "attendance": "حضور",
+    "recitation": "تسميع",
+    "tracking": "ورقة متابعة",
+    "admin_bonus": "نقاط تميز",
+    "bonus": "نقاط إضافية (يدوي)",
+    "deduction": "خصم (يدوي)",
+    "freeze": "تجميد",
+}
+
+
+async def assert_can_manage_student_points(current_user: dict, student_id: str):
+    """المدير لأي طالب؛ المشرف لطلاب مجموعاته فقط."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك بإدارة النقاط")
+    student = await db.users.find_one({"id": student_id, "role": "student"}, {"_id": 0, "id": 1, "name": 1, "group_id": 1})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    if current_user["role"] == "sheikh":
+        gids = await _sheikh_group_ids(current_user["user_id"])
+        if student.get("group_id") not in gids:
+            raise HTTPException(status_code=403, detail="هذا الطالب ليس ضمن مجموعاتك")
+    return student
+
+
+class PointsAdjustRequest(BaseModel):
+    student_id: str
+    type: str          # bonus | deduction | freeze
+    points: int        # المقدار (موجب دائمًا)
+    reason: Optional[str] = None
+
+
+@api_router.post("/points/adjust")
+async def adjust_points(data: PointsAdjustRequest, current_user: dict = Depends(get_current_user)):
+    """إضافة نقاط خارجية أو خصمها أو تجميد مبلغ منها (المدير لأي طالب، المشرف لطلابه)."""
+    student = await assert_can_manage_student_points(current_user, data.student_id)
+
+    if data.type not in ADJUSTMENT_TYPES:
+        raise HTTPException(status_code=400, detail="نوع التعديل غير صحيح")
+    if data.points <= 0:
+        raise HTTPException(status_code=400, detail="المقدار يجب أن يكون أكبر من صفر")
+    if data.points > 10000:
+        raise HTTPException(status_code=400, detail="المقدار كبير جدًا (الحد 10000)")
+
+    points_doc = await db.student_points.find_one({"student_id": data.student_id}, {"_id": 0}) or {}
+    current_total = points_doc.get("total_points", 0) or 0
+    current_frozen = points_doc.get("frozen_points", 0) or 0
+
+    # لا يمكن خصم أو تجميد أكثر من المتاح فعلًا
+    if data.type == "deduction" and data.points > current_total:
+        raise HTTPException(
+            status_code=400,
+            detail=f"لا يمكن خصم {data.points} نقطة — رصيد الطالب {current_total} فقط"
+        )
+    if data.type == "freeze":
+        available = max(0, current_total - current_frozen)
+        if data.points > available:
+            raise HTTPException(
+                status_code=400,
+                detail=f"لا يمكن تجميد {data.points} نقطة — المتاح {available} فقط"
+            )
+
+    now = datetime.now(timezone.utc).isoformat()
+    adjustment = {
+        "id": str(uuid.uuid4()),
+        "student_id": data.student_id,
+        "student_name": student.get("name", ""),
+        "type": data.type,
+        "points": int(data.points),
+        "reason": (data.reason or "").strip() or None,
+        "created_by": current_user["user_id"],
+        "created_by_name": current_user.get("name", ""),
+        "created_by_role": current_user["role"],
+        "created_at": now,
+        # التجميد يبقى ساريًا لحدّ ما يُفَك
+        "active": True if data.type == "freeze" else None,
+        "released_at": None,
+        "released_by": None,
+    }
+    await db.points_adjustments.insert_one(dict(adjustment))
+
+    result = await recompute_student_points(data.student_id)
+
+    # إشعار الطالب
+    reason_txt = adjustment["reason"]
+    if data.type == "bonus":
+        title, body = "⭐ نقاط إضافية", f"حصلت على {data.points} نقطة إضافية"
+    elif data.type == "deduction":
+        title, body = "⚠️ خصم نقاط", f"تم خصم {data.points} نقطة من رصيدك"
+    else:
+        title, body = "🔒 تجميد نقاط", f"تم تجميد {data.points} نقطة من رصيدك مؤقتًا"
+    if reason_txt:
+        body += f" — السبب: {reason_txt}"
+    await create_notification_internal(data.student_id, title, body, "info" if data.type == "bonus" else "warning")
+
+    if current_user["role"] == "admin":
+        await log_admin_action(current_user, f"points_{data.type}", "student", data.student_id,
+                               student.get("name"), f"{ADJUSTMENT_LABELS[data.type]}: {data.points} — {reason_txt or 'بدون سبب'}")
+
+    adjustment.pop("_id", None)
+    return {"message": ADJUSTMENT_DONE_TEXTS[data.type], "adjustment": adjustment, "points": result}
+
+
+@api_router.post("/points/freeze/{adjustment_id}/release")
+async def release_freeze(adjustment_id: str, current_user: dict = Depends(get_current_user)):
+    """فكّ تجميد سارٍ — النقاط بترجع للرصيد المتاح."""
+    adj = await db.points_adjustments.find_one({"id": adjustment_id, "type": "freeze"}, {"_id": 0})
+    if not adj:
+        raise HTTPException(status_code=404, detail="التجميد غير موجود")
+    if not adj.get("active"):
+        raise HTTPException(status_code=400, detail="هذا التجميد مفكوك أصلًا")
+
+    await assert_can_manage_student_points(current_user, adj["student_id"])
+
+    await db.points_adjustments.update_one(
+        {"id": adjustment_id},
+        {"$set": {"active": False,
+                  "released_at": datetime.now(timezone.utc).isoformat(),
+                  "released_by": current_user["user_id"]}},
+    )
+    result = await recompute_student_points(adj["student_id"])
+    await create_notification_internal(
+        adj["student_id"], "🔓 فكّ تجميد النقاط",
+        f"تم فكّ تجميد {adj['points']} نقطة — رجعت لرصيدك المتاح.", "success"
+    )
+    return {"message": f"تم فكّ تجميد {adj['points']} نقطة", "points": result}
+
+
+@api_router.delete("/points/adjustments/{adjustment_id}")
+async def delete_adjustment(adjustment_id: str, current_user: dict = Depends(get_current_user)):
+    """حذف تعديل يدوي (تراجع عن إضافة/خصم/تجميد)."""
+    adj = await db.points_adjustments.find_one({"id": adjustment_id}, {"_id": 0})
+    if not adj:
+        raise HTTPException(status_code=404, detail="التعديل غير موجود")
+    await assert_can_manage_student_points(current_user, adj["student_id"])
+
+    await db.points_adjustments.delete_one({"id": adjustment_id})
+    result = await recompute_student_points(adj["student_id"])
+    return {"message": "تم حذف التعديل وإعادة احتساب النقاط", "points": result}
+
+
+@api_router.get("/points/ledger/{student_id}")
+async def points_ledger(student_id: str, source: Optional[str] = None,
+                        current_user: dict = Depends(get_current_user)):
+    """سجل نقاط الطالب — مبني من البيانات الخام مباشرةً (مش من جدول الحركات)
+    فبيضل دقيق حتى بعد إعادة الاحتساب أو الأرشفة.
+    الطالب يرى سجلّه، والمشرف طلابه، والمدير الجميع."""
+    if current_user["role"] == "student":
+        if current_user["user_id"] != student_id:
+            raise HTTPException(status_code=403, detail="غير مصرح لك")
+        student = await db.users.find_one({"id": student_id}, {"_id": 0, "id": 1, "name": 1, "group_id": 1})
+    else:
+        student = await assert_can_manage_student_points(current_user, student_id)
+
+    entries = []
+
+    # 1) الحضور
+    atts = await db.attendance.find(
+        {"student_id": student_id, "status": "present"}, {"_id": 0, "date": 1}
+    ).to_list(100000)
+    for a in atts:
+        entries.append({
+            "source": "attendance", "points": ATTENDANCE_POINTS,
+            "date": a.get("date"), "description": f"حضور يوم {a.get('date')}",
+        })
+
+    # 2) التسميع
+    recs = await db.recitations.find(
+        {"student_id": student_id, "did_not_recite": {"$ne": True}},
+        {"_id": 0, "record_date": 1, "points_earned": 1, "new_pages": 1, "review_pages": 1},
+    ).to_list(100000)
+    for r in recs:
+        pts = r.get("points_earned", 0) or 0
+        if pts:
+            entries.append({
+                "source": "recitation", "points": pts, "date": r.get("record_date"),
+                "description": f"تسميع — {r.get('new_pages') or 0} صفحة حفظ، {r.get('review_pages') or 0} مراجعة",
+            })
+
+    # 3) ورق المتابعة
+    sheets = await db.tracking_sheets.find(
+        {"student_id": student_id}, {"_id": 0, "week_start": 1, "points_earned": 1}
+    ).to_list(100000)
+    for s in sheets:
+        pts = s.get("points_earned", 0) or 0
+        if pts:
+            entries.append({
+                "source": "tracking", "points": pts, "date": s.get("week_start"),
+                "description": f"ورقة متابعة أسبوع {s.get('week_start')}",
+            })
+
+    # 4) نقاط التميز
+    bonuses = await db.admin_bonus_grants.find(
+        {"student_id": student_id}, {"_id": 0, "points": 1, "reason": 1, "created_at": 1}
+    ).to_list(10000)
+    for b in bonuses:
+        entries.append({
+            "source": "admin_bonus", "points": b.get("points", 0) or 0,
+            "date": str(b.get("created_at") or "")[:10],
+            "description": "نقاط تميز" + (f" — {b['reason']}" if b.get("reason") else ""),
+        })
+
+    # 5) التعديلات اليدوية (إضافة / خصم / تجميد)
+    adjustments = await db.points_adjustments.find(
+        {"student_id": student_id}, {"_id": 0}
+    ).to_list(10000)
+    for a in adjustments:
+        pts = int(a.get("points") or 0)
+        signed = -pts if a["type"] == "deduction" else pts
+        desc = ADJUSTMENT_LABELS[a["type"]]
+        if a.get("reason"):
+            desc += f" — {a['reason']}"
+        by = a.get("created_by_name") or ("المدير" if a.get("created_by_role") == "admin" else "المشرف")
+        entries.append({
+            "source": a["type"], "points": signed,
+            "date": str(a.get("created_at") or "")[:10],
+            "description": desc,
+            "by": by,
+            "adjustment_id": a["id"],
+            "active": a.get("active"),
+            "released_at": a.get("released_at"),
+            # التجميد ما بيغيّر الرصيد الكلي — بس بيحجز منه
+            "affects_total": a["type"] != "freeze",
+        })
+
+    if source and source != "all":
+        entries = [e for e in entries if e["source"] == source]
+
+    entries.sort(key=lambda e: (e.get("date") or ""), reverse=True)
+
+    # ملخّص لكل مصدر
+    by_source = {}
+    for e in entries:
+        if e.get("affects_total") is False:
+            continue
+        by_source[e["source"]] = by_source.get(e["source"], 0) + e["points"]
+
+    points_doc = await db.student_points.find_one({"student_id": student_id}, {"_id": 0}) or {}
+    active_freezes = [a for a in adjustments if a["type"] == "freeze" and a.get("active")]
+
+    return {
+        "student_id": student_id,
+        "student_name": (student or {}).get("name", ""),
+        "entries": entries,
+        "count": len(entries),
+        "by_source": by_source,
+        "source_labels": LEDGER_SOURCE_LABELS,
+        "totals": {
+            "total_points": points_doc.get("total_points", 0) or 0,
+            "available_points": points_doc.get("available_points",
+                                               points_doc.get("total_points", 0) or 0),
+            "frozen_points": points_doc.get("frozen_points", 0) or 0,
+            "manual_points": points_doc.get("manual_points", 0) or 0,
+            "level": points_doc.get("level", 1),
+        },
+        "active_freezes": [
+            {"id": f["id"], "points": f["points"], "reason": f.get("reason"),
+             "created_at": f.get("created_at"), "by": f.get("created_by_name")}
+            for f in active_freezes
+        ],
+    }
+
+
+@api_router.get("/points/overview")
+async def points_overview(group_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """قائمة الطلاب بأرصدتهم — للوحة إدارة النقاط (المدير للكل، المشرف لطلابه)."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+
+    uq = {"role": "student"}
+    if current_user["role"] == "sheikh":
+        gids = await _sheikh_group_ids(current_user["user_id"])
+        uq["group_id"] = group_id if (group_id and group_id in gids) else {"$in": gids}
+    elif group_id:
+        uq["group_id"] = group_id
+
+    students = await db.users.find(uq, {"_id": 0, "id": 1, "name": 1, "group_id": 1}).to_list(10000)
+    sids = [s["id"] for s in students]
+
+    points_docs = {p["student_id"]: p for p in await db.student_points.find(
+        {"student_id": {"$in": sids}}, {"_id": 0}
+    ).to_list(10000)}
+    group_names = {g["id"]: g["name"] for g in
+                   await db.groups.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(3000)}
+
+    # عدد التعديلات اليدوية والتجميدات السارية لكل طالب
+    adjustments = await db.points_adjustments.find(
+        {"student_id": {"$in": sids}}, {"_id": 0, "student_id": 1, "type": 1, "active": 1}
+    ).to_list(100000)
+    adj_count, freeze_count = {}, {}
+    for a in adjustments:
+        adj_count[a["student_id"]] = adj_count.get(a["student_id"], 0) + 1
+        if a["type"] == "freeze" and a.get("active"):
+            freeze_count[a["student_id"]] = freeze_count.get(a["student_id"], 0) + 1
+
+    rows = []
+    for s in students:
+        p = points_docs.get(s["id"], {})
+        total = p.get("total_points", 0) or 0
+        frozen = p.get("frozen_points", 0) or 0
+        rows.append({
+            "student_id": s["id"],
+            "student_name": s.get("name", ""),
+            "group_name": group_names.get(s.get("group_id"), "بدون مجموعة"),
+            "total_points": total,
+            "frozen_points": frozen,
+            "available_points": p.get("available_points", max(0, total - frozen)),
+            "manual_points": p.get("manual_points", 0) or 0,
+            "attendance_points": p.get("attendance_points", 0) or 0,
+            "recitation_points": p.get("recitation_points", 0) or 0,
+            "tracking_points": p.get("tracking_points", 0) or 0,
+            "level": p.get("level", 1),
+            "adjustments_count": adj_count.get(s["id"], 0),
+            "active_freezes": freeze_count.get(s["id"], 0),
+        })
+
+    rows.sort(key=lambda r: r["total_points"], reverse=True)
+    return {"count": len(rows), "students": rows}
 
 
 @api_router.post("/admin/recompute-points")
@@ -6620,12 +7472,16 @@ async def get_fees(student_id: Optional[str] = None, current_user: dict = Depend
     elif student_id:
         query["student_id"] = student_id
     
-    fees = await db.fees.find(query, {"_id": 0}).sort("created_at", -1).to_list(200)
+    fees = await db.fees.find(query, {"_id": 0}).sort("created_at", -1).to_list(100000)
 
-    # Add student names + computed status (قائم/مستحق/مدفوع)
+    # أسماء الطلاب دفعة واحدة (بدون N+1) + الحالة المحسوبة
+    sids = list({f["student_id"] for f in fees})
+    names = {u["id"]: u.get("name", "") for u in await db.users.find(
+        {"id": {"$in": sids}}, {"_id": 0, "id": 1, "name": 1}
+    ).to_list(10000)} if sids else {}
+
     for fee in fees:
-        student = await db.users.find_one({"id": fee["student_id"]}, {"_id": 0, "name": 1})
-        fee["student_name"] = student["name"] if student else "غير معروف"
+        fee["student_name"] = names.get(fee["student_id"], "غير معروف")
         fee["status"] = compute_fee_status(fee)
 
     return fees
@@ -6654,6 +7510,265 @@ async def get_student_fees(student_id: str, current_user: dict = Depends(get_cur
             "pending_count": len([f for f in fees if f["status"] != "paid"])
         }
     }
+
+# ============== إعدادات الرسوم + التوليد الشهري التلقائي ==============
+FEES_DEFAULTS = {"monthly_amount": 5.0, "fee_type": "subscription", "auto_generate": True}
+
+ARABIC_MONTHS = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+                 "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"]
+
+
+async def get_fees_config() -> dict:
+    """إعدادات الرسوم: القيمة الشهرية الافتراضية + هل يُولَّد تلقائيًا للطلاب الجدد."""
+    doc = await db.settings.find_one({"key": "fees_config"}, {"_id": 0}) or {}
+    try:
+        amount = float(doc.get("monthly_amount", FEES_DEFAULTS["monthly_amount"]))
+    except (TypeError, ValueError):
+        amount = FEES_DEFAULTS["monthly_amount"]
+    return {
+        "monthly_amount": max(0.0, amount),
+        "fee_type": doc.get("fee_type") or FEES_DEFAULTS["fee_type"],
+        "auto_generate": bool(doc.get("auto_generate", FEES_DEFAULTS["auto_generate"])),
+    }
+
+
+class FeesConfigUpdate(BaseModel):
+    monthly_amount: Optional[float] = None
+    fee_type: Optional[str] = None
+    auto_generate: Optional[bool] = None
+
+
+@api_router.get("/settings/fees")
+async def get_fees_settings(current_user: dict = Depends(get_current_user)):
+    """إعدادات الرسوم الشهرية (المدير فقط)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
+    return await get_fees_config()
+
+
+@api_router.put("/settings/fees")
+async def update_fees_settings(data: FeesConfigUpdate, current_user: dict = Depends(get_current_user)):
+    """تعديل إعدادات الرسوم (المدير فقط)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل إعدادات الرسوم")
+    update = {"updated_at": datetime.now(timezone.utc).isoformat()}
+    if data.monthly_amount is not None:
+        if data.monthly_amount < 0 or data.monthly_amount > 100000:
+            raise HTTPException(status_code=400, detail="المبلغ الشهري يجب أن يكون بين 0 و 100000")
+        update["monthly_amount"] = float(data.monthly_amount)
+    if data.fee_type is not None:
+        if data.fee_type not in ("subscription", "umrah", "activity"):
+            raise HTTPException(status_code=400, detail="نوع الرسوم غير صحيح")
+        update["fee_type"] = data.fee_type
+    if data.auto_generate is not None:
+        update["auto_generate"] = bool(data.auto_generate)
+    await db.settings.update_one({"key": "fees_config"}, {"$set": update}, upsert=True)
+    return {"message": "تم تحديث إعدادات الرسوم", "settings": await get_fees_config()}
+
+
+async def generate_year_fees_for_students(student_ids: List[str], year: int,
+                                          amount: float, fee_type: str, created_by: str) -> int:
+    """توليد رسوم 12 شهرًا لكل طالب — بدون تكرار ما هو موجود أصلًا."""
+    if not student_ids:
+        return 0
+
+    existing = await db.fees.find(
+        {"student_id": {"$in": student_ids}, "year": year, "fee_type": fee_type},
+        {"_id": 0, "student_id": 1, "month": 1},
+    ).to_list(200000)
+    have = {(e["student_id"], e.get("month")) for e in existing}
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    docs = []
+    for sid in student_ids:
+        for month in range(1, 13):
+            if (sid, month) in have:
+                continue
+            docs.append({
+                "id": str(uuid.uuid4()),
+                "student_id": sid,
+                "fee_type": fee_type,
+                "amount": float(amount),
+                "description": f"اشتراك شهر {ARABIC_MONTHS[month - 1]} {year}",
+                "due_date": f"{year}-{month:02d}-01",
+                "month": month,
+                "year": year,
+                "is_paid": False,
+                "status": "pending",
+                "status_overridden": False,
+                "auto_generated": True,
+                "created_by": created_by,
+                "created_at": now_iso,
+            })
+
+    if docs:
+        await db.fees.insert_many(docs)
+    return len(docs)
+
+
+class GenerateFeesRequest(BaseModel):
+    year: Optional[int] = None
+    amount: Optional[float] = None
+    student_ids: Optional[List[str]] = None  # افتراضيًا كل الطلاب
+
+
+@api_router.post("/admin/fees/generate-year")
+async def generate_year_fees(data: GenerateFeesRequest, current_user: dict = Depends(get_current_user)):
+    """توليد رسوم 12 شهرًا لكل الطلاب (أو المحدّدين) بالقيمة الافتراضية.
+    آمن للتكرار — ما بيكرّر شهرًا موجودًا."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه توليد الرسوم")
+
+    cfg = await get_fees_config()
+    year = data.year or datetime.now(timezone.utc).year
+    if not 2000 <= year <= 2100:
+        raise HTTPException(status_code=400, detail="السنة غير صحيحة")
+    amount = cfg["monthly_amount"] if data.amount is None else float(data.amount)
+    if amount < 0:
+        raise HTTPException(status_code=400, detail="المبلغ يجب أن يكون صفرًا أو أكثر")
+
+    if data.student_ids:
+        sids = data.student_ids
+    else:
+        sids = [s["id"] for s in await db.users.find(
+            {"role": "student"}, {"_id": 0, "id": 1}
+        ).to_list(10000)]
+
+    created = await generate_year_fees_for_students(sids, year, amount, cfg["fee_type"], current_user["user_id"])
+    await log_admin_action(current_user, "generate_fees", "fees", None, None,
+                           f"توليد {created} رسم لسنة {year} بقيمة {amount} لـ {len(sids)} طالب")
+    return {
+        "message": f"تم توليد {created} رسم شهري لسنة {year}",
+        "created": created, "year": year, "amount": amount, "students": len(sids),
+    }
+
+
+class MonthAmountUpdate(BaseModel):
+    year: int
+    month: int
+    amount: float
+    student_ids: Optional[List[str]] = None  # افتراضيًا كل الطلاب
+
+
+@api_router.put("/admin/fees/month-amount")
+async def update_month_amount(data: MonthAmountUpdate, current_user: dict = Depends(get_current_user)):
+    """تعديل مبلغ شهر معيّن (لكل الطلاب أو المحدّدين) — لا يمسّ الأشهر المدفوعة."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل الرسوم")
+    if not 1 <= data.month <= 12:
+        raise HTTPException(status_code=400, detail="الشهر يجب أن يكون بين 1 و 12")
+    if data.amount < 0:
+        raise HTTPException(status_code=400, detail="المبلغ يجب أن يكون صفرًا أو أكثر")
+
+    q = {"year": data.year, "month": data.month, "is_paid": {"$ne": True}}
+    if data.student_ids:
+        q["student_id"] = {"$in": data.student_ids}
+
+    res = await db.fees.update_many(q, {"$set": {"amount": float(data.amount)}})
+    return {
+        "message": f"تم تعديل مبلغ شهر {ARABIC_MONTHS[data.month - 1]} {data.year} لـ {res.modified_count} طالب",
+        "modified": res.modified_count,
+    }
+
+
+@api_router.get("/admin/fees/overview")
+async def fees_overview(year: Optional[int] = None, group_id: Optional[str] = None,
+                        current_user: dict = Depends(get_current_user)):
+    """نظرة شاملة على الرسوم: صف لكل طالب فيه 12 شهر + إجماليّاته، مع ملخّص عام.
+    مبنيّة باستعلامات مجمّعة (بدون N+1)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
+    year = year or datetime.now(timezone.utc).year
+
+    uq = {"role": "student"}
+    if group_id:
+        uq["group_id"] = group_id
+    students = await db.users.find(uq, {"_id": 0, "id": 1, "name": 1, "group_id": 1}).to_list(10000)
+    sids = [s["id"] for s in students]
+
+    group_names = {g["id"]: g["name"] for g in
+                   await db.groups.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(3000)}
+
+    fees = await db.fees.find(
+        {"student_id": {"$in": sids}, "year": year}, {"_id": 0}
+    ).to_list(200000)
+
+    by_student = {}
+    for f in fees:
+        f["status"] = compute_fee_status(f)
+        by_student.setdefault(f["student_id"], []).append(f)
+
+    rows = []
+    totals = {"total": 0.0, "paid": 0.0, "due": 0.0, "pending": 0.0}
+    for s in students:
+        sfees = by_student.get(s["id"], [])
+        months = {}
+        st_total = st_paid = st_due = st_pending = 0.0
+        for f in sfees:
+            m = f.get("month")
+            amt = float(f.get("amount") or 0)
+            st_total += amt
+            if f["status"] == "paid":
+                st_paid += amt
+            elif f["status"] == "due":
+                st_due += amt
+            else:
+                st_pending += amt
+            if m:
+                months[str(m)] = {"fee_id": f["id"], "amount": amt, "status": f["status"]}
+
+        rows.append({
+            "student_id": s["id"],
+            "student_name": s.get("name") or "",
+            "group_name": group_names.get(s.get("group_id"), "بدون مجموعة"),
+            "months": months,
+            "total": round(st_total, 2),
+            "paid": round(st_paid, 2),
+            "due": round(st_due, 2),
+            "pending": round(st_pending, 2),
+            "outstanding": round(st_due + st_pending, 2),  # المتبقّي = مستحق + قائم
+            "months_generated": len(months),
+        })
+        totals["total"] += st_total
+        totals["paid"] += st_paid
+        totals["due"] += st_due
+        totals["pending"] += st_pending
+
+    # الأكثر تخلّفًا عن الدفع أولًا
+    rows.sort(key=lambda r: r["due"], reverse=True)
+
+    totals = {k: round(v, 2) for k, v in totals.items()}
+    totals["outstanding"] = round(totals["due"] + totals["pending"], 2)
+    totals["collection_rate"] = round(totals["paid"] / totals["total"] * 100, 1) if totals["total"] else 0.0
+
+    return {
+        "year": year,
+        "months": ARABIC_MONTHS,
+        "config": await get_fees_config(),
+        "summary": totals,
+        "students_count": len(rows),
+        "rows": rows,
+    }
+
+
+class BulkFeeStatusRequest(BaseModel):
+    fee_ids: List[str]
+    status: str  # pending | due | paid
+
+
+@api_router.put("/admin/fees/bulk-status")
+async def bulk_fee_status(data: BulkFeeStatusRequest, current_user: dict = Depends(get_current_user)):
+    """تغيير حالة عدة رسوم دفعةً واحدة (المدير فقط)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تغيير حالة الرسوم")
+    if data.status not in ("pending", "due", "paid"):
+        raise HTTPException(status_code=400, detail="حالة غير صحيحة")
+
+    update = {"status": data.status, "status_overridden": True}
+    if data.status == "paid":
+        update["is_paid"] = True
+        update["paid_date"] = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    else:
+        update["is_paid"] = False
+        update["paid_date"] = None
+
+    res = await db.fees.update_many({"id": {"$in": data.fee_ids}}, {"$set": update})
+    return {"message": f"تم تحديث {res.modified_count} رسم", "modified": res.modified_count}
+
 
 @api_router.put("/fees/{fee_id}/pay")
 async def mark_fee_paid(fee_id: str, current_user: dict = Depends(get_current_user)):

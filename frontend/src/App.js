@@ -23,6 +23,7 @@ import Rankings from './pages/Rankings';
 import UsersPage from './pages/UsersPage';
 import MyPoints from './pages/MyPoints';
 import MyWarnings from './pages/MyWarnings';
+import PointsManager from './pages/PointsManager';
 import RegistrationCodes from './pages/RegistrationCodes';
 import StudentProfile from './pages/StudentProfile';
 import StudentManagement from './pages/StudentManagement';
@@ -595,6 +596,17 @@ function AppRoutes() {
           <ProtectedRoute allow={['student']}>
             <Layout>
               <MyProgress />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/points-manager"
+        element={
+          <ProtectedRoute allow={['admin', 'sheikh']}>
+            <Layout>
+              <PointsManager />
             </Layout>
           </ProtectedRoute>
         }
