@@ -18,13 +18,17 @@ const Activities = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
+  const EMPTY_FORM = {
     title: '',
     description: '',
     date: '',
     time: '',
-    location: ''
-  });
+    end_time: '',
+    location: '',
+    required_fee: '',
+    required_points: '',
+  };
+  const [formData, setFormData] = useState(EMPTY_FORM);
 
   useEffect(() => {
     fetchActivities();
@@ -46,10 +50,15 @@ const Activities = () => {
     setSubmitting(true);
     
     try {
-      await axios.post(`${API}/activities`, formData);
+      await axios.post(`${API}/activities`, {
+        ...formData,
+        end_time: formData.end_time || null,
+        required_fee: formData.required_fee !== '' ? Number(formData.required_fee) : null,
+        required_points: formData.required_points !== '' ? Number(formData.required_points) : null,
+      });
       toast.success('تم إنشاء النشاط بنجاح');
       setDialogOpen(false);
-      setFormData({ title: '', description: '', date: '', time: '', location: '' });
+      setFormData(EMPTY_FORM);
       fetchActivities();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'فشل إنشاء النشاط');
@@ -138,7 +147,7 @@ const Activities = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-slate-300">الوقت</Label>
+                    <Label className="text-slate-300">من الساعة</Label>
                     <Input
                       type="time"
                       value={formData.time}
@@ -150,15 +159,59 @@ const Activities = () => {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-slate-300">المكان (اختياري)</Label>
-                  <Input
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    className="bg-slate-800 border-slate-700 text-white"
-                    placeholder="مثال: قاعة المركز الرئيسية"
-                    data-testid="activity-location-input"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-slate-300">إلى الساعة (اختياري)</Label>
+                    <Input
+                      type="time"
+                      value={formData.end_time}
+                      onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                      className="bg-slate-800 border-slate-700 text-white"
+                      data-testid="activity-end-time-input"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-300">المكان (اختياري)</Label>
+                    <Input
+                      value={formData.location}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      className="bg-slate-800 border-slate-700 text-white"
+                      placeholder="مثال: قاعة المركز"
+                      data-testid="activity-location-input"
+                    />
+                  </div>
+                </div>
+
+                {/* شروط المشاركة */}
+                <div className="p-3 rounded-lg bg-slate-800/50 border border-white/5 space-y-3">
+                  <p className="text-sm text-slate-300">شروط المشاركة (اختياري)</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-slate-400 text-xs">الرسوم المطلوبة</Label>
+                      <Input
+                        type="number" min="0" step="0.5"
+                        value={formData.required_fee}
+                        onChange={(e) => setFormData({ ...formData, required_fee: e.target.value })}
+                        className="bg-slate-800 border-slate-700 text-white"
+                        placeholder="مثال: 20"
+                        data-testid="activity-fee-input"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-slate-400 text-xs">النقاط المطلوبة</Label>
+                      <Input
+                        type="number" min="0"
+                        value={formData.required_points}
+                        onChange={(e) => setFormData({ ...formData, required_points: e.target.value })}
+                        className="bg-slate-800 border-slate-700 text-white"
+                        placeholder="مثال: 50"
+                        data-testid="activity-points-input"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    تظهر للطلاب كشرط للمشاركة — التحصيل يتم يدويًا من الإدارة.
+                  </p>
                 </div>
 
                 <Button
@@ -214,12 +267,32 @@ const Activities = () => {
                   </div>
                   <div className="flex items-center gap-2 text-slate-300">
                     <Clock className="w-4 h-4" />
-                    <span className="text-sm">{activity.time}</span>
+                    <span className="text-sm">
+                      {activity.time}
+                      {activity.end_time && <span className="text-slate-400"> ← {activity.end_time}</span>}
+                    </span>
                   </div>
                   {activity.location && (
                     <div className="flex items-center gap-2 text-slate-400">
                       <MapPin className="w-4 h-4" />
                       <span className="text-sm">{activity.location}</span>
+                    </div>
+                  )}
+
+                  {/* شروط المشاركة */}
+                  {(activity.required_fee || activity.required_points) && (
+                    <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-white/5">
+                      <span className="text-xs text-slate-500">للمشاركة:</span>
+                      {activity.required_fee ? (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400">
+                          💰 {activity.required_fee}
+                        </span>
+                      ) : null}
+                      {activity.required_points ? (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
+                          ⭐ {activity.required_points} نقطة
+                        </span>
+                      ) : null}
                     </div>
                   )}
                 </div>

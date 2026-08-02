@@ -35,7 +35,8 @@ const TrackingSettings = () => {
     submission_start_day: 'friday',
     submission_start_time: '21:00',
     submission_end_day: 'saturday',
-    submission_end_time: '08:50'
+    submission_end_time: '08:50',
+    allow_late_submission: true
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -148,7 +149,8 @@ const TrackingSettings = () => {
         submission_start_day: response.data.submission_start_day || 'friday',
         submission_start_time: response.data.submission_start_time || '21:00',
         submission_end_day: response.data.submission_end_day || 'saturday',
-        submission_end_time: response.data.submission_end_time || '08:50'
+        submission_end_time: response.data.submission_end_time || '08:50',
+        allow_late_submission: response.data.allow_late_submission ?? true
       });
     } catch (error) {
       console.error('Error fetching settings:', error);
@@ -405,6 +407,24 @@ const TrackingSettings = () => {
 
           {settings.submission_enabled && (
             <>
+              {/* استقبال الورقة المتأخرة */}
+              <div className="flex items-center justify-between p-4 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                <div>
+                  <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                    استقبال الورقة خارج التوقيت
+                  </p>
+                  <p className="text-slate-400 text-sm">
+                    {settings.allow_late_submission
+                      ? 'الورقة المتأخرة تُقبل وتُحفظ، لكن بدون احتساب نقاط.'
+                      : 'الورقة المتأخرة تُرفض تمامًا ولا تُحفظ.'}
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.allow_late_submission}
+                  onCheckedChange={(checked) => setSettings({ ...settings, allow_late_submission: checked })}
+                />
+              </div>
+
               {/* وقت البداية */}
               <div className="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20 space-y-4">
                 <div className="flex items-center gap-2 text-emerald-400 font-medium">

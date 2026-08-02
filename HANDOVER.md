@@ -41,6 +41,13 @@
 `C:\Users\USER\AppData\Local\Temp\claude\C--Users-USER\f41a7e7c-640a-49d0-a78e-08626946e24d\scratchpad\mongo\data`
 (مسار الجلسة القديمة — لا يتغيّر. الـ launcher `start-mongo.js` بنفس المجلد.)
 
+> ⚠️ **مهم — تشغيل MongoDB:** `start-mongo.js` بيعتمد على `process.stdin.resume()` للبقاء حيًّا. لو شغّلته بـ stdin مغلق (مثلًا `Start-Process -WindowStyle Hidden` مع redirect) بيطلع فورًا، **والإيقاف غير النظيف المتكرر بيتلّف WiredTiger** (صار فعليًا بتاريخ 2026-08-02 واحتاج `--repair`).
+> **الأمتن:** شغّل mongod مباشرةً:
+> ```
+> <mongo>\node_modules\.cache\mongodb-memory-server\mongod-x64-win32-8.2.6.exe --dbpath <mongo>\data --port 27017 --bind_ip 127.0.0.1
+> ```
+> ولو فشل الإقلاع بـ `fassert()`: احذف `mongod.lock` و`WiredTiger.lock`، وإن لزم شغّل `mongod --dbpath ... --repair`.
+
 **التشغيل (3 عمليات بالخلفية بالترتيب):**
 
 ```bash
@@ -137,29 +144,27 @@ BROWSER=none PORT=3000 npm start > /tmp/frontend.log 2>&1 &
 
 ## 7) حالة شجرة العمل الحالية (غير مكوميت) ⚠️
 
-آخر commit = `9a79892`. **كل الشغل الجديد لسّا غير مكوميت** — التعديلات اليدوية السابقة + دفعة الـ 7 بنود فوقها.
+آخر commit = `29e91a7`. **دفعة 9 (7 بنود) + دفعة 10 (المسابقات) لسّا غير مكوميتات.**
 
-**الحالة:** الخادم يعدّي `py_compile`، والواجهة تُصرَّف بـ **`Compiled successfully` بدون تحذيرات**، و**35/35 اختبار E2E ناجح**.
+**الحالة:** الخادم يعدّي `py_compile`، والواجهة تعدّي فحص `esbuild`، و**22/22 اختبار E2E للمسابقات ناجح** + فحص بصري كامل.
 
 **الملفات المعدّلة:**
 
 | الملف | المحتوى |
 |------|---------|
-| `backend/server.py` | البنود 1، 3، 4، 6، 7 + تحسين endpoint الإنذارات + فهرس `admin_bonus_grants` + إصلاح N+1 في `dashboard-stats` |
-| `frontend/src/pages/AdminDashboard.jsx` | تعديلات المستخدم اليدوية + قائمة الطلاب مع «إظهار المزيد» وأزرار التنزيل + عرض أداء المشرفين + شريط الوصول السريع |
-| `frontend/src/pages/MyWarnings.jsx` | **ملف جديد** — تبويب إنذارات الطالب |
-| `frontend/src/pages/SheikhManagement.jsx` | حوار «إضافة مشرف» + المسجد يدوي |
-| `frontend/src/pages/TrackingSettings.jsx` | كرت إعدادات نقاط التميز |
-| `frontend/src/pages/StudentManagement.jsx` | قراءة إعدادات التميز بدل 50 الثابتة |
-| `frontend/src/pages/SheikhEditProfile.jsx`، `Register.jsx` | المسجد يدوي للمشرف |
-| `frontend/src/pages/StudentDashboard.jsx`، `components/Sidebar.jsx`، `App.js` | ربط تبويب الإنذارات |
-| `frontend/src/pages/FeesManagement.jsx`، `BulkOperations.jsx` | تعديلات المستخدم اليدوية (إعادة ترتيب + نصوص) |
+| `backend/server.py` | رسوم/نقاط ووقت النشاط، جمهور الإعلانات، `allow_late_submission`، `period_name` للحصص، حذف المفصّل، «امتحانات»→«اختبارات»، حقول المسابقات + فلترها + تصديرها، إصلاح صلاحية التقييم لكل مجموعات المشرف |
+| `backend/models.py` | `end_time`/`required_fee`/`required_points` للنشاط، `period_name` للحصة، حقول المسابقات في `InitialAssessment` |
+| `frontend/src/pages/InitialAssessment.jsx` | بلوك «المشاركة في المسابقات» + شبكة أجزاء لكل مسابقة + تحقّق |
+| `frontend/src/pages/StudentStats.jsx` | فلتر «المسابقات» + عمود «🏆 المسابقات» |
+| `frontend/src/pages/ScheduleManagement.jsx` | عرض الجدول كجدول مدرسي (حصص × أيام) + فلتر مجموعة |
+| `frontend/src/pages/Activities.jsx` | وقت من→إلى + الرسوم/النقاط المطلوبة |
+| `frontend/src/pages/Announcements.jsx` | جمهور الإعلان (مشرفون/طلاب/الكل) |
+| `frontend/src/pages/TrackingSettings.jsx` | مفتاح استقبال الورقة المتأخرة بلا نقاط |
+| `frontend/src/pages/ExamsManagement.jsx` | إزالة اختبار المفصّل بالكامل |
+| `frontend/src/components/Sidebar.jsx`، `OnlineExams.jsx`، `SheikhAnalytics.jsx` | «امتحانات» → «اختبارات» |
+| `EDITS_SUMMARY.md`، `HANDOVER.md` | التوثيق |
 
-**ملاحظتان بسيطتان باقيتان من التعديلات اليدوية:**
-- `Sidebar.jsx`: أسطر فاضية ومسافات بادئة غير منتظمة في قائمة المدير — تجميلي.
-- `AdminDashboard.jsx`: بطاقة «طلبات التسجيل» عنوان بلا رقم (`summary.total_points` معلّق عمدًا) — لو بدك رقم، استخدم `summary.pending_students`.
-
-**تم إصلاحه:** حوار «تحميل Excel» رجع قابل للوصول عبر شريط الوصول السريع، ونص إشعار نقاط التميز أُعيدت صياغته (كان فيه مسافتان).
+**تنبيه تشغيل:** `uvicorn` بيشتغل **بدون hot reload** — أي تعديل على `server.py` بدّه إعادة تشغيل يدوية، وإلا الاختبارات بتفحص كودًا قديمًا.
 
 ---
 

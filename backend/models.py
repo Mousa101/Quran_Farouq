@@ -232,6 +232,11 @@ class InitialAssessment(BaseModel):
     weak_juz: List[int] = []  # الأجزاء الضعيفة في الحفظ
     strong_juz: List[int] = []  # الأجزاء القوية في الحفظ
     administrative_test_juz: List[int] = []  # الأجزاء المختبَرة إدارياً (مضاعفات 5)
+    # المشاركة في المسابقات — لكل واحدة الأجزاء اللي شارك فيها
+    annual_competition: bool = False           # شارك في المسابقة السنوية
+    annual_competition_juz: List[int] = []     # أجزاء المسابقة السنوية
+    young_hafiz: bool = False                  # شارك في مسابقة الحافظ الصغير
+    young_hafiz_juz: List[int] = []            # أجزاء الحافظ الصغير
 
 # Group Models
 class GroupCreate(BaseModel):
@@ -445,8 +450,12 @@ class ActivityCreate(BaseModel):
     title: str
     description: str
     date: str
-    time: str
+    time: str                      # وقت البداية (يُبقى للتوافق الخلفي)
+    end_time: Optional[str] = None  # وقت النهاية
     location: Optional[str] = None
+    # شروط المشاركة (عرض فقط — التحصيل يتم يدويًا)
+    required_fee: Optional[float] = None    # الرسوم المطلوبة للمشاركة
+    required_points: Optional[int] = None   # الحد الأدنى من النقاط للمشاركة
 
 class Activity(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -455,7 +464,10 @@ class Activity(BaseModel):
     description: str
     date: str
     time: str
+    end_time: Optional[str] = None
     location: Optional[str] = None
+    required_fee: Optional[float] = None
+    required_points: Optional[int] = None
     created_by: str
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -674,6 +686,7 @@ class ScheduleSlotCreate(BaseModel):
     start_time: str  # وقت البداية HH:MM
     end_time: str  # وقت النهاية HH:MM
     subject: str  # الدرس/الموضوع
+    period_name: Optional[str] = None  # اسم الحصة (الحصة الأولى، الثانية...) — لصفوف الجدول المدرسي
     description: Optional[str] = None
     group_id: Optional[str] = None  # Optional: specific group
 
@@ -685,6 +698,7 @@ class ScheduleSlot(BaseModel):
     start_time: str
     end_time: str
     subject: str
+    period_name: Optional[str] = None
     description: Optional[str] = None
     group_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -828,7 +842,7 @@ class AdminExam(BaseModel):
 
 class TajweedExamCreate(BaseModel):
     student_id: str
-    topic: str  # موضوع الامتحان (أحكام النون الساكنة، المدود، etc.)
+    topic: str  # موضوع الاختبار (أحكام النون الساكنة، المدود، etc.)
     questions_count: int = 10
     correct_answers: int = 0
     practical_score: int = 0  # الاختبار العملي (0-100)
@@ -862,10 +876,10 @@ QURAN_JUZ = [
     "الجزء السادس والعشرون", "الجزء السابع والعشرون", "الجزء الثامن والعشرون", "الجزء التاسع والعشرون", "الجزء الثلاثون (جزء عم)"
 ]
 
-# ============== ONLINE EXAMS (امتحانات إلكترونية) ==============
+# ============== ONLINE EXAMS (اختبارات إلكترونية) ==============
 
 class ExamQuestion(BaseModel):
-    """سؤال في الامتحان الإلكتروني"""
+    """سؤال في الاختبار الإلكتروني"""
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     question_text: str  # نص السؤال
     options: List[str]  # الخيارات (4 خيارات)
@@ -873,27 +887,27 @@ class ExamQuestion(BaseModel):
     points: int = 1  # نقاط السؤال
 
 class OnlineExamCreate(BaseModel):
-    """إنشاء امتحان إلكتروني جديد"""
-    title: str  # عنوان الامتحان
-    description: Optional[str] = None  # وصف الامتحان
+    """إنشاء اختبار إلكتروني جديد"""
+    title: str  # عنوان الاختبار
+    description: Optional[str] = None  # وصف الاختبار
     category: str = "general"  # تصنيف: quran, tajweed, general, islamic
     target_groups: List[str] = []  # المجموعات المستهدفة (فارغ = الكل)
-    questions: List[ExamQuestion]  # أسئلة الامتحان
-    duration_minutes: int = 30  # مدة الامتحان بالدقائق
+    questions: List[ExamQuestion]  # أسئلة الاختبار
+    duration_minutes: int = 30  # مدة الاختبار بالدقائق
     passing_score: int = 60  # درجة النجاح %
-    start_date: Optional[str] = None  # تاريخ بداية الامتحان
-    end_date: Optional[str] = None  # تاريخ نهاية الامتحان
-    is_active: bool = True  # هل الامتحان فعال
+    start_date: Optional[str] = None  # تاريخ بداية الاختبار
+    end_date: Optional[str] = None  # تاريخ نهاية الاختبار
+    is_active: bool = True  # هل الاختبار فعال
 
 class OnlineExam(BaseModel):
-    """الامتحان الإلكتروني"""
+    """الاختبار الإلكتروني"""
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     title: str
     description: Optional[str] = None
     category: str = "general"
     target_groups: List[str] = []
-    questions: List[dict]  # أسئلة الامتحان (بدون الإجابات الصحيحة للطالب)
+    questions: List[dict]  # أسئلة الاختبار (بدون الإجابات الصحيحة للطالب)
     questions_with_answers: List[dict]  # أسئلة مع الإجابات (للمشرف)
     duration_minutes: int = 30
     passing_score: int = 60
@@ -905,12 +919,12 @@ class OnlineExam(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class ExamSubmissionCreate(BaseModel):
-    """تقديم إجابات الامتحان"""
+    """تقديم إجابات الاختبار"""
     exam_id: str
     answers: List[int]  # قائمة فهارس الإجابات المختارة
 
 class ExamSubmission(BaseModel):
-    """نتيجة تقديم الامتحان"""
+    """نتيجة تقديم الاختبار"""
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     exam_id: str

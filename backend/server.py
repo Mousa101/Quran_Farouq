@@ -909,9 +909,11 @@ async def submit_initial_assessment(student_id: str, data: InitialAssessment, cu
     if not student:
         raise HTTPException(status_code=404, detail="الطالب غير موجود")
     
-    # Check if student is in sheikh's group
-    group = await db.groups.find_one({"sheikh_id": current_user["user_id"]})
-    if not group or student.get("group_id") != group["id"]:
+    # الطالب يجب أن يكون ضمن **أي** من مجموعات المشرف
+    # (كان `find_one` بيجيب مجموعة واحدة فقط، فالمشرف صاحب أكثر من مجموعة
+    #  ما كان يقدر يقيّم إلا طلاب مجموعة واحدة منها)
+    gids = await _sheikh_group_ids(current_user["user_id"])
+    if student.get("group_id") not in gids:
         raise HTTPException(status_code=403, detail="الطالب ليس في مجموعتك")
     
     # Validate tajweed level
@@ -941,6 +943,17 @@ async def submit_initial_assessment(student_id: str, data: InitialAssessment, cu
             detail=f"الأجزاء التالية مسجّلة قوية وضعيفة معاً: {'، '.join(str(j) for j in both)}. اختر واحدة فقط."
         )
 
+    # المسابقات: لا تُسجَّل أجزاء لمسابقة غير مُحدَّدة، ولا تُترك مُحدَّدة بلا أجزاء
+    annual_juz = sorted(set(data.annual_competition_juz or [])) if data.annual_competition else []
+    young_juz = sorted(set(data.young_hafiz_juz or [])) if data.young_hafiz else []
+    for flag, juz, label in ((data.annual_competition, annual_juz, "المسابقة السنوية"),
+                             (data.young_hafiz, young_juz, "الحافظ الصغير")):
+        if flag and not juz:
+            raise HTTPException(status_code=400, detail=f"حدّد الأجزاء التي شارك فيها الطالب في {label}")
+        for j in juz:
+            if not 1 <= j <= 30:
+                raise HTTPException(status_code=400, detail=f"رقم جزء غير صحيح في {label}: {j}")
+
     now_iso = datetime.now(timezone.utc).isoformat()
     active_term_id = await get_active_term_id()
     prev_count = student.get("assessment_count") or 0
@@ -953,6 +966,10 @@ async def submit_initial_assessment(student_id: str, data: InitialAssessment, cu
         "weak_juz": data.weak_juz,
         "strong_juz": data.strong_juz,
         "administrative_test_juz": data.administrative_test_juz,
+        "annual_competition": bool(data.annual_competition),
+        "annual_competition_juz": annual_juz,
+        "young_hafiz": bool(data.young_hafiz),
+        "young_hafiz_juz": young_juz,
         "initial_assessment_done": True,
         "last_assessment_date": now_iso,
         "assessment_count": prev_count + 1
@@ -974,6 +991,10 @@ async def submit_initial_assessment(student_id: str, data: InitialAssessment, cu
         "weak_juz": data.weak_juz,
         "strong_juz": data.strong_juz,
         "administrative_test_juz": data.administrative_test_juz,
+        "annual_competition": bool(data.annual_competition),
+        "annual_competition_juz": annual_juz,
+        "young_hafiz": bool(data.young_hafiz),
+        "young_hafiz_juz": young_juz,
         "notes": data.notes,
         "is_reassessment": prev_count > 0
     }
@@ -1048,6 +1069,10 @@ async def get_student_progress(student_id: str, current_user: dict = Depends(get
         "weak_juz": student.get("weak_juz") or [],
         "strong_juz": student.get("strong_juz") or [],
         "administrative_test_juz": student.get("administrative_test_juz") or [],
+        "annual_competition": bool(student.get("annual_competition")),
+        "annual_competition_juz": student.get("annual_competition_juz") or [],
+        "young_hafiz": bool(student.get("young_hafiz")),
+        "young_hafiz_juz": student.get("young_hafiz_juz") or [],
         "previous_memorization": {
             "juz": previous_juz,
             "juz_count": len(previous_juz),
@@ -2248,8 +2273,18 @@ def _sheet_prayers_sitting(sheet: dict) -> tuple:
 
 async def _build_student_stats(current_user, group_id=None, student_id=None,
                                term_id=None, sort_by="name", order="asc",
-                               tracking_period="term"):
+                               tracking_period="term", competition=None):
     uq = {"role": "student"}
+    # فلتر المسابقة: annual | young | any | none
+    if competition == "annual":
+        uq["annual_competition"] = True
+    elif competition == "young":
+        uq["young_hafiz"] = True
+    elif competition == "any":
+        uq["$or"] = [{"annual_competition": True}, {"young_hafiz": True}]
+    elif competition == "none":
+        uq["annual_competition"] = {"$ne": True}
+        uq["young_hafiz"] = {"$ne": True}
     if current_user["role"] == "sheikh":
         gids = await _sheikh_group_ids(current_user["user_id"])
         uq["group_id"] = group_id if (group_id and group_id in gids) else {"$in": gids}
@@ -2262,6 +2297,8 @@ async def _build_student_stats(current_user, group_id=None, student_id=None,
         "_id": 0, "id": 1, "name": 1, "group_id": 1, "birth_date": 1, "school_grade": 1,
         "school_average": 1, "strong_juz": 1, "weak_juz": 1,
         "previous_memorization_juz": 1, "previous_memorization_pages": 1,
+        "annual_competition": 1, "annual_competition_juz": 1,
+        "young_hafiz": 1, "young_hafiz_juz": 1,
     }).to_list(5000)
     sids = [s["id"] for s in students]
 
@@ -2337,6 +2374,11 @@ async def _build_student_stats(current_user, group_id=None, student_id=None,
             "tracking_prayers": prayers_by.get(s["id"], 0),
             "tracking_sitting": sitting_by.get(s["id"], 0),
             "last_sheet": last_sheet_by.get(s["id"]),
+            # المشاركة في المسابقات (من التقييم الأولي)
+            "annual_competition": bool(s.get("annual_competition")),
+            "annual_competition_juz": s.get("annual_competition_juz") or [],
+            "young_hafiz": bool(s.get("young_hafiz")),
+            "young_hafiz_juz": s.get("young_hafiz_juz") or [],
             "age": age,
             "grade": s.get("school_grade") or "",
             "average": parse_average(s.get("school_average")),  # المعدّل الموحّد (رقم)
@@ -2361,15 +2403,20 @@ async def _build_student_stats(current_user, group_id=None, student_id=None,
 async def student_stats_report(group_id: Optional[str] = None, student_id: Optional[str] = None,
                                term_id: Optional[str] = None, sort_by: str = "name", order: str = "asc",
                                tracking_period: str = "term",
+                               competition: Optional[str] = None,
                                current_user: dict = Depends(get_current_user)):
     """جدول إحصائيات الطلاب: الحفظ الكلي/الجديد/المراجعة، الحضور، ورق المتابعة (صلوات + جلوس)، العمر، الصف.
-    tracking_period: week | month | term — يحدّد مدى احتساب أعمدة المتابعة."""
+    tracking_period: week | month | term — يحدّد مدى احتساب أعمدة المتابعة.
+    competition: annual | young | any | none — فلترة حسب المشاركة في المسابقات."""
     ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     if tracking_period not in ("week", "month", "term"):
         tracking_period = "term"
-    rows = await _build_student_stats(current_user, group_id, student_id, term_id, sort_by, order, tracking_period)
+    if competition not in ("annual", "young", "any", "none"):
+        competition = None
+    rows = await _build_student_stats(current_user, group_id, student_id, term_id, sort_by, order,
+                                      tracking_period, competition)
     return {"count": len(rows), "sort_by": sort_by, "order": order,
-            "tracking_period": tracking_period, "rows": rows}
+            "tracking_period": tracking_period, "competition": competition, "rows": rows}
 
 
 TRACKING_PERIOD_LABELS = {"week": "الأسبوع الحالي", "month": "الشهر الحالي", "term": "الفصل"}
@@ -2379,12 +2426,16 @@ TRACKING_PERIOD_LABELS = {"week": "الأسبوع الحالي", "month": "ال�
 async def export_student_stats_excel(group_id: Optional[str] = None, student_id: Optional[str] = None,
                                      term_id: Optional[str] = None, sort_by: str = "name", order: str = "asc",
                                      tracking_period: str = "term",
+                                     competition: Optional[str] = None,
                                      current_user: dict = Depends(get_current_user)):
     """تصدير جدول إحصائيات الطلاب إلى Excel (بنفس الفلاتر والترتيب)."""
     ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     if tracking_period not in ("week", "month", "term"):
         tracking_period = "term"
-    rows = await _build_student_stats(current_user, group_id, student_id, term_id, sort_by, order, tracking_period)
+    if competition not in ("annual", "young", "any", "none"):
+        competition = None
+    rows = await _build_student_stats(current_user, group_id, student_id, term_id, sort_by, order,
+                                      tracking_period, competition)
     period_label = TRACKING_PERIOD_LABELS[tracking_period]
     output = io.BytesIO()
     wb = xlsxwriter.Workbook(output, {'in_memory': True})
@@ -2393,14 +2444,15 @@ async def export_student_stats_excel(group_id: Optional[str] = None, student_id:
     cell_f = wb.add_format({'border': 1, 'align': 'center'})
     sh = wb.add_worksheet('إحصائيات الطلاب')
     sh.right_to_left()
-    sh.merge_range('A1:N1', f'جدول إحصائيات الطلاب — ورق المتابعة حسب: {period_label}', title_f)
+    sh.merge_range('A1:P1', f'جدول إحصائيات الطلاب — ورق المتابعة حسب: {period_label}', title_f)
     headers = ['#', 'الطالب', 'المجموعة', 'الحفظ الكلي (ص)', 'الحفظ الجديد (ص)', 'المراجعة (ص)',
                'أيام الحضور', 'أوراق المتابعة', 'الصلوات', 'الجلوس مع القرآن', 'آخر ورقة',
+               'المسابقة السنوية', 'الحافظ الصغير',
                'العمر', 'الصف', 'المعدل %']
     for c, h in enumerate(headers):
         sh.write(2, c, h, head_f)
     sh.set_column('A:A', 5); sh.set_column('B:B', 22); sh.set_column('C:C', 16)
-    sh.set_column('D:J', 14); sh.set_column('K:K', 14); sh.set_column('L:N', 12)
+    sh.set_column('D:J', 14); sh.set_column('K:K', 14); sh.set_column('L:M', 18); sh.set_column('N:P', 12)
     for i, r in enumerate(rows, 1):
         row = i + 2
         last = r.get("last_sheet") or {}
@@ -2415,9 +2467,11 @@ async def export_student_stats_excel(group_id: Optional[str] = None, student_id:
         sh.write(row, 8, r.get("tracking_prayers", 0), cell_f)
         sh.write(row, 9, r.get("tracking_sitting", 0), cell_f)
         sh.write(row, 10, last.get("week_start") or "لم يسلّم", cell_f)
-        sh.write(row, 11, r["age"] if r["age"] is not None else "", cell_f)
-        sh.write(row, 12, r["grade"], cell_f)
-        sh.write(row, 13, f"{r['average']}%" if r.get("average") is not None else "", cell_f)
+        sh.write(row, 11, "، ".join(str(j) for j in r.get("annual_competition_juz") or []) or "—", cell_f)
+        sh.write(row, 12, "، ".join(str(j) for j in r.get("young_hafiz_juz") or []) or "—", cell_f)
+        sh.write(row, 13, r["age"] if r["age"] is not None else "", cell_f)
+        sh.write(row, 14, r["grade"], cell_f)
+        sh.write(row, 15, f"{r['average']}%" if r.get("average") is not None else "", cell_f)
     wb.close()
     return _xlsx_response(output, f"student_stats_{datetime.now().strftime('%Y%m%d')}.xlsx")
 
@@ -2995,6 +3049,13 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
                 is_within_submission_window = True
         
         if not is_within_submission_window:
+            # الإعداد يحدّد: نستقبلها بدون نقاط، أو نرفضها أصلًا
+            if not submission_settings.get("allow_late_submission", True):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"التسليم مغلق حاليًا. الوقت المسموح من {submission_settings.get('submission_start_day_ar', '')} "
+                           f"{start_time_str} إلى {end_time_str}."
+                )
             submission_message = "تم حفظ الورقة بدون نقاط (خارج وقت التسليم)"
     
     # الحصول على بداية الأسبوع الحالي (السبت)
@@ -3963,30 +4024,47 @@ async def get_attendance(
 async def create_activity(activity_data: ActivityCreate, current_user: dict = Depends(get_current_user)):
     ensure_role(current_user, "admin", "فقط المدير يمكنه إنشاء الأنشطة")
     
+    if activity_data.required_fee is not None and activity_data.required_fee < 0:
+        raise HTTPException(status_code=400, detail="الرسوم يجب أن تكون صفرًا أو أكثر")
+    if activity_data.required_points is not None and activity_data.required_points < 0:
+        raise HTTPException(status_code=400, detail="النقاط المطلوبة يجب أن تكون صفرًا أو أكثر")
+    if activity_data.end_time and activity_data.time and activity_data.end_time < activity_data.time:
+        raise HTTPException(status_code=400, detail="وقت النهاية يجب أن يكون بعد وقت البداية")
+
     activity = Activity(
         title=activity_data.title,
         description=activity_data.description,
         date=activity_data.date,
         time=activity_data.time,
+        end_time=activity_data.end_time,
         location=activity_data.location,
+        required_fee=activity_data.required_fee,
+        required_points=activity_data.required_points,
         created_by=current_user["user_id"]
     )
-    
+
     activity_dict = activity.model_dump()
     activity_dict["created_at"] = activity_dict["created_at"].isoformat()
-    
+
     await db.activities.insert_one(activity_dict)
-    
-    # Notify all users
-    users = await db.users.find({}, {"_id": 0, "id": 1}).to_list(1000)
+
+    # إشعار الطلاب والمشرفين (المدير ما بيحتاج إشعارًا بنشاط أنشأه بنفسه)
+    users = await db.users.find({"role": {"$in": ["student", "sheikh"]}}, {"_id": 0, "id": 1}).to_list(10000)
+    time_txt = activity_data.time + (f" – {activity_data.end_time}" if activity_data.end_time else "")
+    req = []
+    if activity_data.required_fee:
+        req.append(f"رسوم {activity_data.required_fee}")
+    if activity_data.required_points:
+        req.append(f"{activity_data.required_points} نقطة")
+    req_txt = f" · المطلوب: {' أو '.join(req)}" if req else ""
     for user in users:
         await create_notification_internal(
             user["id"],
             "نشاط جديد",
-            f"{activity_data.title} - {activity_data.date}",
+            f"{activity_data.title} — {activity_data.date} {time_txt}{req_txt}",
             "info"
         )
-    
+
     return {"message": "تم إنشاء النشاط بنجاح", "activity_id": activity.id}
 
 @api_router.get("/activities")
@@ -4056,7 +4134,15 @@ async def get_audit_logs(action: Optional[str] = None, limit: int = 200,
 class AnnouncementCreate(BaseModel):
     title: str
     message: str
-    audience: str = "sheikhs"  # "sheikhs" (النسخة الأولى) أو "all"
+    audience: str = "sheikhs"  # sheikhs | students | all
+
+
+# جمهور كل إعلان → أدوار المستقبِلين
+ANNOUNCEMENT_AUDIENCES = {
+    "sheikhs": ["sheikh"],
+    "students": ["student"],
+    "all": ["sheikh", "student"],
+}
 
 
 @api_router.post("/announcements")
@@ -4065,7 +4151,7 @@ async def create_announcement(data: AnnouncementCreate, current_user: dict = Dep
     ensure_role(current_user, "admin", "فقط المدير يمكنه بثّ الإعلانات")
     if not data.title.strip() or not data.message.strip():
         raise HTTPException(status_code=400, detail="العنوان والنص مطلوبان")
-    audience = data.audience if data.audience in ("sheikhs", "all") else "sheikhs"
+    audience = data.audience if data.audience in ANNOUNCEMENT_AUDIENCES else "sheikhs"
     ann = {
         "id": str(uuid.uuid4()),
         "title": data.title.strip(),
@@ -4078,8 +4164,8 @@ async def create_announcement(data: AnnouncementCreate, current_user: dict = Dep
     await db.announcements.insert_one(ann)
 
     # إرسال إشعار للجمهور المستهدف
-    role_filter = {"role": "sheikh"} if audience == "sheikhs" else {"role": {"$in": ["sheikh", "student"]}}
-    targets = await db.users.find(role_filter, {"_id": 0, "id": 1}).to_list(5000)
+    role_filter = {"role": {"$in": ANNOUNCEMENT_AUDIENCES[audience]}}
+    targets = await db.users.find(role_filter, {"_id": 0, "id": 1}).to_list(10000)
     for u in targets:
         await create_notification_internal(u["id"], f"📢 {data.title.strip()}", data.message.strip(), "info")
 
@@ -4095,7 +4181,7 @@ async def get_announcements(current_user: dict = Depends(get_current_user)):
     elif role == "sheikh":
         query = {"audience": {"$in": ["sheikhs", "all"]}}
     else:
-        query = {"audience": "all"}
+        query = {"audience": {"$in": ["students", "all"]}}
     anns = await db.announcements.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
     return anns
 
@@ -4471,7 +4557,11 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
             "join_date": student.get("join_date"),
             "registration_date": student.get("registration_date"),
             "group_id": student.get("group_id"),
-            "initial_assessment_done": student.get("initial_assessment_done", False)
+            "initial_assessment_done": student.get("initial_assessment_done", False),
+            "annual_competition": student.get("annual_competition", False),
+            "annual_competition_juz": student.get("annual_competition_juz") or [],
+            "young_hafiz": student.get("young_hafiz", False),
+            "young_hafiz_juz": student.get("young_hafiz_juz") or []
         },
         "memorization": {
             "previous_juz": previous_juz,
@@ -5344,10 +5434,10 @@ async def chat_unread_count(current_user: dict = Depends(get_current_user)):
     return {"unread": n}
 
 
-# ============== T5 - مؤشرات الواجبات والامتحانات للمشرف ==============
+# ============== T5 - مؤشرات الواجبات والاختبارات للمشرف ==============
 @api_router.get("/sheikh/assignment-stats")
 async def sheikh_assignment_stats(current_user: dict = Depends(get_current_user)):
-    """T5 — نِسَب تسليم الواجبات والامتحانات ومتوسط الدرجات لمجموعات المشرف."""
+    """T5 — نِسَب تسليم الواجبات والاختبارات ومتوسط الدرجات لمجموعات المشرف."""
     ensure_role(current_user, ["sheikh", "admin"], "غير مصرح لك")
 
     hw_query = {} if current_user["role"] == "admin" else {"created_by": current_user["user_id"]}
@@ -6758,6 +6848,7 @@ async def add_schedule_slot(schedule_id: str, data: ScheduleSlotCreate, current_
         start_time=data.start_time,
         end_time=data.end_time,
         subject=data.subject,
+        period_name=(data.period_name or "").strip() or None,
         description=data.description,
         group_id=data.group_id
     )
@@ -6781,6 +6872,7 @@ async def update_schedule_slot(slot_id: str, data: ScheduleSlotCreate, current_u
             "start_time": data.start_time,
             "end_time": data.end_time,
             "subject": data.subject,
+            "period_name": (data.period_name or "").strip() or None,
             "description": data.description,
             "group_id": data.group_id
         }}
@@ -8375,7 +8467,7 @@ async def create_admin_exam(data: AdminExamCreate, current_user: dict = Depends(
     
     # Notify student
     result_text = "ناجح ✅" if data.result == "pass" else "راسب ❌" if data.result == "fail" else "قيد المراجعة"
-    exam_type_text = "مفصل قرآن" if data.exam_type == "quran" else "امتحان تجويد"
+    exam_type_text = "مفصل قرآن" if data.exam_type == "quran" else "اختبار تجويد"
     juz_text = ""
     if data.juz_numbers:
         juz_text = f" - الأجزاء: {', '.join(map(str, data.juz_numbers))}"
@@ -8389,7 +8481,7 @@ async def create_admin_exam(data: AdminExamCreate, current_user: dict = Depends(
         "success" if data.result == "pass" else "warning"
     )
     
-    return {"message": "تم إضافة الامتحان بنجاح", "exam_id": exam.id, "grade": final_grade}
+    return {"message": "تم إضافة الاختبار بنجاح", "exam_id": exam.id, "grade": final_grade}
 
 @api_router.get("/admin-exams")
 async def get_admin_exams(student_id: Optional[str] = None, exam_type: Optional[str] = None, current_user: dict = Depends(get_current_user)):
@@ -8457,9 +8549,9 @@ async def update_admin_exam(exam_id: str, data: AdminExamCreate, current_user: d
     result = await db.admin_exams.update_one({"id": exam_id}, {"$set": update_data})
     
     if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+        raise HTTPException(status_code=404, detail="الاختبار غير موجود")
     
-    return {"message": "تم تحديث الامتحان بنجاح"}
+    return {"message": "تم تحديث الاختبار بنجاح"}
 
 @api_router.delete("/admin-exams/{exam_id}")
 async def delete_admin_exam(exam_id: str, current_user: dict = Depends(get_current_user)):
@@ -8468,9 +8560,9 @@ async def delete_admin_exam(exam_id: str, current_user: dict = Depends(get_curre
     
     result = await db.admin_exams.delete_one({"id": exam_id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+        raise HTTPException(status_code=404, detail="الاختبار غير موجود")
     
-    return {"message": "تم حذف الامتحان بنجاح"}
+    return {"message": "تم حذف الاختبار بنجاح"}
 
 # ============== TAJWEED EXAMS ==============
 
@@ -8505,12 +8597,12 @@ async def create_tajweed_exam(data: TajweedExamCreate, current_user: dict = Depe
     result_text = "ناجح ✅" if data.result == "pass" else "راسب ❌"
     await create_notification_internal(
         data.student_id,
-        "نتيجة امتحان التجويد",
+        "نتيجة اختبار التجويد",
         f"موضوع: {data.topic} - النتيجة: {result_text} - الدرجة: {final_score}%",
         "success" if data.result == "pass" else "warning"
     )
     
-    return {"message": "تم إضافة امتحان التجويد بنجاح", "exam_id": exam.id}
+    return {"message": "تم إضافة اختبار التجويد بنجاح", "exam_id": exam.id}
 
 @api_router.get("/tajweed-exams")
 async def get_tajweed_exams(student_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
@@ -8537,16 +8629,16 @@ async def delete_tajweed_exam(exam_id: str, current_user: dict = Depends(get_cur
     
     result = await db.tajweed_exams.delete_one({"id": exam_id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+        raise HTTPException(status_code=404, detail="الاختبار غير موجود")
     
-    return {"message": "تم حذف الامتحان بنجاح"}
+    return {"message": "تم حذف الاختبار بنجاح"}
 
-# ============== ONLINE EXAMS (امتحانات إلكترونية) ==============
+# ============== ONLINE EXAMS (اختبارات إلكترونية) ==============
 
 @api_router.post("/online-exams")
 async def create_online_exam(data: OnlineExamCreate, current_user: dict = Depends(get_current_user)):
-    """إنشاء امتحان إلكتروني جديد (للمشرف/المدير)"""
-    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك بإنشاء امتحانات")
+    """إنشاء اختبار إلكتروني جديد (للمشرف/المدير)"""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك بإنشاء اختبارات")
     
     if len(data.questions) == 0:
         raise HTTPException(status_code=400, detail="يجب إضافة سؤال واحد على الأقل")
@@ -8590,7 +8682,7 @@ async def create_online_exam(data: OnlineExamCreate, current_user: dict = Depend
     await db.online_exams.insert_one(exam_dict)
     
     return {
-        "message": "تم إنشاء الامتحان بنجاح",
+        "message": "تم إنشاء الاختبار بنجاح",
         "exam_id": exam.id,
         "total_questions": len(data.questions),
         "total_points": total_points
@@ -8598,11 +8690,11 @@ async def create_online_exam(data: OnlineExamCreate, current_user: dict = Depend
 
 @api_router.get("/online-exams")
 async def get_online_exams(current_user: dict = Depends(get_current_user)):
-    """الحصول على قائمة الامتحانات الإلكترونية"""
+    """الحصول على قائمة الاختبارات الإلكترونية"""
     query = {}
     
     if current_user["role"] == "student":
-        # للطلاب: الامتحانات الفعالة فقط
+        # للطلاب: الاختبارات الفعالة فقط
         query["is_active"] = True
         # يمكن تصفية حسب المجموعة لاحقاً
     
@@ -8614,7 +8706,7 @@ async def get_online_exams(current_user: dict = Depends(get_current_user)):
         creator = await db.users.find_one({"id": exam.get("created_by")}, {"_id": 0, "name": 1})
         exam["creator_name"] = creator["name"] if creator else "غير معروف"
         
-        # التحقق إذا كان الطالب قد أكمل الامتحان
+        # التحقق إذا كان الطالب قد أكمل الاختبار
         if current_user["role"] == "student":
             submission = await db.exam_submissions.find_one({
                 "exam_id": exam["id"],
@@ -8628,17 +8720,17 @@ async def get_online_exams(current_user: dict = Depends(get_current_user)):
 
 @api_router.get("/online-exams/{exam_id}")
 async def get_online_exam(exam_id: str, current_user: dict = Depends(get_current_user)):
-    """الحصول على تفاصيل امتحان معين"""
+    """الحصول على تفاصيل اختبار معين"""
     exam = await db.online_exams.find_one({"id": exam_id}, {"_id": 0})
     
     if not exam:
-        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+        raise HTTPException(status_code=404, detail="الاختبار غير موجود")
     
     # للطلاب: إخفاء الإجابات الصحيحة
     if current_user["role"] == "student":
         exam.pop("questions_with_answers", None)
         
-        # التحقق إذا كان قد أكمل الامتحان
+        # التحقق إذا كان قد أكمل الاختبار
         submission = await db.exam_submissions.find_one({
             "exam_id": exam_id,
             "student_id": current_user["user_id"]
@@ -8655,21 +8747,21 @@ async def get_online_exam(exam_id: str, current_user: dict = Depends(get_current
 
 @api_router.post("/online-exams/{exam_id}/submit")
 async def submit_online_exam(exam_id: str, data: ExamSubmissionCreate, current_user: dict = Depends(get_current_user)):
-    """تقديم إجابات الامتحان (للطالب)"""
-    ensure_role(current_user, "student", "فقط الطلاب يمكنهم تقديم الامتحانات")
+    """تقديم إجابات الاختبار (للطالب)"""
+    ensure_role(current_user, "student", "فقط الطلاب يمكنهم تقديم الاختبارات")
     
-    # التحقق من وجود الامتحان
+    # التحقق من وجود الاختبار
     exam = await db.online_exams.find_one({"id": exam_id}, {"_id": 0})
     if not exam:
-        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+        raise HTTPException(status_code=404, detail="الاختبار غير موجود")
     
-    # التحقق من عدم تقديم الامتحان سابقاً
+    # التحقق من عدم تقديم الاختبار سابقاً
     existing = await db.exam_submissions.find_one({
         "exam_id": exam_id,
         "student_id": current_user["user_id"]
     })
     if existing:
-        raise HTTPException(status_code=400, detail="لقد قدمت هذا الامتحان سابقاً")
+        raise HTTPException(status_code=400, detail="لقد قدمت هذا الاختبار سابقاً")
     
     # حساب النتيجة
     questions = exam.get("questions_with_answers", [])
@@ -8710,20 +8802,20 @@ async def submit_online_exam(exam_id: str, data: ExamSubmissionCreate, current_u
         current_user["user_id"],
         points_earned,
         "online_exam",
-        f"امتحان: {exam.get('title')} - الدرجة: {score}%"
+        f"اختبار: {exam.get('title')} - الدرجة: {score}%"
     )
     
     # إرسال إشعار
     result_text = "ناجح ✅" if passed else "راسب ❌"
     await create_notification_internal(
         current_user["user_id"],
-        f"نتيجة الامتحان: {exam.get('title')}",
+        f"نتيجة الاختبار: {exam.get('title')}",
         f"النتيجة: {result_text} - الدرجة: {score}% - الإجابات الصحيحة: {correct_count}/{total_questions}",
         "success" if passed else "warning"
     )
     
     return {
-        "message": "تم تقديم الامتحان بنجاح",
+        "message": "تم تقديم الاختبار بنجاح",
         "score": score,
         "correct_count": correct_count,
         "total_questions": total_questions,
@@ -8734,13 +8826,13 @@ async def submit_online_exam(exam_id: str, data: ExamSubmissionCreate, current_u
 
 @api_router.get("/online-exams/{exam_id}/results")
 async def get_exam_results(exam_id: str, current_user: dict = Depends(get_current_user)):
-    """الحصول على نتائج الامتحان (للمشرف/المدير)"""
+    """الحصول على نتائج الاختبار (للمشرف/المدير)"""
     ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
-    # التحقق من وجود الامتحان
+    # التحقق من وجود الاختبار
     exam = await db.online_exams.find_one({"id": exam_id}, {"_id": 0})
     if not exam:
-        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+        raise HTTPException(status_code=404, detail="الاختبار غير موجود")
     
     # الحصول على جميع التقديمات
     submissions = await db.exam_submissions.find({"exam_id": exam_id}, {"_id": 0}).to_list(1000)
@@ -8774,31 +8866,31 @@ async def get_exam_results(exam_id: str, current_user: dict = Depends(get_curren
 
 @api_router.delete("/online-exams/{exam_id}")
 async def delete_online_exam(exam_id: str, current_user: dict = Depends(get_current_user)):
-    """حذف امتحان إلكتروني"""
+    """حذف اختبار إلكتروني"""
     ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     result = await db.online_exams.delete_one({"id": exam_id})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+        raise HTTPException(status_code=404, detail="الاختبار غير موجود")
     
     # حذف جميع التقديمات المرتبطة
     await db.exam_submissions.delete_many({"exam_id": exam_id})
     
-    return {"message": "تم حذف الامتحان بنجاح"}
+    return {"message": "تم حذف الاختبار بنجاح"}
 
 @api_router.put("/online-exams/{exam_id}/toggle-active")
 async def toggle_exam_active(exam_id: str, current_user: dict = Depends(get_current_user)):
-    """تفعيل/إلغاء تفعيل امتحان"""
+    """تفعيل/إلغاء تفعيل اختبار"""
     ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     
     exam = await db.online_exams.find_one({"id": exam_id})
     if not exam:
-        raise HTTPException(status_code=404, detail="الامتحان غير موجود")
+        raise HTTPException(status_code=404, detail="الاختبار غير موجود")
     
     new_status = not exam.get("is_active", True)
     await db.online_exams.update_one({"id": exam_id}, {"$set": {"is_active": new_status}})
     
-    return {"message": f"تم {'تفعيل' if new_status else 'إلغاء تفعيل'} الامتحان", "is_active": new_status}
+    return {"message": f"تم {'تفعيل' if new_status else 'إلغاء تفعيل'} الاختبار", "is_active": new_status}
 
 @api_router.post("/curriculum/{curriculum_id}/upload-pdf")
 async def upload_curriculum_pdf(curriculum_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
@@ -8840,6 +8932,7 @@ class TrackingSettingsUpdate(BaseModel):
     submission_start_time: Optional[str] = None  # HH:MM format (e.g., "21:00")
     submission_end_day: Optional[str] = None
     submission_end_time: Optional[str] = None  # HH:MM format (e.g., "08:50")
+    allow_late_submission: Optional[bool] = None  # استقبال المتأخرة بدون نقاط
 
 @api_router.get("/settings/tracking-submission")
 async def get_tracking_submission_settings(current_user: dict = Depends(get_current_user)):
@@ -8857,11 +8950,15 @@ async def get_tracking_submission_settings(current_user: dict = Depends(get_curr
             "submission_start_time": "21:00",
             "submission_end_day": "saturday",
             "submission_end_time": "08:50",
+            # استقبال الورقة المتأخرة بدون احتساب نقاط (إن أُطفئ تُرفض تمامًا)
+            "allow_late_submission": True,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         await db.settings.insert_one(default_settings)
         return default_settings
-    
+
+    # الإعدادات القديمة ما فيها هذا المفتاح — الافتراضي: نستقبل المتأخرة بلا نقاط
+    settings.setdefault("allow_late_submission", True)
     return settings
 
 @api_router.put("/settings/tracking-submission")
@@ -8876,6 +8973,9 @@ async def update_tracking_submission_settings(data: TrackingSettingsUpdate, curr
     
     if data.submission_enabled is not None:
         update_data["submission_enabled"] = data.submission_enabled
+
+    if data.allow_late_submission is not None:
+        update_data["allow_late_submission"] = bool(data.allow_late_submission)
     
     if data.submission_start_day is not None:
         if data.submission_start_day.lower() not in valid_days:

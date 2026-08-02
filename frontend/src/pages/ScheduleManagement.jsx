@@ -24,6 +24,8 @@ const ScheduleManagement = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [slotDialogOpen, setSlotDialogOpen] = useState(false);
+  const [viewMode, setViewMode] = useState('grid'); // grid = جدول مدرسي | list = قوائم
+  const [groupFilter, setGroupFilter] = useState('all');
   const [editingSlot, setEditingSlot] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -123,7 +125,7 @@ const ScheduleManagement = () => {
         toast.success('تم إضافة الحصة بنجاح');
       }
       setSlotDialogOpen(false);
-      setSlotData({ day: 'السبت', start_time: '', end_time: '', subject: '', description: '', group_id: '' });
+      setSlotData({ day: 'السبت', start_time: '', end_time: '', subject: '', period_name: '', description: '', group_id: '' });
       setEditingSlot(null);
       fetchScheduleDetails(selectedSchedule.id);
     } catch (error) {
@@ -149,15 +151,45 @@ const ScheduleManagement = () => {
       start_time: slot.start_time,
       end_time: slot.end_time,
       subject: slot.subject,
+      period_name: slot.period_name || '',
       description: slot.description || '',
       group_id: slot.group_id || ''
     });
     setSlotDialogOpen(true);
   };
 
-  const getSlotsByDay = (day) => {
-    return selectedSchedule?.slots?.filter(s => s.day === day).sort((a, b) => a.start_time.localeCompare(b.start_time)) || [];
-  };
+  // فلترة الحصص حسب المجموعة المختارة
+  const visibleSlots = (selectedSchedule?.slots || []).filter(
+    (s) => groupFilter === 'all' || s.group_id === groupFilter || !s.group_id
+  );
+
+  const getSlotsByDay = (day) =>
+    visibleSlots.filter((s) => s.day === day).sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+  const groupLabel = (groupId) =>
+    groupId ? (groups.find((g) => g.id === groupId)?.name || 'مجموعة') : 'كل المجموعات';
+
+  /* صفوف الجدول المدرسي: نجمّع الحصص حسب اسم الحصة إن وُجد، وإلا حسب وقت البداية.
+     كل صف بيحمل الحصص موزّعة على أيام الأسبوع. */
+  const periodRows = (() => {
+    const map = new Map();
+    for (const s of visibleSlots) {
+      const key = (s.period_name || '').trim() || s.start_time;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          label: (s.period_name || '').trim() || `${s.start_time}`,
+          time: `${s.start_time} – ${s.end_time}`,
+          sortKey: s.start_time,
+          byDay: {},
+        });
+      }
+      const row = map.get(key);
+      (row.byDay[s.day] = row.byDay[s.day] || []).push(s);
+      if (s.start_time < row.sortKey) row.sortKey = s.start_time;
+    }
+    return [...map.values()].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  })();
 
   const isAdmin = user?.role === 'admin';
 
@@ -403,6 +435,18 @@ const ScheduleManagement = () => {
                           </div>
                         </div>
                         <div>
+                          <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>اسم الحصة</Label>
+                          <Input
+                            value={slotData.period_name}
+                            onChange={(e) => setSlotData({ ...slotData, period_name: e.target.value })}
+                            placeholder="مثال: الحصة الأولى"
+                            className={isDark ? 'bg-slate-800 border-white/10 text-white' : ''}
+                          />
+                          <p className="text-xs text-slate-500 mt-1">
+                            الحصص اللي إلها نفس الاسم بتنعرض بنفس الصف في الجدول المدرسي.
+                          </p>
+                        </div>
+                        <div>
                           <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>الدرس / الموضوع</Label>
                           <Input
                             value={slotData.subject}
@@ -441,6 +485,93 @@ const ScheduleManagement = () => {
                 )}
               </CardHeader>
               <CardContent>
+                {/* أدوات العرض: شبكة مدرسية أو قوائم + فلتر مجموعة */}
+                <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
+                  <div className={`inline-flex rounded-lg border overflow-hidden ${isDark ? 'border-white/10' : 'border-slate-300'}`}>
+                    {[{ k: 'grid', t: 'جدول مدرسي' }, { k: 'list', t: 'قوائم' }].map((v) => (
+                      <button
+                        key={v.k}
+                        onClick={() => setViewMode(v.k)}
+                        className={`px-3 py-1.5 text-sm transition-colors ${
+                          viewMode === v.k
+                            ? 'bg-blue-600 text-white'
+                            : isDark ? 'bg-slate-800 text-slate-300 hover:bg-white/5' : 'bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {v.t}
+                      </button>
+                    ))}
+                  </div>
+                  <select
+                    value={groupFilter}
+                    onChange={(e) => setGroupFilter(e.target.value)}
+                    className={`p-2 rounded-lg border text-sm ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}
+                  >
+                    <option value="all">كل المجموعات</option>
+                    {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </div>
+
+                {/* عرض الجدول المدرسي: صفوف = الحصص، أعمدة = الأيام */}
+                {viewMode === 'grid' ? (
+                  periodRows.length === 0 ? (
+                    <p className={`text-center py-8 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا توجد حصص بعد</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm border-collapse">
+                        <thead>
+                          <tr>
+                            <th className={`p-2 text-right border ${isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
+                              الحصة
+                            </th>
+                            {DAYS.map((day) => (
+                              <th key={day} className={`p-2 text-center border min-w-[130px] ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-700'}`}>
+                                {day}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {periodRows.map((row) => (
+                            <tr key={row.key}>
+                              <td className={`p-2 border align-top ${isDark ? 'border-white/10 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
+                                <p className={`font-medium text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>{row.label}</p>
+                                {row.time && <p className="text-[10px] text-slate-500">{row.time}</p>}
+                              </td>
+                              {DAYS.map((day) => {
+                                const cellSlots = row.byDay[day] || [];
+                                return (
+                                  <td key={day} className={`p-1 border align-top ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+                                    {cellSlots.map((slot) => (
+                                      <div
+                                        key={slot.id}
+                                        className={`p-1.5 rounded mb-1 text-center ${isDark ? 'bg-blue-500/15 border border-blue-500/25' : 'bg-blue-50 border border-blue-200'}`}
+                                      >
+                                        <p className={`text-xs font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{slot.subject}</p>
+                                        <p className="text-[10px] text-slate-500">{slot.start_time}–{slot.end_time}</p>
+                                        <p className="text-[10px] text-purple-400 truncate">{groupLabel(slot.group_id)}</p>
+                                        {isAdmin && (
+                                          <div className="flex items-center justify-center gap-0.5 mt-1">
+                                            <button onClick={() => openEditSlot(slot)} className="text-blue-400 hover:text-blue-300" title="تعديل">
+                                              <Edit className="w-3 h-3" />
+                                            </button>
+                                            <button onClick={() => handleDeleteSlot(slot.id)} className="text-red-400 hover:text-red-300" title="حذف">
+                                              <Trash2 className="w-3 h-3" />
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                ) : (
                 <div className="space-y-4">
                   {DAYS.map((day) => {
                     const slots = getSlotsByDay(day);
@@ -501,6 +632,7 @@ const ScheduleManagement = () => {
                     <p className={`text-center py-8 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا توجد حصص بعد</p>
                   )}
                 </div>
+                )}
               </CardContent>
             </Card>
           ) : (

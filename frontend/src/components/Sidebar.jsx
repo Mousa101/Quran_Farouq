@@ -105,7 +105,7 @@ const Sidebar = () => {
         
         { to: '/fees', icon: DollarSign, label: 'الرسوم المالية' },
         { to: '/homework', icon: BookText, label: 'الواجبات' },
-        { to: '/exams', icon: Award, label: 'الامتحانات' },
+        { to: '/exams', icon: Award, label: 'الاختبارات' },
         { to: '/curriculum', icon: BookMarked, label: 'إدارة المنهج' },
         { to: '/schedule', icon: CalendarDays, label: 'إدارة الجداول' },
         { to: '/tracking-settings', icon: Settings, label: 'إعدادات ورق المتابعة' },
@@ -128,7 +128,7 @@ const Sidebar = () => {
         { to: '/tracking', icon: FileText, label: 'ورق المتابعة' },
         { to: '/recitations', icon: BookOpen, label: 'التسميع' },
         { to: '/homework', icon: BookText, label: 'الواجبات' },
-        { to: '/exams', icon: Award, label: 'الامتحانات' },
+        { to: '/exams', icon: Award, label: 'الاختبارات' },
         { to: '/sheikh-rankings', icon: TrendingUp, label: 'ترتيب طلابي' },
         { to: '/sheikh-analytics', icon: BarChart3, label: 'تحليلاتي' },
         { to: '/sheikh-message', icon: MessageSquare, label: 'مراسلة الطلاب' },
@@ -152,7 +152,7 @@ const Sidebar = () => {
       { to: '/my-warnings', icon: AlertTriangle, label: 'الإنذارات' },
       { to: '/fees', icon: DollarSign, label: 'المستحقات المالية' },
       { to: '/homework', icon: BookText, label: 'واجباتي' },
-      { to: '/exams', icon: Award, label: 'امتحاناتي' },
+      { to: '/exams', icon: Award, label: 'اختباراتي' },
       { to: '/edit-profile', icon: UserCog, label: 'تعديل بياناتي' },
       { to: '/notifications', icon: Bell, label: 'الإشعارات' },
     ];

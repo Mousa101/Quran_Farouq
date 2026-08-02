@@ -20,14 +20,6 @@ import {
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 // مفاصل القرآن الجديدة
-const MUFASSAL_LEVELS = [
-  { value: 5, label: 'مفصل 5 أجزاء', juz: [26, 27, 28, 29, 30], color: 'emerald' },
-  { value: 10, label: 'مفصل 10 أجزاء', juz: [21, 22, 23, 24, 25, 26, 27, 28, 29, 30], color: 'blue' },
-  { value: 15, label: 'مفصل 15 جزء', juz: [16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30], color: 'purple' },
-  { value: 20, label: 'مفصل 20 جزء', juz: Array.from({ length: 20 }, (_, i) => 11 + i), color: 'amber' },
-  { value: 25, label: 'مفصل 25 جزء', juz: Array.from({ length: 25 }, (_, i) => 6 + i), color: 'pink' },
-  { value: 30, label: 'مفصل 30 جزء (كامل)', juz: Array.from({ length: 30 }, (_, i) => 1 + i), color: 'red' }
-];
 
 const QURAN_JUZ = Array.from({ length: 30 }, (_, i) => i + 1);
 
@@ -52,27 +44,9 @@ const ExamsManagement = () => {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('mufassal'); // mufassal, tajweed, online
+  const [activeTab, setActiveTab] = useState('tajweed'); // tajweed, online
   const [viewFilter, setViewFilter] = useState('all');
   
-  const [quranForm, setQuranForm] = useState({
-    student_id: '',
-    exam_type: 'quran',
-    mufassal_level: 5,
-    juz_numbers: [],  // أجزاء متعددة
-    selected_juz: [],  // الأجزاء المختارة
-    surah_name: '',
-    page_from: '',
-    page_to: '',
-    warning_count: 0,  // التنبيهات (-0.5 لكل تنبيه)
-    error_count: 0,    // الأخطاء (-2 لكل خطأ)
-    tajweed_errors: 0, // أخطاء التجويد (-0.5 لكل خطأ)
-    pronunciation_errors: 0,
-    memorization_errors: 0,
-    result: 'pending', // 'pass', 'fail', 'pending'
-    grade: 100,        // الدرجة من 100
-    notes: ''
-  });
 
   const [tajweedForm, setTajweedForm] = useState({
     student_id: '',
@@ -119,63 +93,6 @@ const ExamsManagement = () => {
     }
   };
 
-  const handleMufassalSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      // حساب الدرجة من 100
-      // كل تنبيه = -0.5، كل خطأ = -2، كل خطأ تجويد = -0.5
-      let calculatedGrade = 100;
-      calculatedGrade -= quranForm.warning_count * 0.5;     // التنبيهات
-      calculatedGrade -= quranForm.error_count * 2;          // الأخطاء
-      calculatedGrade -= quranForm.tajweed_errors * 0.5;     // أخطاء التجويد
-      calculatedGrade = Math.max(0, calculatedGrade);        // لا تنزل تحت الصفر
-      
-      // تحديد ناجح أو راسب
-      const result = quranForm.result;
-      
-      await axios.post(`${API}/admin-exams`, {
-        student_id: quranForm.student_id,
-        exam_type: 'quran',
-        juz_numbers: quranForm.selected_juz.length > 0 ? quranForm.selected_juz : null,
-        surah_name: quranForm.surah_name || null,
-        page_from: quranForm.page_from || null,
-        page_to: quranForm.page_to || null,
-        warning_count: quranForm.warning_count,
-        error_count: quranForm.error_count,
-        tajweed_errors: quranForm.tajweed_errors,
-        pronunciation_errors: quranForm.pronunciation_errors,
-        memorization_errors: quranForm.memorization_errors,
-        result: result,
-        grade: calculatedGrade,
-        notes: quranForm.notes
-      });
-      
-      toast.success('تم تسجيل امتحان المفصل بنجاح');
-      setDialogOpen(false);
-      // إعادة تعيين النموذج
-      setQuranForm({
-        student_id: '',
-        exam_type: 'quran',
-        mufassal_level: 5,
-        juz_numbers: [],
-        selected_juz: [],
-        surah_name: '',
-        page_from: '',
-        page_to: '',
-        warning_count: 0,
-        error_count: 0,
-        tajweed_errors: 0,
-        pronunciation_errors: 0,
-        memorization_errors: 0,
-        result: 'pending',
-        grade: 100,
-        notes: ''
-      });
-      fetchData();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'فشل في تسجيل الامتحان');
-    }
-  };
 
   const handleTajweedSubmit = async (e) => {
     e.preventDefault();
@@ -196,20 +113,20 @@ const ExamsManagement = () => {
         total_score: Math.round(totalScore)
       });
       
-      toast.success('تم تسجيل امتحان التجويد بنجاح');
+      toast.success('تم تسجيل اختبار التجويد بنجاح');
       setDialogOpen(false);
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'فشل في تسجيل الامتحان');
+      toast.error(error.response?.data?.detail || 'فشل في تسجيل الاختبار');
     }
   };
 
   const handleDelete = async (examId, type) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الامتحان؟')) return;
+    if (!confirm('هل أنت متأكد من حذف هذا الاختبار؟')) return;
     try {
       const endpoint = type === 'tajweed' ? 'tajweed-exams' : type === 'online' ? 'online-exams' : 'admin-exams';
       await axios.delete(`${API}/${endpoint}/${examId}`);
-      toast.success('تم حذف الامتحان');
+      toast.success('تم حذف الاختبار');
       fetchData();
     } catch (error) {
       toast.error('فشل في الحذف');
@@ -241,10 +158,6 @@ const ExamsManagement = () => {
     }
   };
 
-  const getMufassalColor = (level) => {
-    const found = MUFASSAL_LEVELS.find(m => m.value === level);
-    return found?.color || 'slate';
-  };
 
   if (loading) {
     return (
@@ -264,9 +177,9 @@ const ExamsManagement = () => {
               <Award className="w-6 h-6 text-amber-400" />
             </div>
             <div>
-              <h1 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>الامتحانات</h1>
+              <h1 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>الاختبارات</h1>
               <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                {isTeacher ? 'إدارة الامتحانات والتقييمات' : 'امتحاناتي ونتائجي'}
+                {isTeacher ? 'إدارة الاختبارات والتقييمات' : 'اختباراتي ونتائجي'}
               </p>
             </div>
           </div>
@@ -276,239 +189,26 @@ const ExamsManagement = () => {
               <Link to="/online-exams">
                 <Button variant="outline" className="border-indigo-500/50 text-indigo-400 hover:bg-indigo-500/10">
                   <FileQuestion className="w-4 h-4 ml-2" />
-                  امتحانات إلكترونية
+                  اختبارات إلكترونية
                 </Button>
               </Link>
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="bg-amber-600 hover:bg-amber-700">
                     <Plus className="w-4 h-4 ml-2" />
-                    تسجيل امتحان
+                    تسجيل اختبار
                   </Button>
                 </DialogTrigger>
                 <DialogContent className={`max-w-2xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white'}`}>
                   <DialogHeader>
-                    <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>تسجيل امتحان جديد</DialogTitle>
+                    <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>تسجيل اختبار جديد</DialogTitle>
                   </DialogHeader>
                   
                   <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className={`grid w-full grid-cols-2 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                      <TabsTrigger value="mufassal">امتحان مفصل</TabsTrigger>
-                      <TabsTrigger value="tajweed">امتحان تجويد</TabsTrigger>
+                    <TabsList className={`grid w-full grid-cols-1 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                      <TabsTrigger value="tajweed">اختبار تجويد</TabsTrigger>
                     </TabsList>
 
-                    {/* امتحان المفصل */}
-                    <TabsContent value="mufassal" className="mt-4">
-                      <form onSubmit={handleMufassalSubmit} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>الطالب</Label>
-                            <select
-                              value={quranForm.student_id}
-                              onChange={(e) => setQuranForm({ ...quranForm, student_id: e.target.value })}
-                              required
-                              className={`w-full p-2 rounded-md border ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}
-                            >
-                              <option value="">اختر الطالب</option>
-                              {students.map((s) => (
-                                <option key={s.id} value={s.id}>{s.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>مستوى المفصل</Label>
-                            <select
-                              value={quranForm.mufassal_level}
-                              onChange={(e) => {
-                                const level = parseInt(e.target.value);
-                                const mufassal = MUFASSAL_LEVELS.find(m => m.value === level);
-                                setQuranForm({ 
-                                  ...quranForm, 
-                                  mufassal_level: level,
-                                  selected_juz: []
-                                });
-                              }}
-                              className={`w-full p-2 rounded-md border ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}
-                            >
-                              {MUFASSAL_LEVELS.map((m) => (
-                                <option key={m.value} value={m.value}>{m.label}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-
-                        {/* اختيار الأجزاء المتعددة - كل أجزاء القرآن */}
-                        <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                          <Label className={`font-bold mb-2 block ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                            اختر الأجزاء (يمكن اختيار أكثر من جزء)
-                          </Label>
-                          <p className={`text-xs mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                            كل أجزاء القرآن الكريم (1-30)
-                          </p>
-                          <div className="grid grid-cols-6 sm:grid-cols-10 gap-2 mt-2">
-                            {Array.from({ length: 30 }, (_, i) => i + 1).map((j) => (
-                              <button
-                                key={j}
-                                type="button"
-                                onClick={() => {
-                                  const newSelected = quranForm.selected_juz.includes(j)
-                                    ? quranForm.selected_juz.filter(x => x !== j)
-                                    : [...quranForm.selected_juz, j].sort((a,b) => a-b);
-                                  setQuranForm({ ...quranForm, selected_juz: newSelected });
-                                }}
-                                className={`px-2 py-1 rounded-lg text-xs font-medium transition-all ${
-                                  quranForm.selected_juz.includes(j)
-                                    ? 'bg-amber-500 text-white'
-                                    : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                                }`}
-                              >
-                                {j}
-                              </button>
-                            ))}
-                          </div>
-                          {quranForm.selected_juz.length > 0 && (
-                            <p className={`mt-2 text-sm ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
-                              الأجزاء المختارة: {quranForm.selected_juz.join(', ')}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>من صفحة (اختياري)</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="604"
-                              value={quranForm.page_from}
-                              onChange={(e) => setQuranForm({ ...quranForm, page_from: e.target.value })}
-                              className={isDark ? 'bg-slate-800 border-white/10 text-white' : ''}
-                            />
-                          </div>
-                          <div>
-                            <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>إلى صفحة (اختياري)</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="604"
-                              value={quranForm.page_to}
-                              onChange={(e) => setQuranForm({ ...quranForm, page_to: e.target.value })}
-                              className={isDark ? 'bg-slate-800 border-white/10 text-white' : ''}
-                            />
-                          </div>
-                        </div>
-
-                        {/* التقييم من 100 */}
-                        <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                          <h4 className={`font-bold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                            التقييم من 100
-                          </h4>
-                          <p className={`text-xs mb-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                            كل تنبيه = -0.5 | كل خطأ = -2 | كل خطأ تجويد = -0.5
-                          </p>
-                          <div className="grid grid-cols-3 gap-4">
-                            <div>
-                              <Label className={`flex items-center gap-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                                <AlertTriangle className="w-3 h-3 text-yellow-400" />
-                                تنبيهات (-0.5)
-                              </Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                value={quranForm.warning_count}
-                                onChange={(e) => setQuranForm({ ...quranForm, warning_count: parseInt(e.target.value) || 0 })}
-                                className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
-                              />
-                            </div>
-                            <div>
-                              <Label className={`flex items-center gap-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                                <XCircle className="w-3 h-3 text-red-400" />
-                                أخطاء (-2)
-                              </Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                value={quranForm.error_count}
-                                onChange={(e) => setQuranForm({ ...quranForm, error_count: parseInt(e.target.value) || 0 })}
-                                className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
-                              />
-                            </div>
-                            <div>
-                              <Label className={`flex items-center gap-1 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                                <BookOpen className="w-3 h-3 text-blue-400" />
-                                تجويد (-0.5)
-                              </Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                value={quranForm.tajweed_errors}
-                                onChange={(e) => setQuranForm({ ...quranForm, tajweed_errors: parseInt(e.target.value) || 0 })}
-                                className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
-                              />
-                            </div>
-                          </div>
-                          {/* عرض الدرجة المحسوبة */}
-                          <div className={`mt-4 p-3 rounded-lg text-center ${isDark ? 'bg-slate-700/50' : 'bg-slate-100'}`}>
-                            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الدرجة المتوقعة</p>
-                            <p className={`text-2xl font-bold ${
-                              (100 - quranForm.warning_count * 0.5 - quranForm.error_count * 2 - quranForm.tajweed_errors * 0.5) >= 50 
-                                ? 'text-emerald-400' 
-                                : 'text-red-400'
-                            }`}>
-                              {Math.max(0, 100 - quranForm.warning_count * 0.5 - quranForm.error_count * 2 - quranForm.tajweed_errors * 0.5).toFixed(1)}%
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* النتيجة: ناجح أو راسب */}
-                        <div>
-                          <Label className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>النتيجة</Label>
-                          <div className="flex gap-4 mt-2">
-                            <button
-                              type="button"
-                              onClick={() => setQuranForm({ ...quranForm, result: 'pass' })}
-                              className={`flex-1 p-3 rounded-xl flex items-center justify-center gap-2 transition-all ${
-                                quranForm.result === 'pass'
-                                  ? 'bg-emerald-500 text-white'
-                                  : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                              }`}
-                            >
-                              <CheckCircle className="w-5 h-5" />
-                              ناجح
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setQuranForm({ ...quranForm, result: 'fail' })}
-                              className={`flex-1 p-3 rounded-xl flex items-center justify-center gap-2 transition-all ${
-                                quranForm.result === 'fail'
-                                  ? 'bg-red-500 text-white'
-                                  : isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                              }`}
-                            >
-                              <XCircle className="w-5 h-5" />
-                              راسب
-                            </button>
-                          </div>
-                        </div>
-
-                        <div>
-                          <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>ملاحظات</Label>
-                          <Textarea
-                            value={quranForm.notes}
-                            onChange={(e) => setQuranForm({ ...quranForm, notes: e.target.value })}
-                            className={isDark ? 'bg-slate-800 border-white/10 text-white' : ''}
-                          />
-                        </div>
-
-                        <DialogFooter>
-                          <Button type="submit" className="bg-amber-600 hover:bg-amber-700">
-                            تسجيل الامتحان
-                          </Button>
-                        </DialogFooter>
-                      </form>
-                    </TabsContent>
-
-                    {/* امتحان التجويد */}
                     <TabsContent value="tajweed" className="mt-4">
                       <form onSubmit={handleTajweedSubmit} className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
@@ -586,7 +286,7 @@ const ExamsManagement = () => {
 
                         <DialogFooter>
                           <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                            تسجيل الامتحان
+                            تسجيل الاختبار
                           </Button>
                         </DialogFooter>
                       </form>
@@ -599,79 +299,21 @@ const ExamsManagement = () => {
         </div>
       </div>
 
-      {/* مفاصل القرآن */}
-      {isTeacher && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {MUFASSAL_LEVELS.map((mufassal) => {
-            const count = exams.filter(e => e.mufassal_level === mufassal.value).length;
-            return (
-              <Card key={mufassal.value} className={`${isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'} cursor-pointer hover:border-${mufassal.color}-500/50 transition-all`}>
-                <CardContent className="p-4 text-center">
-                  <BookOpen className={`w-8 h-8 mx-auto text-${mufassal.color}-400 mb-2`} />
-                  <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{mufassal.label}</p>
-                  <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {count} امتحان
-                  </p>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
 
-      {/* Tabs للامتحانات */}
-      <Tabs defaultValue="mufassal" className="w-full">
-        <TabsList className={`grid w-full grid-cols-3 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-          <TabsTrigger value="mufassal">امتحانات المفصل ({exams.length})</TabsTrigger>
-          <TabsTrigger value="tajweed">امتحانات التجويد ({tajweedExams.length})</TabsTrigger>
-          <TabsTrigger value="online">امتحانات إلكترونية ({onlineExams.length})</TabsTrigger>
+      {/* Tabs للاختبارات */}
+      <Tabs defaultValue="tajweed" className="w-full">
+        <TabsList className={`grid w-full grid-cols-2 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+          <TabsTrigger value="tajweed">اختبارات التجويد ({tajweedExams.length})</TabsTrigger>
+          <TabsTrigger value="online">اختبارات إلكترونية ({onlineExams.length})</TabsTrigger>
         </TabsList>
 
-        {/* امتحانات المفصل */}
-        <TabsContent value="mufassal">
-          <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-            <CardContent className="p-0">
-              {exams.length === 0 ? (
-                <p className={`p-8 text-center ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا توجد امتحانات مفصل</p>
-              ) : (
-                <div className={`divide-y ${isDark ? 'divide-white/5' : 'divide-slate-100'}`}>
-                  {exams.map((exam) => (
-                    <div key={exam.id} className={`p-4 flex items-center justify-between ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'}`}>
-                      <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-xl bg-${getMufassalColor(exam.mufassal_level)}-500/20 flex items-center justify-center`}>
-                          <BookOpen className={`w-6 h-6 text-${getMufassalColor(exam.mufassal_level)}-400`} />
-                        </div>
-                        <div>
-                          <h3 className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{getStudentName(exam.student_id)}</h3>
-                          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                            مفصل {exam.mufassal_level || exam.juz_number} أجزاء • الجزء {exam.juz_number}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Badge className={getResultBadge(exam.result)}>
-                          {getResultLabel(exam.result)}
-                        </Badge>
-                        {isTeacher && (
-                          <Button variant="ghost" size="sm" onClick={() => handleDelete(exam.id, 'quran')} className="text-red-400">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        {/* امتحانات التجويد */}
+        {/* اختبارات التجويد */}
         <TabsContent value="tajweed">
           <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
             <CardContent className="p-0">
               {tajweedExams.length === 0 ? (
-                <p className={`p-8 text-center ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا توجد امتحانات تجويد</p>
+                <p className={`p-8 text-center ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا توجد اختبارات تجويد</p>
               ) : (
                 <div className={`divide-y ${isDark ? 'divide-white/5' : 'divide-slate-100'}`}>
                   {tajweedExams.map((exam) => (
@@ -706,15 +348,15 @@ const ExamsManagement = () => {
           </Card>
         </TabsContent>
 
-        {/* امتحانات إلكترونية */}
+        {/* اختبارات إلكترونية */}
         <TabsContent value="online">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {onlineExams.length === 0 ? (
               <p className={`col-span-full p-8 text-center ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                لا توجد امتحانات إلكترونية
+                لا توجد اختبارات إلكترونية
                 {isTeacher && (
                   <Link to="/online-exams" className="block mt-2 text-indigo-400 hover:underline">
-                    إنشاء امتحان إلكتروني جديد
+                    إنشاء اختبار إلكتروني جديد
                   </Link>
                 )}
               </p>

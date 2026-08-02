@@ -35,7 +35,7 @@ const OnlineExams = () => {
   const [examResults, setExamResults] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   
-  // حالة إنشاء الامتحان
+  // حالة إنشاء الاختبار
   const [examForm, setExamForm] = useState({
     title: '',
     description: '',
@@ -53,7 +53,7 @@ const OnlineExams = () => {
     points: 1
   });
   
-  // حالة تقديم الامتحان
+  // حالة تقديم الاختبار
   const [studentAnswers, setStudentAnswers] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
@@ -114,7 +114,7 @@ const OnlineExams = () => {
 
   const handleCreateExam = async () => {
     if (!examForm.title.trim()) {
-      toast.error('يرجى كتابة عنوان الامتحان');
+      toast.error('يرجى كتابة عنوان الاختبار');
       return;
     }
     if (examForm.questions.length === 0) {
@@ -125,12 +125,12 @@ const OnlineExams = () => {
     setSubmitting(true);
     try {
       await axios.post(`${API}/online-exams`, examForm);
-      toast.success('تم إنشاء الامتحان بنجاح');
+      toast.success('تم إنشاء الاختبار بنجاح');
       setCreateDialogOpen(false);
       resetExamForm();
       fetchExams();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'فشل في إنشاء الامتحان');
+      toast.error(error.response?.data?.detail || 'فشل في إنشاء الاختبار');
     } finally {
       setSubmitting(false);
     }
@@ -157,7 +157,7 @@ const OnlineExams = () => {
     try {
       const res = await axios.get(`${API}/online-exams/${exam.id}`);
       if (res.data.already_submitted) {
-        toast.error('لقد قدمت هذا الامتحان سابقاً');
+        toast.error('لقد قدمت هذا الاختبار سابقاً');
         return;
       }
       setSelectedExam(res.data);
@@ -165,7 +165,7 @@ const OnlineExams = () => {
       setCurrentQuestionIndex(0);
       setTakeExamDialogOpen(true);
     } catch (error) {
-      toast.error('فشل في تحميل الامتحان');
+      toast.error('فشل في تحميل الاختبار');
     }
   };
 
@@ -186,14 +186,14 @@ const OnlineExams = () => {
       
       toast.success(
         res.data.passed 
-          ? `مبارك! نجحت في الامتحان بدرجة ${res.data.score}%` 
+          ? `مبارك! نجحت في الاختبار بدرجة ${res.data.score}%` 
           : `للأسف لم تنجح. الدرجة: ${res.data.score}%`
       );
       
       setTakeExamDialogOpen(false);
       fetchExams();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'فشل في تقديم الامتحان');
+      toast.error(error.response?.data?.detail || 'فشل في تقديم الاختبار');
     } finally {
       setSubmitting(false);
     }
@@ -210,10 +210,10 @@ const OnlineExams = () => {
   };
 
   const handleDeleteExam = async (examId) => {
-    if (!confirm('هل أنت متأكد من حذف هذا الامتحان؟')) return;
+    if (!confirm('هل أنت متأكد من حذف هذا الاختبار؟')) return;
     try {
       await axios.delete(`${API}/online-exams/${examId}`);
-      toast.success('تم حذف الامتحان');
+      toast.success('تم حذف الاختبار');
       fetchExams();
     } catch (error) {
       toast.error('فشل في الحذف');
@@ -249,10 +249,10 @@ const OnlineExams = () => {
             </div>
             <div>
               <h1 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                الامتحانات الإلكترونية
+                الاختبارات الإلكترونية
               </h1>
               <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                {isTeacher ? 'إنشاء وإدارة الامتحانات' : 'اختبر معلوماتك'}
+                {isTeacher ? 'إنشاء وإدارة الاختبارات' : 'اختبر معلوماتك'}
               </p>
             </div>
           </div>
@@ -262,25 +262,25 @@ const OnlineExams = () => {
               <DialogTrigger asChild>
                 <Button className="bg-indigo-600 hover:bg-indigo-700">
                   <Plus className="w-4 h-4 ml-2" />
-                  إنشاء امتحان جديد
+                  إنشاء اختبار جديد
                 </Button>
               </DialogTrigger>
               <DialogContent className={`max-w-4xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white'}`}>
                 <DialogHeader>
-                  <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>إنشاء امتحان إلكتروني</DialogTitle>
+                  <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>إنشاء اختبار إلكتروني</DialogTitle>
                 </DialogHeader>
                 
                 <div className="space-y-6">
-                  {/* معلومات الامتحان */}
+                  {/* معلومات الاختبار */}
                   <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                    <h3 className={`font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>معلومات الامتحان</h3>
+                    <h3 className={`font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>معلومات الاختبار</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="col-span-2">
-                        <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>عنوان الامتحان *</Label>
+                        <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>عنوان الاختبار *</Label>
                         <Input
                           value={examForm.title}
                           onChange={(e) => setExamForm({ ...examForm, title: e.target.value })}
-                          placeholder="مثال: امتحان أحكام النون الساكنة"
+                          placeholder="مثال: اختبار أحكام النون الساكنة"
                           className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                         />
                       </div>
@@ -289,7 +289,7 @@ const OnlineExams = () => {
                         <Textarea
                           value={examForm.description}
                           onChange={(e) => setExamForm({ ...examForm, description: e.target.value })}
-                          placeholder="وصف مختصر للامتحان..."
+                          placeholder="وصف مختصر للاختبار..."
                           className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                         />
                       </div>
@@ -422,7 +422,7 @@ const OnlineExams = () => {
                 <DialogFooter className="mt-6">
                   <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>إلغاء</Button>
                   <Button onClick={handleCreateExam} disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700">
-                    {submitting ? 'جاري الإنشاء...' : 'إنشاء الامتحان'}
+                    {submitting ? 'جاري الإنشاء...' : 'إنشاء الاختبار'}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -431,12 +431,12 @@ const OnlineExams = () => {
         </div>
       </div>
 
-      {/* قائمة الامتحانات */}
+      {/* قائمة الاختبارات */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {exams.length === 0 ? (
           <div className={`col-span-full text-center py-12 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
             <FileQuestion className="w-16 h-16 mx-auto mb-4 opacity-50" />
-            <p>لا توجد امتحانات متاحة</p>
+            <p>لا توجد اختبارات متاحة</p>
           </div>
         ) : (
           exams.map((exam) => (
@@ -504,7 +504,7 @@ const OnlineExams = () => {
                     ) : (
                       <Button onClick={() => handleStartExam(exam)} className="flex-1 bg-indigo-600 hover:bg-indigo-700">
                         <Play className="w-4 h-4 ml-2" />
-                        بدء الامتحان
+                        بدء الاختبار
                       </Button>
                     )
                   ) : (
@@ -532,7 +532,7 @@ const OnlineExams = () => {
         )}
       </div>
 
-      {/* نافذة تقديم الامتحان */}
+      {/* نافذة تقديم الاختبار */}
       <Dialog open={takeExamDialogOpen} onOpenChange={setTakeExamDialogOpen}>
         <DialogContent className={`max-w-2xl ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white'}`}>
           <DialogHeader>
@@ -618,7 +618,7 @@ const OnlineExams = () => {
                 
                 {currentQuestionIndex === selectedExam.questions.length - 1 ? (
                   <Button onClick={handleSubmitExam} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700">
-                    {submitting ? 'جاري التقديم...' : 'تقديم الامتحان'}
+                    {submitting ? 'جاري التقديم...' : 'تقديم الاختبار'}
                   </Button>
                 ) : (
                   <Button

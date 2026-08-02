@@ -70,7 +70,7 @@ const SheikhAnalytics = () => {
             <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center"><BarChart3 className="w-6 h-6 text-emerald-400" /></div>
             <div>
               <h1 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>تحليلاتي</h1>
-              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>اتجاهات مجموعاتي · الطلاب المتعثّرون · الواجبات والامتحانات</p>
+              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>اتجاهات مجموعاتي · الطلاب المتعثّرون · الواجبات والاختبارات</p>
             </div>
           </div>
           <select value={groupId} onChange={(e) => setGroupId(e.target.value)} className={`p-2 rounded-lg border text-sm ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}>
@@ -117,15 +117,15 @@ const SheikhAnalytics = () => {
             )}
           </div>
 
-          {/* T5 - مؤشرات الواجبات والامتحانات */}
+          {/* T5 - مؤشرات الواجبات والاختبارات */}
           {assign && (
             <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
-              <CardHeader className="pb-2"><CardTitle className={`text-base flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}><ClipboardList className="w-4 h-4 text-blue-400" />الواجبات والامتحانات</CardTitle></CardHeader>
+              <CardHeader className="pb-2"><CardTitle className={`text-base flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}><ClipboardList className="w-4 h-4 text-blue-400" />الواجبات والاختبارات</CardTitle></CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="text-center p-3 rounded-lg bg-blue-500/10"><p className="text-xs text-slate-400">نسبة تسليم الواجبات</p><p className="text-lg font-bold text-blue-400">{assign.homework.submission_rate}%</p><p className="text-xs text-slate-500">{assign.homework.submitted}/{assign.homework.total_assigned}</p></div>
                   <div className="text-center p-3 rounded-lg bg-emerald-500/10"><p className="text-xs text-slate-400">متوسط درجات الواجبات</p><p className="text-lg font-bold text-emerald-400">{assign.homework.avg_grade}</p></div>
-                  <div className="text-center p-3 rounded-lg bg-purple-500/10"><p className="text-xs text-slate-400">متوسط درجات الامتحانات</p><p className="text-lg font-bold text-purple-400">{assign.exams.avg_score}%</p><p className="text-xs text-slate-500">{assign.exams.attempts} محاولة</p></div>
+                  <div className="text-center p-3 rounded-lg bg-purple-500/10"><p className="text-xs text-slate-400">متوسط درجات الاختبارات</p><p className="text-lg font-bold text-purple-400">{assign.exams.avg_score}%</p><p className="text-xs text-slate-500">{assign.exams.attempts} محاولة</p></div>
                   <div className="text-center p-3 rounded-lg bg-amber-500/10"><p className="text-xs text-slate-400">نسبة النجاح</p><p className="text-lg font-bold text-amber-400">{assign.exams.pass_rate}%</p></div>
                 </div>
               </CardContent>

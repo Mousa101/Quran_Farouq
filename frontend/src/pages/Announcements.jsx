@@ -84,6 +84,7 @@ const Announcements = () => {
               <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>الجمهور</Label>
               <select value={audience} onChange={(e) => setAudience(e.target.value)} className={`block p-2 rounded-lg border text-sm ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}>
                 <option value="sheikhs">المشرفون فقط</option>
+                <option value="students">الطلاب فقط</option>
                 <option value="all">المشرفون والطلاب</option>
               </select>
             </div>
@@ -107,7 +108,13 @@ const Announcements = () => {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className={`font-bold text-sm ${isDark ? 'text-white' : 'text-slate-900'}`}>{a.title}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${a.audience === 'all' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'}`}>{a.audience === 'all' ? 'الكل' : 'المشرفون'}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        a.audience === 'all' ? 'bg-blue-500/20 text-blue-400'
+                        : a.audience === 'students' ? 'bg-purple-500/20 text-purple-400'
+                        : 'bg-emerald-500/20 text-emerald-400'
+                      }`}>
+                        {a.audience === 'all' ? 'الكل' : a.audience === 'students' ? 'الطلاب' : 'المشرفون'}
+                      </span>
                     </div>
                     <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{a.message}</p>
                     <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmt(a.created_at)}</p>

@@ -31,6 +31,15 @@ const TRACKING_PERIODS = [
   { key: 'term', label: 'الفصل' },
 ];
 
+// فلتر المشاركة في المسابقات (من التقييم الأولي)
+const COMPETITION_FILTERS = [
+  { key: 'all', label: 'الكل' },
+  { key: 'annual', label: '🏆 المسابقة السنوية' },
+  { key: 'young', label: '⭐ الحافظ الصغير' },
+  { key: 'any', label: 'أي مسابقة' },
+  { key: 'none', label: 'بدون مشاركة' },
+];
+
 const StudentStats = () => {
   const { isDark } = useTheme();
   const [groups, setGroups] = useState([]);
@@ -41,6 +50,7 @@ const StudentStats = () => {
   const [sortBy, setSortBy] = useState('total_memorization'); // الفلتر الثاني
   const [order, setOrder] = useState('desc');       // الفلتر الثالث
   const [trackingPeriod, setTrackingPeriod] = useState('term'); // مدى أعمدة ورق المتابعة
+  const [competition, setCompetition] = useState('all'); // فلتر المسابقات
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -51,7 +61,7 @@ const StudentStats = () => {
   useEffect(() => {
     fetchRows();
     // eslint-disable-next-line
-  }, [groupId, sortBy, order, trackingPeriod]);
+  }, [groupId, sortBy, order, trackingPeriod, competition]);
 
   const params = (withStudent) => {
     const p = new URLSearchParams();
@@ -60,6 +70,7 @@ const StudentStats = () => {
     p.append('sort_by', sortBy);
     p.append('order', order);
     p.append('tracking_period', trackingPeriod);
+    if (competition !== 'all') p.append('competition', competition);
     return p.toString();
   };
 
@@ -153,6 +164,17 @@ const StudentStats = () => {
               {SORT_FIELDS.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
             </select>
           </div>
+          {/* فلتر المسابقات */}
+          <div>
+            <label className={`block text-xs mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المسابقات</label>
+            <select
+              value={competition}
+              onChange={(e) => setCompetition(e.target.value)}
+              className={`p-2 rounded-lg border text-sm ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}
+            >
+              {COMPETITION_FILTERS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+            </select>
+          </div>
           {/* مدى أعمدة ورق المتابعة */}
           <div>
             <label className={`block text-xs mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>ورق المتابعة خلال</label>
@@ -209,6 +231,7 @@ const StudentStats = () => {
                     <th className={`${th} ${activeCol('tracking_prayers')}`}>🕌 الصلوات</th>
                     <th className={`${th} ${activeCol('tracking_sitting')}`}>📖 الجلوس مع القرآن</th>
                     <th className={th}>آخر ورقة</th>
+                    <th className={th}>🏆 المسابقات</th>
                     <th className={`${th} ${activeCol('age')}`}>العمر</th>
                     <th className={`${th} ${activeCol('grade')}`}>الصف</th>
                     <th className={`${th} ${activeCol('average')}`}>المعدل</th>
@@ -232,6 +255,26 @@ const StudentStats = () => {
                           <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{r.last_sheet.week_start}</span>
                         ) : (
                           <span className={isDark ? 'text-slate-600' : 'text-slate-400'}>لم يسلّم</span>
+                        )}
+                      </td>
+                      <td className="p-2">
+                        {(r.annual_competition || r.young_hafiz) ? (
+                          <div className="flex flex-col gap-0.5">
+                            {r.annual_competition && (
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 whitespace-nowrap"
+                                    title={`المسابقة السنوية — أجزاء: ${(r.annual_competition_juz || []).join('، ')}`}>
+                                🏆 سنوية ({(r.annual_competition_juz || []).length})
+                              </span>
+                            )}
+                            {r.young_hafiz && (
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 whitespace-nowrap"
+                                    title={`الحافظ الصغير — أجزاء: ${(r.young_hafiz_juz || []).join('، ')}`}>
+                                ⭐ الحافظ الصغير ({(r.young_hafiz_juz || []).length})
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className={isDark ? 'text-slate-600' : 'text-slate-400'}>—</span>
                         )}
                       </td>
                       <td className={`p-2 ${activeCol('age')}`}>{r.age ?? '—'}</td>

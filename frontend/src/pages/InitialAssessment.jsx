@@ -8,7 +8,7 @@ import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
-import { BookOpen, User, CheckCircle, Loader2, AlertCircle, Star, RefreshCw, History } from 'lucide-react';
+import { BookOpen, User, CheckCircle, Loader2, AlertCircle, Star, RefreshCw, History, Trophy } from 'lucide-react';
 import { toast } from 'sonner';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -20,7 +20,12 @@ const EMPTY_FORM = {
   notes: '',
   weakJuz: [],
   strongJuz: [],
-  adminJuz: []
+  adminJuz: [],
+  // المشاركة في المسابقات
+  annualCompetition: false,
+  annualJuz: [],
+  youngHafiz: false,
+  youngHafizJuz: []
 };
 
 // شبكة اختيار الأجزاء (1-30)
@@ -97,7 +102,11 @@ const InitialAssessment = () => {
     notes: '',
     weakJuz: student.weak_juz || [],
     strongJuz: student.strong_juz || [],
-    adminJuz: student.administrative_test_juz || []
+    adminJuz: student.administrative_test_juz || [],
+    annualCompetition: !!student.annual_competition,
+    annualJuz: student.annual_competition_juz || [],
+    youngHafiz: !!student.young_hafiz,
+    youngHafizJuz: student.young_hafiz_juz || []
   });
 
   const openAssessmentDialog = useCallback((student) => {
@@ -173,6 +182,15 @@ const InitialAssessment = () => {
       toast.error(`الأجزاء التالية قوية وضعيفة معاً: ${both.join('، ')} — اختر واحدة فقط`);
       return;
     }
+    // مسابقة مُحدَّدة بلا أجزاء = تسجيل ناقص
+    if (formData.annualCompetition && formData.annualJuz.length === 0) {
+      toast.error('حدّد الأجزاء التي شارك فيها الطالب في المسابقة السنوية');
+      return;
+    }
+    if (formData.youngHafiz && formData.youngHafizJuz.length === 0) {
+      toast.error('حدّد الأجزاء التي شارك فيها الطالب في الحافظ الصغير');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -184,7 +202,11 @@ const InitialAssessment = () => {
         notes: formData.notes,
         weak_juz: formData.weakJuz,
         strong_juz: formData.strongJuz,
-        administrative_test_juz: formData.adminJuz
+        administrative_test_juz: formData.adminJuz,
+        annual_competition: formData.annualCompetition,
+        annual_competition_juz: formData.annualCompetition ? formData.annualJuz : [],
+        young_hafiz: formData.youngHafiz,
+        young_hafiz_juz: formData.youngHafiz ? formData.youngHafizJuz : []
       });
 
       toast.success(isReassessment ? 'تم تسجيل إعادة التقييم بنجاح' : 'تم تسجيل التقييم الأولي بنجاح');
@@ -414,6 +436,51 @@ const InitialAssessment = () => {
                 {formData.adminJuz.length} جزء مختبَر إدارياً
                 {formData.adminJuz.length % 5 !== 0 && ' — يجب أن يكون العدد من مضاعفات 5'}
               </p>
+            </div>
+
+            {/* المشاركة في المسابقات */}
+            <div className="space-y-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
+              <Label className="text-amber-400 flex items-center gap-2">
+                <Trophy className="w-4 h-4" />
+                المشاركة في المسابقات
+              </Label>
+
+              {[
+                { key: 'annualCompetition', juzKey: 'annualJuz', label: 'شارك في المسابقة السنوية', color: 'bg-amber-500 text-white' },
+                { key: 'youngHafiz', juzKey: 'youngHafizJuz', label: 'شارك في مسابقة الحافظ الصغير', color: 'bg-cyan-500 text-white' },
+              ].map((c) => (
+                <div key={c.key} className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={formData[c.key]}
+                      onChange={(e) => setFormData({
+                        ...formData,
+                        [c.key]: e.target.checked,
+                        // إلغاء التحديد بيمسح الأجزاء حتى ما تتخزّن أجزاء لمسابقة ما شارك فيها
+                        [c.juzKey]: e.target.checked ? formData[c.juzKey] : [],
+                      })}
+                    />
+                    {c.label}
+                  </label>
+
+                  {formData[c.key] && (
+                    <div className="space-y-1 pr-6">
+                      <p className="text-xs text-slate-400">الأجزاء التي شارك فيها:</p>
+                      <JuzGrid
+                        selected={formData[c.juzKey]}
+                        onToggle={toggleIn(c.juzKey)}
+                        activeClass={c.color}
+                      />
+                      <p className={`text-xs ${formData[c.juzKey].length ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {formData[c.juzKey].length
+                          ? `${formData[c.juzKey].length} جزء: ${formData[c.juzKey].join('، ')}`
+                          : 'لم تُحدَّد أجزاء بعد'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
 
             {/* Tajweed Level */}
