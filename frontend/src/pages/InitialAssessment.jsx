@@ -116,17 +116,25 @@ const InitialAssessment = () => {
     setDialogOpen(true);
   }, []);
 
+  const [allStudents, setAllStudents] = useState(null);
+
   useEffect(() => {
-    fetchStudents().then((all) => {
-      // فتح تقييم طالب محدد قادم من صفحة الحضور/التسميع
-      const sid = searchParams.get('student');
-      if (sid) {
-        const student = all.find(s => s.id === sid);
-        if (student) openAssessmentDialog(student);
-        setSearchParams({}, { replace: true });
-      }
-    });
-  }, []); // eslint-disable-line
+    fetchStudents().then(setAllStudents);
+  }, [fetchStudents]);
+
+  // فتح تقييم طالب محدد قادم من صفحة الحضور/التسميع — يتفاعل مع تغيّر الرابط وليس فقط عند التحميل الأول
+  const sid = searchParams.get('student');
+  useEffect(() => {
+    if (!sid || !allStudents) return;
+    const student = allStudents.find(s => s.id === sid);
+    setSearchParams({}, { replace: true });
+    if (student) {
+      // تأجيل الفتح لإطار لاحق حتى يكتمل رسم الصفحة وإغلاق أي نافذة سابقة
+      requestAnimationFrame(() => openAssessmentDialog(student));
+    } else {
+      toast.error('لم يتم العثور على الطالب');
+    }
+  }, [sid, allStudents, openAssessmentDialog, setSearchParams]);
 
   const toggleIn = (field) => (juzNumber) => {
     setFormData(prev => {
