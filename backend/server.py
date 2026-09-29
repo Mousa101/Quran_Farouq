@@ -10476,6 +10476,22 @@ async def export_student_recitations_excel(
     )
 
 
+# TEMPORARY — full database backup for migrating off the old host. Remove after migration.
+@api_router.get("/admin/full-backup")
+async def full_database_backup(current_user: dict = Depends(get_current_user)):
+    """نسخة احتياطية كاملة لكل المجموعات (للمدير فقط)"""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
+    from bson import json_util
+    backup = {}
+    for name in await db.list_collection_names():
+        backup[name] = await db[name].find().to_list(None)
+    return StreamingResponse(
+        io.BytesIO(json_util.dumps(backup, ensure_ascii=False).encode("utf-8")),
+        media_type="application/json",
+        headers={"Content-Disposition": f"attachment; filename=full_backup_{datetime.now().strftime('%Y%m%d')}.json"}
+    )
+
+
 # Include the router
 app.include_router(api_router)
 
