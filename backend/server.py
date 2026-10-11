@@ -3830,6 +3830,9 @@ async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict 
             {"id": existing["id"]},
             {"$set": update_data}
         )
+        # نقاط الحضور تتبع الحالة: تُسحب عند التراجع عن "حاضر" وتُمنح عند التحويل إليه
+        if (existing.get("status") == "present") != (attendance_data.status == "present"):
+            await recompute_student_points(attendance_data.student_id)
         return {"message": "تم تحديث الحضور"}
     
     attendance = Attendance(
