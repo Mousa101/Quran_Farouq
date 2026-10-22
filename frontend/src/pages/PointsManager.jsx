@@ -21,7 +21,7 @@ const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const ADJUST_TYPES = [
   { key: 'bonus', label: 'إضافة نقاط', icon: Plus, color: 'emerald', hint: 'نقاط خارجية (مسابقة، مبادرة، إنجاز خارج النظام)' },
   { key: 'deduction', label: 'خصم نقاط', icon: Minus, color: 'red', hint: 'خصم من رصيد الطالب' },
-  { key: 'freeze', label: 'تجميد نقاط', icon: Lock, color: 'amber', hint: 'حجز مبلغ مؤقتًا — بينخصم من المتاح وبيرجع لما تفكّه' },
+  { key: 'freeze', label: 'تجميد نقاط', icon: Lock, color: 'amber', hint: 'حجز مؤقت للنقاط — يُخصم من المتاح ويعود عند فكّ التجميد' },
 ];
 
 // أيقونة ولون كل مصدر في السجل
@@ -512,7 +512,7 @@ const PointsManager = () => {
               </div>
 
               <p className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
-                {ledger.count} حركة · التجميد ما بيغيّر الإجمالي، بس بيحجز من المتاح.
+                {ledger.count} حركة · التجميد لا يغيّر الإجمالي، وإنما يحجز من المتاح.
               </p>
             </>
           )}

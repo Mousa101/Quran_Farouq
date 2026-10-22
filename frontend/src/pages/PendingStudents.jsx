@@ -6,6 +6,8 @@ import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { UserPlus, Clock, Phone, Mail, Key, Copy, CheckCircle, School, Home, Calendar, User, Loader2, BookOpen, Shield, GraduationCap, Briefcase, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import RegistrationLinks from '../components/RegistrationLinks';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -55,12 +57,7 @@ const PendingStudents = () => {
     }
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('ar-SA', {
-      year: 'numeric', month: 'long', day: 'numeric'
-    });
-  };
+  const formatDate = (dateStr) => fmtDate(dateStr);
 
   const getRoleInfo = (role) => {
     switch(role) {
@@ -126,6 +123,8 @@ const PendingStudents = () => {
         </div>
       </div>
 
+      <RegistrationLinks />
+
       {pendingList.length === 0 ? (
         <Card className="glass-card border-white/10">
           <CardContent className="py-12 text-center">
@@ -155,7 +154,7 @@ const PendingStudents = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="bg-slate-800/50 rounded-xl p-2 md:p-3 border border-amber-500/30">
-                        <p className="text-[10px] md:text-xs text-slate-400 mb-0.5">كود التفعيل:</p>
+                        <p className="text-[10px] md:text-xs text-slate-400 mb-0.5">رمز التفعيل:</p>
                         <div className="flex items-center gap-1">
                           <span className="text-lg md:text-2xl font-mono font-bold text-amber-400 tracking-widest">{user.activation_code}</span>
                           <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-slate-400" onClick={(e) => { e.stopPropagation(); copyToClipboard(user.activation_code); }}>
@@ -191,7 +190,7 @@ const PendingStudents = () => {
                 </Badge>
               </div>
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center">
-                <p className="text-sm text-amber-300 mb-2">كود التفعيل</p>
+                <p className="text-sm text-amber-300 mb-2">رمز التفعيل</p>
                 <div className="flex items-center justify-center gap-3">
                   <span className="text-3xl font-mono font-bold text-amber-400 tracking-[0.3em]">{selectedUser.activation_code}</span>
                   <Button size="sm" variant="outline" className="border-amber-500/50 text-amber-400" onClick={() => copyToClipboard(selectedUser.activation_code)}>

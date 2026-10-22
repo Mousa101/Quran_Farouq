@@ -88,7 +88,7 @@ const FeesManagement = () => {
         month: formData.month,
         year: formData.year
       });
-      toast.success('تم إضافة الرسوم بنجاح');
+      toast.success('تمت إضافة الرسوم بنجاح');
       setDialogOpen(false);
       setFormData({ 
         student_id: '', 

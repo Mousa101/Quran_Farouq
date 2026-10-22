@@ -7,6 +7,7 @@ import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { BookOpen, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { EMAIL_PLACEHOLDER } from '../lib/constants';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -76,7 +77,7 @@ const Login = () => {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="example@email.com"
+                    placeholder={EMAIL_PLACEHOLDER}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pr-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500 text-left h-10 md:h-11 text-sm md:text-base"
@@ -130,12 +131,16 @@ const Login = () => {
             <div className="mt-4 md:mt-6 text-center space-y-2">
               <p className="text-slate-400 text-sm md:text-base">
                 ليس لديك حساب؟{' '}
-                <Link 
-                  to="/register" 
+                <Link
+                  to="/register"
                   className="text-emerald-400 hover:text-emerald-300 font-medium"
                   data-testid="register-link"
                 >
-                  سجل الآن
+                  تسجيل طالب
+                </Link>
+                <span className="text-slate-600 mx-2">|</span>
+                <Link to="/register/teacher" className="text-blue-400 hover:text-blue-300 font-medium">
+                  تسجيل مشرف
                 </Link>
               </p>
               <p className="text-slate-500 text-xs md:text-sm">
@@ -145,16 +150,6 @@ const Login = () => {
                 >
                   نسيت كلمة المرور؟
                 </Link>
-              </p>
-              <p className="pt-2 border-t border-slate-700/50">
-                <button
-                  type="button"
-                  onClick={() => window.open(`${window.location.origin}/login?login=new`, '_blank')}
-                  className="text-slate-400 hover:text-emerald-400 text-xs"
-                  title="يفتح تبويباً جديداً بجلسة مستقلة — للاختبار بعدة حسابات معاً"
-                >
-                  🧪 فتح حساب آخر في تبويب جديد (للاختبار)
-                </button>
               </p>
             </div>
           </CardContent>

@@ -8,17 +8,18 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import {
-  AlertTriangle, BellRing, Users, Save, BookOpen, Hand, BookMarked,
+  AlertTriangle, BellRing, Users, Save, BookOpen, BookMarked,
   UserCheck, Layers, Settings2, Loader2, ChevronDown, ChevronUp
 } from 'lucide-react';
 import StudentLink from '../components/StudentLink';
+import MosqueIcon from '../components/icons/MosqueIcon';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
 // أقسام التعثّر — تطابق STRUGGLING_CATEGORIES في الخادم
 const CATEGORIES = [
   { key: 'recitation', label: 'التسميع', icon: BookOpen, color: 'blue' },
-  { key: 'prayers', label: 'الصلوات', icon: Hand, color: 'emerald' },
+  { key: 'prayers', label: 'الصلوات', icon: MosqueIcon, color: 'emerald' },
   { key: 'sitting', label: 'الجلوس مع القرآن', icon: BookMarked, color: 'purple' },
   { key: 'attendance', label: 'الحضور', icon: UserCheck, color: 'amber' },
   { key: 'all', label: 'متعثّر في كل شيء', icon: Layers, color: 'red' },
@@ -197,7 +198,7 @@ const StrugglingStudents = () => {
                 الطلاب المتعثّرون
               </h1>
               <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                فلترة حسب قسم التعثّر — والمقاييس يحدّدها المدير
+                تصفية حسب قسم التعثّر — والمقاييس يحدّدها المدير
               </p>
             </div>
           </div>
@@ -254,7 +255,7 @@ const StrugglingStudents = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-              الصلوات والجلوس والحضور تُقاس خلال <strong>{PERIODS.find((p) => p.key === period)?.label}</strong> (حسب الفلتر فوق).
+              الصلوات والجلوس والحضور تُقاس خلال <strong>{PERIODS.find((p) => p.key === period)?.label}</strong> (حسب المرشّح أعلاه).
               أما التسميع فبعدد الأيام منذ آخر تسميع.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -337,7 +338,7 @@ const StrugglingStudents = () => {
         <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
           <CardContent className="p-12 text-center">
             <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>
-              ما في طلاب متعثّرين في {activeCat?.label} 🎉
+              لا يوجد طلاب متعثّرون في {activeCat?.label} 🎉
             </p>
           </CardContent>
         </Card>

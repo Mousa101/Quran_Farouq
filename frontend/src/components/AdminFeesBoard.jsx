@@ -98,7 +98,7 @@ const AdminFeesBoard = () => {
   const generateYear = async () => {
     const ok = window.confirm(
       `سيتم توليد رسوم 12 شهرًا لسنة ${year} لكل الطلاب بقيمة ${config.monthly_amount} لكل شهر.\n` +
-      'الأشهر الموجودة أصلًا ما رح تتكرّر. متابعة؟'
+      'لن تتكرّر الأشهر الموجودة مسبقًا. هل تريد المتابعة؟'
     );
     if (!ok) return;
     setGenerating(true);
@@ -269,7 +269,7 @@ const AdminFeesBoard = () => {
 
             <div className={`p-3 rounded-lg ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
               <p className={`text-sm mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                توليد رسوم كل أشهر سنة {year} لكل الطلاب — ما بيكرّر الأشهر الموجودة.
+                توليد رسوم كل أشهر سنة {year} لكل الطلاب دون تكرار الأشهر الموجودة.
               </p>
               <Button onClick={generateYear} disabled={generating} className="bg-blue-600 hover:bg-blue-700">
                 {generating ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Sparkles className="w-4 h-4 ml-1" />}
@@ -279,7 +279,7 @@ const AdminFeesBoard = () => {
 
             <div className={`p-3 rounded-lg ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
               <p className={`text-sm mb-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                تعديل مبلغ شهر معيّن لكل الطلاب (الأشهر المدفوعة ما بتتأثّر):
+                تعديل مبلغ شهر معيّن لكل الطلاب (لا تتأثر الأشهر المدفوعة):
               </p>
               <div className="flex items-end gap-2 flex-wrap">
                 <select

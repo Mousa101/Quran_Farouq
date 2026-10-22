@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Progress } from '../components/ui/progress';
+import MemorizationBar from '../components/MemorizationBar';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -11,13 +11,16 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { CircularGauge } from '../components/ui/circular-gauge';
+import { defaultAvatar, onAvatarError } from '../lib/avatar';
 import { toast } from 'sonner';
 import { 
   BookOpen, Clock, Users, Trophy, Calendar, CheckCircle, 
   User, Phone, School, Home, Star, AlertTriangle, Award,
-  Sunrise, Moon, BookMarked, Hand, Mail, Cake, MapPin, GraduationCap,
+  Sunrise, Moon, BookMarked, Mail, Cake, MapPin, GraduationCap,
   ChevronDown, ChevronUp, Plus, Edit2, Sparkles, History
 } from 'lucide-react';
+import { formatDate as fmtDate } from '../lib/utils';
+import MosqueIcon from '../components/icons/MosqueIcon';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -138,14 +141,7 @@ const StudentDashboard = () => {
     return age;
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('ar-SA', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+  const formatDate = (dateStr) => fmtDate(dateStr);
 
   // تقديم ورقة المتابعة من حساب الطالب
   const handleSubmitTracking = async () => {
@@ -220,17 +216,12 @@ console.log(stats)
         <div className="flex flex-col gap-4 md:gap-6">
           {/* Profile Image & Name */}
           <div className="flex items-center gap-3 md:gap-4">
-            {stats?.student?.profile_image ? (
-              <img 
-                src={stats.student.profile_image} 
-                alt="صورة شخصية"
-                className="w-14 h-14 md:w-20 md:h-20 rounded-xl md:rounded-2xl object-cover border-2 border-emerald-500/30"
-              />
-            ) : (
-              <div className="w-14 h-14 md:w-20 md:h-20 rounded-xl md:rounded-2xl bg-emerald-500/20 flex items-center justify-center">
-                <User className="w-7 h-7 md:w-10 md:h-10 text-emerald-400" />
-              </div>
-            )}
+            <img
+              src={stats?.student?.profile_image || defaultAvatar('student')}
+              onError={onAvatarError('student')}
+              alt="صورة شخصية"
+              className="w-14 h-14 md:w-20 md:h-20 rounded-xl md:rounded-2xl object-cover border-2 border-emerald-500/30 flex-shrink-0"
+            />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-lg md:text-2xl font-bold text-white truncate">{stats?.student?.name || user?.name}</h1>
@@ -261,24 +252,29 @@ console.log(stats)
             </div>
           </div>
 
-          {/* مقدار الحفظ والتجويد + مجموع النقاط (بدل ترتيبك في المجموعة) */}
-          <div className="grid grid-cols-2 gap-2 md:gap-4">
+          {/* مقدار الحفظ، ومستوى التجويد، ومجموع النقاط — كلٌّ في بطاقة مستقلة */}
+          <div className="grid grid-cols-3 gap-2 md:gap-4">
             <div className="flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-3 rounded-xl bg-blue-500/20 border border-blue-500/30">
               <BookOpen className="w-6 h-6 md:w-8 md:h-8 text-blue-400 flex-shrink-0" />
               <div className="min-w-0">
                 <p className="text-xl md:text-2xl font-bold text-blue-400">
                   {stats?.memorization?.total_memorized || 0} <span className="text-xs font-normal">صفحة</span>
                 </p>
-                <p className="text-slate-400 text-[10px] md:text-sm truncate">
-                  مقدار الحفظ · تجويد: <span className="text-purple-400">{stats?.student?.tajweed_level || '-'}</span>
-                </p>
+                <p className="text-slate-400 text-[10px] md:text-sm truncate">مقدار الحفظ</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-3 rounded-xl bg-purple-500/20 border border-purple-500/30">
+              <Star className="w-6 h-6 md:w-8 md:h-8 text-purple-400 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-base md:text-xl font-bold text-purple-400 truncate">{stats?.student?.tajweed_level || '-'}</p>
+                <p className="text-slate-400 text-[10px] md:text-sm truncate">مستوى التجويد</p>
               </div>
             </div>
             <div className="flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/30">
               <Award className="w-6 h-6 md:w-8 md:h-8 text-emerald-400 flex-shrink-0" />
-              <div>
+              <div className="min-w-0">
                 <p className="text-xl md:text-2xl font-bold text-emerald-400">{stats?.total_points || 0}</p>
-                <p className="text-slate-400 text-[10px] md:text-sm">مجموع النقاط</p>
+                <p className="text-slate-400 text-[10px] md:text-sm truncate">مجموع النقاط</p>
               </div>
             </div>
           </div>
@@ -610,7 +606,7 @@ console.log(stats)
                   {(showTasmeeHistory ? tasmeeHistory : tasmeeHistory.slice(0, 5)).map((rec, idx) => (
                     <tr key={rec.id || idx} className="border-b border-slate-800 hover:bg-slate-800/50">
                       <td className="py-3 px-2 text-slate-300 text-sm">
-                        {rec.date ? new Date(rec.date).toLocaleDateString('ar-SA') : '-'}
+                        {rec.date ? fmtDate(rec.date) : '-'}
                       </td>
                       <td className="py-3 px-2 text-center">
                         <span className={`font-bold ${rec.new_pages > 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
@@ -689,16 +685,11 @@ console.log(stats)
                   {stats?.memorization?.total_memorized || 0} صفحة
                 </span>
               </div>
-              <Progress 
-                value={stats?.memorization?.percentage || 0} 
-                className="h-4 bg-slate-700"
+              {/* الحفظ قبل الفصل بلون، وإنجاز الفصل الحالي بلون مختلف */}
+              <MemorizationBar
+                previousPages={stats?.memorization?.total_previous || 0}
+                termPages={stats?.memorization?.new_pages || 0}
               />
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">604 صفحة</span>
-                <span className="text-slate-500">
-                  {stats?.memorization?.percentage || 0}% من القرآن
-                </span>
-              </div>
               
             </div>
           </CardContent>
@@ -787,7 +778,7 @@ console.log(stats)
         <CardHeader className="pb-2 md:pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
-              <Hand className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
+              <MosqueIcon className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
               ورقة المتابعة الإيمانية (100 نقطة)
             </CardTitle>
             <Button
@@ -809,7 +800,7 @@ console.log(stats)
             </h4>
             <div className="grid grid-cols-2 gap-2">
               <div className="p-2 md:p-3 rounded-xl bg-emerald-500/10 text-center">
-                <Hand className="w-5 h-5 md:w-6 md:h-6 mx-auto text-emerald-400 mb-1" />
+                <MosqueIcon className="w-5 h-5 md:w-6 md:h-6 mx-auto text-emerald-400 mb-1" />
                 <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.weekly?.prayers || 0}<span className="text-xs text-slate-500">/35</span></p>
                 <p className="text-emerald-400 text-[10px] md:text-xs">الصلوات</p>
               </div>
@@ -836,7 +827,7 @@ console.log(stats)
             </h4>
             <div className="grid grid-cols-2 gap-2">
               <div className="p-2 md:p-3 rounded-xl bg-emerald-500/10 text-center">
-                <Hand className="w-5 h-5 md:w-6 md:h-6 mx-auto text-emerald-400 mb-1" />
+                <MosqueIcon className="w-5 h-5 md:w-6 md:h-6 mx-auto text-emerald-400 mb-1" />
                 <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.split?.month?.prayers || 0}</p>
                 <p className="text-emerald-400 text-[10px] md:text-xs">الصلوات</p>
               </div>
@@ -887,10 +878,10 @@ console.log(stats)
               آخر ورقة متابعة سلّمتها
             </h4>
             {!stats?.tracking?.last_sheet ? (
-              <p className="text-amber-400 text-sm">ما سلّمت ولا ورقة متابعة لحد الآن.</p>
+              <p className="text-amber-400 text-sm">لم تُسلِّم أي ورقة متابعة حتى الآن.</p>
             ) : (
               <div className="flex items-center justify-between gap-2 flex-wrap text-sm">
-                <span className="text-white font-medium">أسبوع {stats.tracking.last_sheet.week_start}</span>
+                <span className="text-white font-medium">أسبوع {fmtDate(stats.tracking.last_sheet.week_start)}</span>
                 <div className="flex items-center gap-3 text-xs">
                   <span className="text-emerald-400">🕌 {stats.tracking.last_sheet.prayers_count}</span>
                   <span className="text-blue-400">📖 {stats.tracking.last_sheet.quran_sitting_days}</span>
@@ -923,7 +914,7 @@ console.log(stats)
                   <div className="flex items-center gap-2 mb-1">
                     <Badge className="bg-red-500/20 text-red-400 text-xs">{warning.type}</Badge>
                     <span className="text-slate-500 text-xs">
-                      {new Date(warning.date).toLocaleDateString('ar-SA')}
+                      {fmtDate(warning.date)}
                     </span>
                   </div>
                   <p className="text-slate-300 text-sm">{warning.message}</p>
@@ -956,7 +947,7 @@ console.log(stats)
                       <p className="text-slate-400 text-sm mt-1">{activity.description}</p>
                     </div>
                     <div className="text-left">
-                      <p className="text-emerald-400 font-medium text-sm">{activity.date}</p>
+                      <p className="text-emerald-400 font-medium text-sm">{fmtDate(activity.date)}</p>
                       <p className="text-slate-500 text-xs">{activity.time}</p>
                     </div>
                   </div>
@@ -979,7 +970,7 @@ console.log(stats)
               {/* الصلوات */}
               <div>
                 <Label className="text-slate-300 flex items-center gap-2">
-                  <Hand className="w-4 h-4 text-emerald-400" />
+                  <MosqueIcon className="w-4 h-4 text-emerald-400" />
                   الصلوات (من 35)
                 </Label>
                 <Input
@@ -1056,7 +1047,7 @@ console.log(stats)
               disabled={submittingTracking}
               className="bg-purple-600 hover:bg-purple-700"
             >
-              {submittingTracking ? 'جاري الحفظ...' : 'حفظ ورقة المتابعة'}
+              {submittingTracking ? 'جارٍ الحفظ...' : 'حفظ ورقة المتابعة'}
             </Button>
           </DialogFooter>
         </DialogContent>

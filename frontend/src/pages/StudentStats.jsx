@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { Table2, FileDown, ArrowUpNarrowWide, ArrowDownWideNarrow } from 'lucide-react';
 import { SCHOOL_GRADES } from '../lib/constants';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -116,7 +117,7 @@ const StudentStats = () => {
           <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center"><Table2 className="w-6 h-6 text-emerald-400" /></div>
           <div>
             <h1 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>جدول إحصائيات الطلاب</h1>
-            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>فلترة حسب المجموعة والطالب · ترتيب حسب أي إحصائية · تصدير Excel</p>
+            <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>تصفية حسب المجموعة والطالب · ترتيب حسب أي إحصائية · تصدير Excel</p>
           </div>
         </div>
       </div>
@@ -252,7 +253,7 @@ const StudentStats = () => {
                       <td className={`p-2 ${activeCol('tracking_sitting')}`}>{r.tracking_sitting ?? 0}</td>
                       <td className="p-2">
                         {r.last_sheet?.week_start ? (
-                          <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{r.last_sheet.week_start}</span>
+                          <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{fmtDate(r.last_sheet.week_start)}</span>
                         ) : (
                           <span className={isDark ? 'text-slate-600' : 'text-slate-400'}>لم يسلّم</span>
                         )}
@@ -288,7 +289,7 @@ const StudentStats = () => {
                 الأرقام بالصفحات (الحفظ الكلي/الجديد/المراجعة).
                 {' '}أعمدة ورق المتابعة (الأوراق/الصلوات/الجلوس) محسوبة خلال{' '}
                 <strong>{TRACKING_PERIODS.find((p) => p.key === trackingPeriod)?.label}</strong>؛
-                عمود «آخر ورقة» بيعرض أسبوع آخر ورقة مُسلَّمة بغضّ النظر عن المدة.
+                يعرض عمود «آخر ورقة» أسبوع آخر ورقة مُسلَّمة بغضّ النظر عن المدة.
               </p>
             </div>
           )}

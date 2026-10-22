@@ -16,6 +16,7 @@ import {
   UserPlus, Eye, RefreshCcw, Loader2, Key, Award
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { avatarSrc, onAvatarError } from '../lib/avatar';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -93,7 +94,7 @@ const StudentManagement = () => {
         ...newStudentData,
         role: 'student'
       });
-      toast.success('تم إضافة الطالب بنجاح');
+      toast.success('تمت إضافة الطالب بنجاح');
       setAddDialogOpen(false);
       setNewStudentData({
         email: '',
@@ -269,7 +270,7 @@ const StudentManagement = () => {
                       value={emailLocalPart(newStudentData.email)}
                       onChange={(e) => setNewStudentData({ ...newStudentData, email: buildEmail(e.target.value) })}
                       className="bg-slate-800 border-slate-700 text-white text-left rounded-r-none flex-1"
-                      placeholder="اسم المستخدم"
+                      placeholder="example"
                     />
                     <span className="h-10 flex items-center px-2 text-xs text-slate-300 bg-slate-700/70 border border-slate-700 border-r-0 rounded-r-md whitespace-nowrap select-none">{EMAIL_DOMAIN}</span>
                   </div>
@@ -398,11 +399,13 @@ const StudentManagement = () => {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-full bg-slate-700 flex items-center justify-center">
-                        <span className="text-lg font-bold text-emerald-400">
-                          {student.name?.charAt(0)}
-                        </span>
-                      </div>
+                      <img
+                        src={avatarSrc(student.profile_image, 'student')}
+                        onError={onAvatarError('student')}
+                        alt={student.name}
+                        className="w-12 h-12 rounded-full object-cover bg-slate-700 flex-shrink-0"
+                        data-testid={`student-avatar-${student.id}`}
+                      />
                       <div>
                         <h3 className="text-white font-medium">{student.name}</h3>
                         <p className="text-slate-400 text-sm">{student.email}</p>

@@ -8,6 +8,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { toast } from 'sonner';
 import { Megaphone, Plus, Trash2, Send } from 'lucide-react';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -53,7 +54,7 @@ const Announcements = () => {
     } catch (e) { toast.error('فشل في الحذف'); }
   };
 
-  const fmt = (iso) => { try { return new Date(iso).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }); } catch { return ''; } };
+  const fmt = (iso) => fmtDate(iso, { withTime: true });
 
   return (
     <div className="space-y-6 animate-fadeIn">

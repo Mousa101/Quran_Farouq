@@ -7,7 +7,6 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
 import { Textarea } from '../components/ui/textarea';
 import { Checkbox } from '../components/ui/checkbox';
@@ -18,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import BulkOperations from './BulkOperations';
 import StudentLink from '../components/StudentLink';
+import { avatarSrc, onAvatarError } from '../lib/avatar';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -39,7 +39,7 @@ const GroupManagement = () => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    sheikh_id: ''
+    sheikh_ids: []
   });
 
   useEffect(() => {
@@ -70,8 +70,8 @@ const GroupManagement = () => {
 
   const handleCreateGroup = async (e) => {
     e.preventDefault();
-    if (!formData.sheikh_id) {
-      toast.error('يرجى اختيار مشرف للمجموعة');
+    if (formData.sheikh_ids.length === 0) {
+      toast.error('يرجى اختيار مشرف واحد على الأقل للمجموعة');
       return;
     }
     setSubmitting(true);
@@ -79,7 +79,7 @@ const GroupManagement = () => {
       await axios.post(`${API}/groups`, formData);
       toast.success('تم إنشاء المجموعة بنجاح');
       setCreateDialogOpen(false);
-      setFormData({ name: '', description: '', sheikh_id: '' });
+      setFormData({ name: '', description: '', sheikh_ids: [] });
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'فشل في إنشاء المجموعة');
@@ -91,6 +91,10 @@ const GroupManagement = () => {
   const handleUpdateGroup = async (e) => {
     e.preventDefault();
     if (!selectedGroup) return;
+    if (formData.sheikh_ids.length === 0) {
+      toast.error('يرجى اختيار مشرف واحد على الأقل للمجموعة');
+      return;
+    }
     setSubmitting(true);
     try {
       await axios.put(`${API}/groups/${selectedGroup.id}`, formData);
@@ -126,7 +130,7 @@ const GroupManagement = () => {
     setFormData({
       name: group.name,
       description: group.description || '',
-      sheikh_id: group.sheikh_id
+      sheikh_ids: group.sheikh_ids?.length ? group.sheikh_ids : (group.sheikh_id ? [group.sheikh_id] : [])
     });
     setEditDialogOpen(true);
   };
@@ -146,7 +150,7 @@ const GroupManagement = () => {
     if (!selectedGroup) return;
     try {
       await axios.post(`${API}/groups/${selectedGroup.id}/add-student`, { student_id: studentId });
-      toast.success('تم إضافة الطالب للمجموعة');
+      toast.success('تمت إضافة الطالب للمجموعة');
       // Refresh students
       const res = await axios.get(`${API}/groups/${selectedGroup.id}/students`);
       setGroupStudents(res.data);
@@ -160,7 +164,7 @@ const GroupManagement = () => {
     if (!selectedGroup) return;
     try {
       await axios.post(`${API}/groups/${selectedGroup.id}/remove-student`, { student_id: studentId });
-      toast.success('تم إزالة الطالب من المجموعة');
+      toast.success('تمت إزالة الطالب من المجموعة');
       // Refresh students
       const res = await axios.get(`${API}/groups/${selectedGroup.id}/students`);
       setGroupStudents(res.data);
@@ -187,6 +191,45 @@ const GroupManagement = () => {
     const sheikh = sheikhs.find(s => s.id === sheikhId);
     return sheikh?.name || 'غير معين';
   };
+
+  // تعدد المشرفين: أول مشرف مختار هو المشرف الرئيسي للمجموعة
+  const toggleSheikh = (sheikhId) => {
+    setFormData((prev) => ({
+      ...prev,
+      sheikh_ids: prev.sheikh_ids.includes(sheikhId)
+        ? prev.sheikh_ids.filter((id) => id !== sheikhId)
+        : [...prev.sheikh_ids, sheikhId]
+    }));
+  };
+
+  const renderSheikhPicker = () => (
+    <div className="space-y-2">
+      <Label className="text-slate-300">مشرفو المجموعة</Label>
+      <p className="text-slate-500 text-xs">يمكن اختيار أكثر من مشرف؛ أول مشرف تختاره هو المشرف الرئيسي.</p>
+      <div className="max-h-48 overflow-y-auto rounded-md border border-slate-700 bg-slate-800 divide-y divide-slate-700/60">
+        {sheikhs.length === 0 ? (
+          <p className="text-slate-400 text-sm text-center py-3">لا يوجد مشرفون</p>
+        ) : sheikhs.map((sheikh) => {
+          const order = formData.sheikh_ids.indexOf(sheikh.id);
+          return (
+            <label
+              key={sheikh.id}
+              className="flex items-center justify-between gap-2 px-3 py-2 cursor-pointer hover:bg-slate-700/40"
+              data-testid={`group-sheikh-option-${sheikh.id}`}
+            >
+              <span className="flex items-center gap-2 text-white text-sm">
+                <Checkbox checked={order !== -1} onCheckedChange={() => toggleSheikh(sheikh.id)} />
+                {sheikh.name}
+              </span>
+              {order === 0 && (
+                <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">رئيسي</Badge>
+              )}
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   // اسم المجموعة الحالية للطالب (يُعرض في قائمة الطلاب المتاحين)
   const getGroupName = (groupId) => {
@@ -252,24 +295,7 @@ const GroupManagement = () => {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-slate-300">مشرف المجموعة</Label>
-                <Select 
-                  value={formData.sheikh_id} 
-                  onValueChange={(v) => setFormData({ ...formData, sheikh_id: v })}
-                >
-                  <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                    <SelectValue placeholder="اختر المشرف" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-700">
-                    {sheikhs.map((sheikh) => (
-                      <SelectItem key={sheikh.id} value={sheikh.id} className="text-white">
-                        {sheikh.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {renderSheikhPicker()}
 
               <Button
                 type="submit"
@@ -327,7 +353,7 @@ const GroupManagement = () => {
                 
                 <div className="flex items-center gap-2 text-sm">
                   <User className="w-4 h-4 text-slate-400" />
-                  <span className="text-slate-400">المشرف:</span>
+                  <span className="text-slate-400">{group.sheikh_ids?.length > 1 ? 'المشرفون:' : 'المشرف:'}</span>
                   <span className="text-emerald-400">{group.sheikh_name || getSheikhName(group.sheikh_id)}</span>
                 </div>
 
@@ -377,24 +403,7 @@ const GroupManagement = () => {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-slate-300">مشرف المجموعة</Label>
-              <Select 
-                value={formData.sheikh_id} 
-                onValueChange={(v) => setFormData({ ...formData, sheikh_id: v })}
-              >
-                <SelectTrigger className="bg-slate-800 border-slate-700 text-white">
-                  <SelectValue placeholder="اختر المشرف" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-800 border-slate-700">
-                  {sheikhs.map((sheikh) => (
-                    <SelectItem key={sheikh.id} value={sheikh.id} className="text-white">
-                      {sheikh.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {renderSheikhPicker()}
 
             <DialogFooter>
               <Button variant="ghost" onClick={() => setEditDialogOpen(false)}>إلغاء</Button>
@@ -416,7 +425,7 @@ const GroupManagement = () => {
             <p className="text-slate-300">
               هل أنت متأكد من حذف المجموعة <span className="text-red-400 font-bold">{selectedGroup?.name}</span>؟
             </p>
-            <p className="text-amber-400 text-sm mt-2">سيتم إزالة جميع الطلاب من هذه المجموعة.</p>
+            <p className="text-amber-400 text-sm mt-2">سيتمت إزالة جميع الطلاب من هذه المجموعة.</p>
           </div>
           <DialogFooter className="mt-6">
             <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)}>إلغاء</Button>
@@ -429,7 +438,7 @@ const GroupManagement = () => {
 
       {/* Manage Students Dialog */}
       <Dialog open={manageStudentsDialogOpen} onOpenChange={setManageStudentsDialogOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="bg-slate-900 border-slate-700 max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-white text-xl flex items-center gap-2">
               <Users className="w-5 h-5 text-emerald-400" />
@@ -437,14 +446,14 @@ const GroupManagement = () => {
             </DialogTitle>
           </DialogHeader>
           
-          <div className="grid grid-cols-2 gap-4 mt-4 flex-1 overflow-hidden">
+          <div className="grid grid-cols-2 gap-4 mt-4 flex-1 min-h-0">
             {/* Current Students */}
-            <div className="flex flex-col">
+            <div className="flex flex-col min-h-0">
               <h3 className="text-white font-medium mb-3 flex items-center gap-2">
                 <Badge className="bg-emerald-500/20 text-emerald-400">{groupStudents.length}</Badge>
                 طلاب المجموعة
               </h3>
-              <div className="space-y-2 overflow-y-auto flex-1 max-h-[300px] pr-2">
+              <div className="space-y-2 overflow-y-auto flex-1 min-h-0 max-h-[55vh] pr-2 pb-2">
                 {groupStudents.length === 0 ? (
                   <p className="text-slate-400 text-sm text-center py-4">لا يوجد طلاب</p>
                 ) : (
@@ -454,9 +463,7 @@ const GroupManagement = () => {
                       className="p-3 rounded-lg bg-slate-800/50 border border-white/5 flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs font-bold text-emerald-400">{student.name?.charAt(0)}</span>
-                        </div>
+                        <img src={avatarSrc(student.profile_image, 'student')} onError={onAvatarError('student')} alt="" className="w-8 h-8 rounded-full object-cover bg-slate-700 flex-shrink-0" />
                         <StudentLink studentId={student.id} name={student.name} className="text-white text-sm" />
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
@@ -486,12 +493,12 @@ const GroupManagement = () => {
             </div>
 
             {/* Available Students */}
-            <div className="flex flex-col">
+            <div className="flex flex-col min-h-0">
               <h3 className="text-white font-medium mb-3 flex items-center gap-2">
                 <Badge className="bg-blue-500/20 text-blue-400">{availableStudents.length}</Badge>
                 الطلاب المتاحون
               </h3>
-              <div className="space-y-2 overflow-y-auto flex-1 max-h-[300px] pr-2">
+              <div className="space-y-2 overflow-y-auto flex-1 min-h-0 max-h-[55vh] pr-2 pb-2">
                 {availableStudents.length === 0 ? (
                   <p className="text-slate-400 text-sm text-center py-4">لا يوجد طلاب متاحون</p>
                 ) : (
@@ -501,9 +508,7 @@ const GroupManagement = () => {
                       className="p-3 rounded-lg bg-slate-800/50 border border-white/5 flex items-center justify-between gap-2"
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs font-bold text-blue-400">{student.name?.charAt(0)}</span>
-                        </div>
+                        <img src={avatarSrc(student.profile_image, 'student')} onError={onAvatarError('student')} alt="" className="w-8 h-8 rounded-full object-cover bg-slate-700 flex-shrink-0" />
                         <div className="min-w-0">
                           <StudentLink
                             studentId={student.id}

@@ -10,6 +10,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { toast } from 'sonner';
 import { BookOpen, Plus, Trash2, Calendar, Users, CheckCircle, Clock, Eye, FileText } from 'lucide-react';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -53,7 +54,7 @@ const HomeworkManagement = () => {
     e.preventDefault();
     try {
       await axios.post(`${API}/homework`, formData);
-      toast.success('تم إضافة الواجب بنجاح');
+      toast.success('تمت إضافة الواجب بنجاح');
       setDialogOpen(false);
       setFormData({ title: '', description: '', due_date: '', group_id: '' });
       fetchData();
@@ -209,7 +210,7 @@ const HomeworkManagement = () => {
                 <div className="flex items-center gap-4 text-sm mb-3">
                   <span className={`flex items-center gap-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                     <Calendar className="w-4 h-4" />
-                    {hw.due_date}
+                    {fmtDate(hw.due_date)}
                   </span>
                 </div>
                 {isStudent && hw.submission && (
@@ -258,7 +259,7 @@ const HomeworkManagement = () => {
                       </p>
                       {sub.submitted_at && (
                         <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                          تاريخ التسليم: {new Date(sub.submitted_at).toLocaleString('ar-SA')}
+                          تاريخ التسليم: {fmtDate(sub.submitted_at, { withTime: true })}
                         </p>
                       )}
                     </div>

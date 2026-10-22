@@ -9,10 +9,12 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { 
-  FileText, Plus, Loader2, BookOpen, Moon, Star, Hand, Eye, 
+  FileText, Plus, Loader2, BookOpen, Moon, Star, Eye, 
   Sunrise, Users, GraduationCap, Calendar, CheckCircle, Sparkles, MessageCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDate as fmtDate } from '../lib/utils';
+import MosqueIcon from '../components/icons/MosqueIcon';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -98,7 +100,7 @@ const StudentTracking = () => {
     // التأكد من أن التاريخ هو بداية الأسبوع الحالي
     const currentWeek = getCurrentWeekStart();
     if (formData.week_start !== currentWeek) {
-      toast.error(`يمكنك فقط تعبئة ورقة الأسبوع الحالي (${currentWeek})`);
+      toast.error(`يمكنك فقط تعبئة ورقة الأسبوع الحالي (${fmtDate(currentWeek)})`);
       return;
     }
 
@@ -193,7 +195,7 @@ const StudentTracking = () => {
                     {/* الصلوات */}
                     <div>
                       <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                        <Hand className="w-4 h-4 text-emerald-400" />
+                        <MosqueIcon className="w-4 h-4 text-emerald-400" />
                         الصلوات (من 35)
                       </Label>
                       <Input
@@ -281,7 +283,7 @@ const StudentTracking = () => {
         <CardContent>
           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
             <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-              <div className="text-lg">🤲</div>
+              <div className="text-lg">🕌</div>
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصلوات</p>
               <p className="text-sm font-bold text-emerald-400">35</p>
             </div>
@@ -317,7 +319,7 @@ const StudentTracking = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className={isDark ? 'text-slate-300' : 'text-slate-600'}>
-                  تم تعبئة ورقة أسبوع {currentWeekSheet.week_start}
+                  تمت تعبئة ورقة أسبوع {fmtDate(currentWeekSheet.week_start)}
                 </p>
                 <p className="text-emerald-400 font-bold text-xl mt-1">
                   {currentWeekSheet.points_earned || 0} نقطة
@@ -356,7 +358,7 @@ const StudentTracking = () => {
                       <FileText className="w-6 h-6 text-purple-400" />
                     </div>
                     <div>
-                      <h3 className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>أسبوع {sheet.week_start}</h3>
+                      <h3 className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>أسبوع {fmtDate(sheet.week_start)}</h3>
                       <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                         صلوات: {sheet.data?.prayers_count || 0}/35
                       </p>
@@ -388,7 +390,7 @@ const StudentTracking = () => {
             <div className="space-y-4">
               <div className={`p-3 rounded-lg ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
                 <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الأسبوع</p>
-                <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedSheet.week_start}</p>
+                <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmtDate(selectedSheet.week_start)}</p>
               </div>
               
               <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>

@@ -249,6 +249,8 @@ class Group(BaseModel):
     name: str
     description: Optional[str] = None
     sheikh_id: str
+    # كل مشرفي المجموعة (يتضمّن المشرف الرئيسي sheikh_id) — للمجموعات متعددة المشرفين
+    sheikh_ids: List[str] = Field(default_factory=list)
     # A4: مدة التنبيه (بالأيام) للطالب المنقطع عن التسميع — يعدّلها المشرف لمجموعاته (الافتراضي 2)
     recitation_alert_days: Optional[int] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -121,7 +121,7 @@ const TrackingSettings = () => {
       // المدير: بدون اختيار مشرف = بند عام للجميع؛ مع اختيار مشرف = خاص فيه
       if (isAdmin && selectedSheikh) payload.sheikh_id = selectedSheikh;
       await axios.post(`${API}/tracking-items`, payload);
-      toast.success(isAdmin && !selectedSheikh ? 'تم إضافة بند عام لكل المشرفين' : 'تم إضافة البند');
+      toast.success(isAdmin && !selectedSheikh ? 'تمت إضافة بند عام لكل المشرفين' : 'تمت إضافة البند');
       setNewItem({ name: '', max_points: '', icon: '⭐' });
       fetchCustomItems();
     } catch (error) {
@@ -234,7 +234,7 @@ const TrackingSettings = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-slate-400 text-sm">
-              النقاط الإدارية اللي بمنحها المدير للطالب المتميّز. حدّد المقدار وكل قديش مرة بيُسمح بمنحها لنفس الطالب.
+              النقاط الإدارية التي يمنحها المدير للطالب المتميّز. حدّد المقدار، والمدة المسموح بعدها بمنحها للطالب نفسه مرة أخرى.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
@@ -306,8 +306,8 @@ const TrackingSettings = () => {
               </select>
               <p className="text-slate-400 text-xs mt-2">
                 {selectedSheikh
-                  ? 'البند اللي بتضيفه رح يظهر عند هذا المشرف وطلابه فقط.'
-                  : 'البند اللي بتضيفه رح ينضاف عند كل المشرفين والطلاب. والقائمة تحت بتعرض البنود العامة.'}
+                  ? 'البند الذي تضيفه يظهر لهذا المشرف وطلابه فقط.'
+                  : 'البند الذي تضيفه يُضاف لجميع المشرفين والطلاب، وتعرض القائمة أدناه البنود العامة.'}
               </p>
             </div>
           )}
@@ -523,7 +523,7 @@ const TrackingSettings = () => {
             {saving ? (
               <>
                 <Loader2 className="w-4 h-4 ml-2 animate-spin" />
-                جاري الحفظ...
+                جارٍ الحفظ...
               </>
             ) : (
               'حفظ الإعدادات'

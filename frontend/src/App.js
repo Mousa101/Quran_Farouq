@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { Toaster } from './components/ui/sonner';
@@ -39,6 +39,7 @@ import AdminRankings from './pages/AdminRankings';
 import AdminAnalytics from './pages/AdminAnalytics';
 import StrugglingStudents from './pages/StrugglingStudents';
 import CompetitionsAnalysis from './pages/CompetitionsAnalysis';
+import AnnualCompetition from './pages/AnnualCompetition';
 import AuditLog from './pages/AuditLog';
 import ChatMonitor from './pages/ChatMonitor';
 import StatisticsHub from './pages/StatisticsHub';
@@ -57,14 +58,18 @@ import MyProgress from './pages/MyProgress';
 import StudentHomework from './pages/StudentHomework';
 import StudentRecord from './pages/StudentRecord';
 import TrackingSettings from './pages/TrackingSettings';
+import DisplaySettings from './pages/DisplaySettings';
+import { hiddenPathsFor } from './lib/navItems';
 import './App.css';
 
 // F1: حماية الصفحات حسب الصلاحية.
 // - إن لم يسجّل الدخول: يُوجَّه إلى /login.
 // - إن كان الدور غير مسموح للصفحة (allow): يُعاد توجيهه إلى /dashboard بدل ظهور خطأ.
 // - الصفحات المشتركة لا تُمرّر allow فتبقى متاحة لكل الأدوار المسجّلة.
+// - الصفحة التي أخفاها المدير لهذا الدور (إعدادات العرض) يُعاد توجيهها إلى /dashboard.
 const ProtectedRoute = ({ children, allow }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, uiSettings } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -79,6 +84,10 @@ const ProtectedRoute = ({ children, allow }) => {
   }
 
   if (allow && !allow.includes(user.role)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (hiddenPathsFor(user.role, uiSettings).includes(location.pathname)) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -142,9 +151,18 @@ function AppRoutes() {
         path="/login"
         element={user ? <Navigate to="/dashboard" replace /> : <Login />}
       />
+      {/* روابط تسجيل منفصلة لكل نوع حساب */}
       <Route
         path="/register"
-        element={user ? <Navigate to="/dashboard" replace /> : <Register />}
+        element={user ? <Navigate to="/dashboard" replace /> : <Register role="student" />}
+      />
+      <Route
+        path="/register/teacher"
+        element={user ? <Navigate to="/dashboard" replace /> : <Register role="sheikh" />}
+      />
+      <Route
+        path="/register/admin"
+        element={user ? <Navigate to="/dashboard" replace /> : <Register role="admin" />}
       />
       <Route
         path="/activate"
@@ -391,6 +409,17 @@ function AppRoutes() {
       />
 
       <Route
+        path="/annual-competition"
+        element={
+          <ProtectedRoute allow={['admin']}>
+            <Layout>
+              <AnnualCompetition />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
         path="/audit-log"
         element={
           <ProtectedRoute allow={['admin']}>
@@ -462,6 +491,17 @@ function AppRoutes() {
           <ProtectedRoute allow={['admin']}>
             <Layout>
               <UsersPage />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/display-settings"
+        element={
+          <ProtectedRoute allow={['admin']}>
+            <Layout>
+              <DisplaySettings />
             </Layout>
           </ProtectedRoute>
         }

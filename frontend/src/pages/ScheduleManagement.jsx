@@ -10,6 +10,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { toast } from 'sonner';
 import { Calendar, Plus, Edit, Trash2, Clock, Check, Power } from 'lucide-react';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -122,7 +123,7 @@ const ScheduleManagement = () => {
         toast.success('تم تحديث الحصة بنجاح');
       } else {
         await axios.post(`${API}/schedule/${selectedSchedule.id}/slots`, slotData);
-        toast.success('تم إضافة الحصة بنجاح');
+        toast.success('تمت إضافة الحصة بنجاح');
       }
       setSlotDialogOpen(false);
       setSlotData({ day: 'السبت', start_time: '', end_time: '', subject: '', period_name: '', description: '', group_id: '' });
@@ -382,7 +383,7 @@ const ScheduleManagement = () => {
                 <div>
                   <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>{selectedSchedule.name}</CardTitle>
                   <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                    {selectedSchedule.start_date} - {selectedSchedule.end_date || 'غير محدد'}
+                    {fmtDate(selectedSchedule.start_date)} - {selectedSchedule.end_date ? fmtDate(selectedSchedule.end_date) : 'غير محدد'}
                   </p>
                 </div>
                 {isAdmin && (
@@ -443,7 +444,7 @@ const ScheduleManagement = () => {
                             className={isDark ? 'bg-slate-800 border-white/10 text-white' : ''}
                           />
                           <p className="text-xs text-slate-500 mt-1">
-                            الحصص اللي إلها نفس الاسم بتنعرض بنفس الصف في الجدول المدرسي.
+                            الحصص التي تحمل الاسم نفسه تُعرض في الصف نفسه من الجدول المدرسي.
                           </p>
                         </div>
                         <div>

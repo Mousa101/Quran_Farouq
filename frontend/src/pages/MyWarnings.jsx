@@ -7,6 +7,7 @@ import { Badge } from '../components/ui/badge';
 import {
   AlertTriangle, ShieldCheck, Calendar, User, Bot, FileText, Filter
 } from 'lucide-react';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -43,13 +44,7 @@ const MyWarnings = () => {
     }
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('ar-EG', {
-      year: 'numeric', month: 'long', day: 'numeric'
-    });
-  };
+  const formatDate = (dateStr) => fmtDate(dateStr);
 
   // أنواع الإنذارات الموجودة فعليًا (للفلترة)
   const availableTypes = [...new Set(warnings.map((w) => w.type_label).filter(Boolean))];
@@ -159,7 +154,7 @@ const MyWarnings = () => {
             <div className="text-center py-10">
               <ShieldCheck className="w-14 h-14 mx-auto text-emerald-400 mb-3" />
               <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                {warnings.length === 0 ? 'ما عندك أي إنذار — أحسنت!' : 'لا توجد إنذارات بهذا النوع'}
+                {warnings.length === 0 ? 'لا توجد لديك أي إنذارات — أحسنت!' : 'لا توجد إنذارات بهذا النوع'}
               </p>
               {warnings.length === 0 && (
                 <p className={`text-sm mt-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>

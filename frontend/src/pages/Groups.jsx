@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { avatarSrc, onAvatarError } from '../lib/avatar';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -96,9 +97,7 @@ const Groups = () => {
                         className="p-3 rounded-lg bg-slate-800/50 border border-white/5 hover:border-emerald-500/30 transition-all flex items-center justify-between group"
                       >
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
-                            <span className="text-xs font-bold text-emerald-400">{student.name?.charAt(0)}</span>
-                          </div>
+                          <img src={avatarSrc(student.profile_image, 'student')} onError={onAvatarError('student')} alt="" className="w-8 h-8 rounded-full object-cover bg-slate-700 flex-shrink-0" />
                           <span className="text-white text-sm">{student.name}</span>
                         </div>
                         <Eye className="w-4 h-4 text-slate-400 group-hover:text-emerald-400 transition-colors" />

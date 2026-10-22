@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import { avatarSrc, onAvatarError } from '../lib/avatar';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -132,7 +133,7 @@ const UsersPage = () => {
   return (
     <div className="space-y-6 animate-fadeIn" data-testid="users-page">
       <div className={`p-6 rounded-xl ${isDark ? 'glass-card border border-white/10' : 'bg-white border border-slate-200 shadow-sm'}`}>
-        <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>المستخدمين</h1>
+        <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>المستخدمون</h1>
         <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>إدارة جميع مستخدمي النظام</p>
       </div>
 
@@ -180,11 +181,15 @@ const UsersPage = () => {
                 className={`p-4 flex items-center justify-between ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} transition-all`}
               >
                 <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
-                    <span className="text-lg font-bold text-emerald-400">
-                      {user.name.charAt(0)}
-                    </span>
-                  </div>
+                  {user.profile_image || user.role !== 'admin' ? (
+                    <img src={avatarSrc(user.profile_image, user.role)} onError={onAvatarError(user.role)} alt="" className={`w-12 h-12 rounded-full object-cover flex-shrink-0 ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`} />
+                  ) : (
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                      <span className="text-lg font-bold text-emerald-400">
+                        {user.name.charAt(0)}
+                      </span>
+                    </div>
+                  )}
                   <div>
                     {user.role === 'student' && (currentUser?.role === 'admin' || currentUser?.role === 'sheikh') ? (
                       <Link to={`/student/${user.id}`} className={`font-medium hover:text-emerald-400 transition-colors flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
@@ -223,7 +228,7 @@ const UsersPage = () => {
           
           {filteredUsers.length === 0 && (
             <div className={`p-12 text-center ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-              لا يوجد مستخدمين
+              لا يوجد مستخدمون
             </div>
           )}
         </CardContent>
@@ -266,7 +271,7 @@ const UsersPage = () => {
               disabled={submitting}
               className="bg-amber-600 hover:bg-amber-700"
             >
-              {submitting ? 'جاري التغيير...' : 'تغيير كلمة المرور'}
+              {submitting ? 'جارٍ التغيير...' : 'تغيير كلمة المرور'}
             </Button>
           </DialogFooter>
         </DialogContent>

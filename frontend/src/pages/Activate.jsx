@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { BookOpen, Mail, Key, CheckCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
+import { EMAIL_PLACEHOLDER } from '../lib/constants';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -19,7 +20,7 @@ const Activate = () => {
     e.preventDefault();
     
     if (activationCode.length !== 6) {
-      toast.error('كود التفعيل يجب أن يكون 6 أرقام');
+      toast.error('رمز التفعيل يجب أن يكون 6 أرقام');
       return;
     }
     
@@ -56,7 +57,7 @@ const Activate = () => {
               تفعيل الحساب
             </CardTitle>
             <CardDescription className="text-slate-400 mt-2">
-              أدخل بريدك الإلكتروني وكود التفعيل الذي حصلت عليه من إدارة المركز
+              أدخل بريدك الإلكتروني ورمز التفعيل الذي حصلت عليه من إدارة المركز
             </CardDescription>
           </div>
         </CardHeader>
@@ -68,7 +69,7 @@ const Activate = () => {
                 <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
                 <Input
                   type="email"
-                  placeholder="email@example.com"
+                  placeholder={EMAIL_PLACEHOLDER}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pr-10 h-12 bg-slate-800 border-slate-700 text-white text-left"
@@ -79,10 +80,10 @@ const Activate = () => {
             </div>
             
             <div className="space-y-2">
-              <Label className="text-slate-300">كود التفعيل</Label>
+              <Label className="text-slate-300">رمز التفعيل</Label>
               <Input
                 type="text"
-                placeholder="أدخل الكود من 6 أرقام"
+                placeholder="أدخل الرمز المكوّن من 6 أرقام"
                 value={activationCode}
                 onChange={(e) => setActivationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 className="text-center text-2xl tracking-[0.5em] bg-slate-800 border-emerald-500/50 text-white h-14"

@@ -37,31 +37,31 @@ const RegistrationCodes = () => {
     try {
       const response = await axios.post(`${API}/auth/generate-code`, { role: selectedRole });
       const roleLabels = { student: 'الطالب', sheikh: 'المشرف', admin: 'المدير' };
-      toast.success(`تم إنشاء كود ${roleLabels[selectedRole]}: ${response.data.code}`);
+      toast.success(`تم إنشاء رمز ${roleLabels[selectedRole]}: ${response.data.code}`);
       fetchCodes();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'فشل إنشاء الكود');
+      toast.error(error.response?.data?.detail || 'فشل إنشاء الرمز');
     } finally {
       setGenerating(false);
     }
   };
 
   const deleteCode = async (code) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا الكود؟')) return;
+    if (!window.confirm('هل أنت متأكد من حذف هذا الرمز؟')) return;
     
     try {
       await axios.delete(`${API}/auth/codes/${code}`);
-      toast.success('تم حذف الكود');
+      toast.success('تم حذف الرمز');
       fetchCodes();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'فشل حذف الكود');
+      toast.error(error.response?.data?.detail || 'فشل حذف الرمز');
     }
   };
 
   const copyCode = (code) => {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
-    toast.success('تم نسخ الكود');
+    toast.success('تم نسخ الرمز');
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
@@ -102,8 +102,8 @@ const RegistrationCodes = () => {
   return (
     <div className="space-y-8 animate-fadeIn" data-testid="registration-codes-page">
       <div>
-        <h1 className="text-2xl font-bold text-white">أكواد التسجيل</h1>
-        <p className="text-slate-400">إنشاء وإدارة أكواد تسجيل الطلاب والمشرفين والمدراء</p>
+        <h1 className="text-2xl font-bold text-white">رموز التسجيل</h1>
+        <p className="text-slate-400">إنشاء وإدارة رموز تسجيل الطلاب والمشرفين والمدراء</p>
       </div>
 
       {/* Generate Code */}
@@ -111,7 +111,7 @@ const RegistrationCodes = () => {
         <CardHeader>
           <CardTitle className="text-xl font-bold text-white flex items-center gap-3">
             <Key className="w-6 h-6 text-emerald-400" />
-            إنشاء كود جديد
+            إنشاء رمز جديد
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -153,7 +153,7 @@ const RegistrationCodes = () => {
               ) : (
                 <Plus className="w-5 h-5 ml-2" />
               )}
-              إنشاء كود
+              إنشاء رمز
             </Button>
           </div>
         </CardContent>
@@ -166,12 +166,12 @@ const RegistrationCodes = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg text-white flex items-center gap-2">
               <GraduationCap className="w-5 h-5 text-emerald-400" />
-              أكواد الطلاب ({studentCodes.length})
+              رموز الطلاب ({studentCodes.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {studentCodes.length === 0 ? (
-              <p className="text-slate-400 text-sm text-center py-4">لا توجد أكواد</p>
+              <p className="text-slate-400 text-sm text-center py-4">لا توجد رموز</p>
             ) : (
               <div className="space-y-2">
                 {studentCodes.map((code) => (
@@ -197,12 +197,12 @@ const RegistrationCodes = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg text-white flex items-center gap-2">
               <Users className="w-5 h-5 text-blue-400" />
-              أكواد المشرفين ({sheikhCodes.length})
+              رموز المشرفين ({sheikhCodes.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {sheikhCodes.length === 0 ? (
-              <p className="text-slate-400 text-sm text-center py-4">لا توجد أكواد</p>
+              <p className="text-slate-400 text-sm text-center py-4">لا توجد رموز</p>
             ) : (
               <div className="space-y-2">
                 {sheikhCodes.map((code) => (
@@ -228,12 +228,12 @@ const RegistrationCodes = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-lg text-white flex items-center gap-2">
               <Shield className="w-5 h-5 text-purple-400" />
-              أكواد المدراء ({adminCodes.length})
+              رموز المدراء ({adminCodes.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             {adminCodes.length === 0 ? (
-              <p className="text-slate-400 text-sm text-center py-4">لا توجد أكواد</p>
+              <p className="text-slate-400 text-sm text-center py-4">لا توجد رموز</p>
             ) : (
               <div className="space-y-2">
                 {adminCodes.map((code) => (
@@ -260,7 +260,7 @@ const RegistrationCodes = () => {
         <Card className="glass-card border-white/10">
           <CardHeader>
             <CardTitle className="text-xl font-bold text-white">
-              الأكواد المستخدمة ({usedCodes.length})
+              الرموز المستخدمة ({usedCodes.length})
             </CardTitle>
           </CardHeader>
           <CardContent>

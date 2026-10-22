@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import StudentLink from '../components/StudentLink';
+import OnlineUsers from '../components/OnlineUsers';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -16,6 +17,7 @@ import {
   ArrowUpRight, UserPlus, Clock, Archive, RefreshCw, Download, FileSpreadsheet, Edit,
   ChevronDown, ChevronUp, Loader2, BookUser, AlertTriangle, Bell
 } from 'lucide-react';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -447,6 +449,8 @@ const AdminDashboard = () => {
         </div>
       </div>
 
+      <OnlineUsers />
+
       {/* Stats Grid — بطاقات مربوطة بصفحاتها */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
         <Link to="/sheikh-management" className="block">
@@ -542,7 +546,7 @@ const AdminDashboard = () => {
                   {summary.week_attendance_rate ?? 0}<span className="text-xs font-normal">%</span>
                 </p>
                 {summary.week_start && (
-                  <p className={`text-[9px] md:text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{summary.week_start} — {summary.week_end}</p>
+                  <p className={`text-[9px] md:text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtDate(summary.week_start)} — {fmtDate(summary.week_end)}</p>
                 )}
               </div>
             </div>
@@ -590,7 +594,7 @@ const AdminDashboard = () => {
                 تفريع الأسبوع حسب المجموعة
               </CardTitle>
               <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                {summary.week_start} — {summary.week_end}
+                {fmtDate(summary.week_start)} — {fmtDate(summary.week_end)}
               </span>
             </div>
           </CardHeader>
@@ -785,7 +789,7 @@ const AdminDashboard = () => {
 
                   {showAllStudents && searchedStudents.length === 0 && (
                     <p className={`text-center py-4 text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                      ما في طالب مطابق للبحث
+                      لا يوجد طالب مطابق للبحث
                     </p>
                   )}
                 </div>
@@ -884,7 +888,7 @@ const AdminDashboard = () => {
         </CardHeader>
         <CardContent>
           {sheikhs.length === 0 ? (
-            <p className={`text-center py-4 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا يوجد مشرفين</p>
+            <p className={`text-center py-4 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا يوجد مشرفون</p>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
               {sheikhs.map((sheikh) => (
@@ -917,7 +921,7 @@ const AdminDashboard = () => {
                   {/* مجموعات المشرف */}
                   {(!sheikh.groups || sheikh.groups.length === 0) ? (
                     <p className={`text-xs text-center py-3 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
-                      ما في مجموعات مُسندة لهذا المشرف
+                      لا توجد مجموعات مُسندة إلى هذا المشرف
                     </p>
                   ) : (
                     <div className="space-y-2">
@@ -990,10 +994,10 @@ const AdminDashboard = () => {
                     <tr key={term.id} className={`border-b ${isDark ? 'border-white/5 hover:bg-white/5' : 'border-slate-100 hover:bg-slate-50'}`}>
                       <td className={`px-4 py-3 font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{term.name}</td>
                       <td className={`px-4 py-3 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {term.start_date ? new Date(term.start_date).toLocaleDateString('ar-SA') : '-'}
+                        {term.start_date ? fmtDate(term.start_date) : '-'}
                       </td>
                       <td className={`px-4 py-3 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {term.end_date ? new Date(term.end_date).toLocaleDateString('ar-SA') : '-'}
+                        {term.end_date ? fmtDate(term.end_date) : '-'}
                       </td>
                       <td className="px-4 py-3">
                         {term.is_active ? (
@@ -1261,7 +1265,7 @@ const AdminDashboard = () => {
               {closingTerm ? (
                 <>
                   <RefreshCw className="w-4 h-4 ml-2 animate-spin" />
-                  جاري الإغلاق...
+                  جارٍ الإغلاق...
                 </>
               ) : (
                 <>
@@ -1339,7 +1343,7 @@ const AdminDashboard = () => {
             {exporting && (
               <div className="flex items-center justify-center py-4">
                 <RefreshCw className="w-6 h-6 animate-spin text-emerald-400" />
-                <span className={`mr-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>جاري التحميل...</span>
+                <span className={`mr-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>جارٍ التحميل...</span>
               </div>
             )}
           </div>

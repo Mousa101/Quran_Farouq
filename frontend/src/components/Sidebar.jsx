@@ -2,48 +2,12 @@ import { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Trophy, 
-  Calendar, 
-  Bell, 
-  LogOut,
-  BookOpen,
-  UserCheck,
-  FileText,
-  UsersRound,
-  Star,
-  Key,
-  GraduationCap,
-  ClipboardList,
-  UserCog,
-  Sun,
-  Moon,
-  UserPlus,
-  BookMarked,
-  CalendarDays,
-  TrendingUp,
-  DollarSign,
-  BookText,
-  Award,
-  Menu,
-  FileQuestion,
-  X,
-  Settings,
-  BarChart3,
-  AlertTriangle,
-  Shield,
-  Table2,
-  Megaphone,
-  Layers,
-  MessageSquare,
-  BookUser
-} from 'lucide-react';
+import { LogOut, Sun, Moon, Menu, X } from 'lucide-react';
+import { navItemsFor } from '../lib/navItems';
 import { Button } from './ui/button';
 
 const Sidebar = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, uiSettings } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -82,83 +46,7 @@ const Sidebar = () => {
     navigate('/login');
   };
 
-  const getNavItems = () => {
-    const baseItems = [
-      { to: '/dashboard', icon: LayoutDashboard, label: 'الرئيسية' },
-    ];
-
-    if (user?.role === 'admin') {
-      return [
-        ...baseItems,
-         { to: '/sheikh-management', icon: BookUser, label: 'إدارة المشرفين' },
-          { to: '/student-management', icon: GraduationCap, label: 'إدارة الطلاب' },
-          { to: '/group-management', icon: UsersRound, label: 'إدارة المجموعات' },
-        { to: '/pending-students', icon: UserPlus, label: 'طلبات التسجيل' },
-       
-        
-       
-        { to: '/attendance', icon: UserCheck, label: 'تسجيل الحضور' },
-        { to: '/recitations', icon: BookOpen, label: 'تسجيل التسميع' },
-        { to: '/statistics', icon: Table2, label: 'إحصائيات الطلاب' },
-        { to: '/points-manager', icon: Star, label: 'إدارة النقاط' },
-        { to: '/struggling-students', icon: AlertTriangle, label: 'الطلاب المتعثّرون' },
-        
-        { to: '/fees', icon: DollarSign, label: 'الرسوم المالية' },
-        { to: '/homework', icon: BookText, label: 'الواجبات' },
-        { to: '/exams', icon: Award, label: 'الاختبارات' },
-        { to: '/curriculum', icon: BookMarked, label: 'إدارة المنهج' },
-        { to: '/schedule', icon: CalendarDays, label: 'إدارة الجداول' },
-        { to: '/tracking-settings', icon: Settings, label: 'إعدادات ورق المتابعة' },
-        { to: '/announcements', icon: Megaphone, label: 'الإعلانات' },
-        { to: '/activities', icon: Calendar, label: 'الأنشطة' },
-        { to: '/users', icon: Users, label: 'المستخدمين' },
-        { to: '/audit-log', icon: Shield, label: 'سجل العمليات' },
-        { to: '/chat-monitor', icon: MessageSquare, label: 'مراقبة المحادثات' },
-        { to: '/notifications', icon: Bell, label: 'الإشعارات' },
-        { to: '/competitions', icon: Trophy, label: 'مرشّحو المسابقات' },
-      ];
-    }
-
-    if (user?.role === 'sheikh') {
-      return [
-        ...baseItems,
-        { to: '/groups', icon: UsersRound, label: 'مجموعاتي' },
-        { to: '/initial-assessment', icon: ClipboardList, label: 'تقييم الطلاب الجدد' },
-        { to: '/attendance', icon: UserCheck, label: 'الحضور' },
-        { to: '/tracking', icon: FileText, label: 'ورق المتابعة' },
-        { to: '/recitations', icon: BookOpen, label: 'التسميع' },
-        { to: '/homework', icon: BookText, label: 'الواجبات' },
-        { to: '/exams', icon: Award, label: 'الاختبارات' },
-        { to: '/sheikh-rankings', icon: TrendingUp, label: 'ترتيب طلابي' },
-        { to: '/sheikh-analytics', icon: BarChart3, label: 'تحليلاتي' },
-        { to: '/sheikh-message', icon: MessageSquare, label: 'مراسلة الطلاب' },
-        { to: '/student-stats', icon: Table2, label: 'إحصائيات الطلاب' },
-        { to: '/points-manager', icon: Star, label: 'إدارة النقاط' },
-        { to: '/struggling-students', icon: AlertTriangle, label: 'الطلاب المتعثّرون' },
-        { to: '/tracking-settings', icon: Settings, label: 'إعدادات ورق المتابعة' },
-        { to: '/curriculum', icon: BookMarked, label: 'عرض المنهج' },
-        { to: '/schedule', icon: CalendarDays, label: 'الجدول الدراسي' },
-        { to: '/sheikh-edit-profile', icon: UserCog, label: 'تعديل بياناتي' },
-        { to: '/notifications', icon: Bell, label: 'الإشعارات' },
-      ];
-    }
-
-    // Student
-    return [
-      ...baseItems,
-      { to: '/my-progress', icon: Trophy, label: 'تقدمي' },
-      { to: '/my-points', icon: Star, label: 'نقاطي' },
-      { to: '/student-tracking', icon: FileText, label: 'ورق المتابعة' },
-      { to: '/my-warnings', icon: AlertTriangle, label: 'الإنذارات' },
-      { to: '/fees', icon: DollarSign, label: 'المستحقات المالية' },
-      { to: '/homework', icon: BookText, label: 'واجباتي' },
-      { to: '/exams', icon: Award, label: 'اختباراتي' },
-      { to: '/edit-profile', icon: UserCog, label: 'تعديل بياناتي' },
-      { to: '/notifications', icon: Bell, label: 'الإشعارات' },
-    ];
-  };
-
-  const navItems = getNavItems();
+  const navItems = navItemsFor(user?.role, uiSettings);
 
   const SidebarContent = ({ isMobile = false }) => (
     <div className="flex flex-col h-full">
@@ -233,17 +121,6 @@ const Sidebar = () => {
               <span>الوضع الداكن</span>
             </>
           )}
-        </Button>
-
-        {/* فتح حساب آخر في تبويب جديد (جلسة مستقلة — للاختبار بعدة حسابات معاً) */}
-        <Button
-          onClick={() => window.open(`${window.location.origin}/login?login=new`, '_blank')}
-          variant="ghost"
-          className="w-full justify-start gap-3 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 text-xs md:text-sm"
-          title="يفتح تبويباً جديداً بجلسة مستقلة لتسجيل حساب آخر"
-        >
-          <UserPlus className="w-5 h-5" />
-          <span>فتح حساب آخر (تبويب)</span>
         </Button>
 
         {/* Logout */}

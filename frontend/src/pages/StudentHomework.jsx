@@ -12,6 +12,7 @@ import {
   Loader2, Send, Eye, X
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -205,7 +206,7 @@ const StudentHomework = () => {
                             : isDark ? 'text-slate-500' : 'text-slate-400'
                         }`}>
                           <Clock className="w-4 h-4" />
-                          تسليم: {new Date(hw.due_date).toLocaleDateString('ar-SA')}
+                          تسليم: {fmtDate(hw.due_date)}
                         </span>
                         {hw.submission?.status === 'graded' && (
                           <span className="text-emerald-400 font-bold">
@@ -379,7 +380,7 @@ const StudentHomework = () => {
                 </p>
                 <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                   تاريخ التسليم: {selectedHomework.submission.submitted_at ? 
-                    new Date(selectedHomework.submission.submitted_at).toLocaleString('ar-SA') : 
+                    fmtDate(selectedHomework.submission.submitted_at, { withTime: true }) : 
                     'غير محدد'}
                 </p>
               </div>

@@ -422,7 +422,7 @@ const OnlineExams = () => {
                 <DialogFooter className="mt-6">
                   <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>إلغاء</Button>
                   <Button onClick={handleCreateExam} disabled={submitting} className="bg-indigo-600 hover:bg-indigo-700">
-                    {submitting ? 'جاري الإنشاء...' : 'إنشاء الاختبار'}
+                    {submitting ? 'جارٍ الإنشاء...' : 'إنشاء الاختبار'}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -618,7 +618,7 @@ const OnlineExams = () => {
                 
                 {currentQuestionIndex === selectedExam.questions.length - 1 ? (
                   <Button onClick={handleSubmitExam} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700">
-                    {submitting ? 'جاري التقديم...' : 'تقديم الاختبار'}
+                    {submitting ? 'جارٍ التقديم...' : 'تقديم الاختبار'}
                   </Button>
                 ) : (
                   <Button

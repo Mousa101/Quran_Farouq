@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { MessageCircle, X, Send, ArrowRight, Loader2, Users, BookUser, Shield } from 'lucide-react';
+import { MessageCircle, X, Send, ArrowRight, Loader2, Users, BookUser, Shield, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 
@@ -28,6 +29,7 @@ const ChatWidget = () => {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const endRef = useRef(null);
+  const lastCountRef = useRef(0);
 
   const role = user?.role;
   const isStudent = role === 'student';
@@ -44,7 +46,21 @@ const ChatWidget = () => {
     return () => clearInterval(t);
   }, [user]); // eslint-disable-line
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  // التمرير للأسفل عند وصول رسائل جديدة فقط (لا عند كل تحديث تلقائي)
+  useEffect(() => {
+    if (messages.length !== lastCountRef.current) endRef.current?.scrollIntoView({ behavior: 'smooth' });
+    lastCountRef.current = messages.length;
+  }, [messages]);
+
+  // عرض مباشر: تحديث الرسائل وقائمة المحادثات كل 3 ثوانٍ ما دامت اللوحة مفتوحة
+  useEffect(() => {
+    if (!open) return;
+    const t = setInterval(() => {
+      if (isStudent || view === 'conversation') loadMessages(active, true);
+      else loadConversations(true);
+    }, 3000);
+    return () => clearInterval(t);
+  }, [open, view, active]); // eslint-disable-line
 
   const openWidget = async () => {
     setOpen(true);
@@ -52,14 +68,14 @@ const ChatWidget = () => {
     else { setView('list'); loadConversations(); }
   };
 
-  const loadConversations = async () => {
-    setLoading(true);
+  const loadConversations = async (silent = false) => {
+    if (!silent) setLoading(true);
     try { const r = await axios.get(`${API}/chat/conversations`); setConversations(r.data.conversations || []); }
-    catch (e) {} finally { setLoading(false); }
+    catch (e) {} finally { if (!silent) setLoading(false); }
   };
 
-  const loadMessages = async (convo) => {
-    setLoading(true);
+  const loadMessages = async (convo, silent = false) => {
+    if (!silent) setLoading(true);
     try {
       let q = '';
       if (convo?.type === 'admin_sheikh') q = `?sheikh_id=${convo.sheikh_id}`;
@@ -67,7 +83,27 @@ const ChatWidget = () => {
       const r = await axios.get(`${API}/chat/messages${q}`);
       setMessages(r.data.messages || []);
       fetchUnread();
-    } catch (e) { setMessages([]); } finally { setLoading(false); }
+    } catch (e) { if (!silent) setMessages([]); } finally { if (!silent) setLoading(false); }
+  };
+
+  // المدير: حذف رسالة أو المحادثة كاملة
+  const deleteMessage = async (m) => {
+    if (!window.confirm('حذف هذه الرسالة؟')) return;
+    try {
+      await axios.delete(`${API}/chat/messages/${m.id}`);
+      setMessages((list) => list.filter((x) => x.id !== m.id));
+    } catch (e) { toast.error(e.response?.data?.detail || 'فشل في حذف الرسالة'); }
+  };
+
+  const deleteConversation = async () => {
+    if (!active || !window.confirm('حذف المحادثة كاملة؟ لا يمكن التراجع عن هذا الإجراء.')) return;
+    try {
+      const q = active.type === 'admin_sheikh' ? `sheikh_id=${active.sheikh_id}` : `student_id=${active.student_id}`;
+      const r = await axios.delete(`${API}/chat/conversation?${q}`);
+      toast.success(r.data.message);
+      setMessages([]);
+      setView('list'); setActive(null); loadConversations();
+    } catch (e) { toast.error(e.response?.data?.detail || 'فشل في حذف المحادثة'); }
   };
 
   const openConversation = (c) => { setActive(c); setView('conversation'); loadMessages(c); };
@@ -99,7 +135,7 @@ const ChatWidget = () => {
     const mine = m.sender_id === user?.user_id || m.sender_id === user?.id;
     const meta = ROLE_META[m.sender_role] || ROLE_META.student;
     return (
-      <div key={m.id} className={`flex ${mine ? 'justify-start' : 'justify-end'} mb-2`}>
+      <div key={m.id} className={`group flex items-center gap-1 ${mine ? 'justify-start' : 'justify-end'} mb-2`}>
         <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${
           mine ? 'bg-emerald-600 text-white rounded-tr-sm'
                : (isDark ? 'bg-slate-700 text-white rounded-tl-sm' : 'bg-slate-200 text-slate-900 rounded-tl-sm')
@@ -111,6 +147,12 @@ const ChatWidget = () => {
           )}
           {m.text}
         </div>
+        {role === 'admin' && (
+          <button onClick={() => deleteMessage(m)} title="حذف الرسالة"
+            className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-400 transition-opacity">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     );
   };
@@ -170,7 +212,12 @@ const ChatWidget = () => {
               </button>
             )}
             <MessageCircle className="w-5 h-5 text-emerald-400" />
-            <p className={`font-bold text-sm truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{title()}</p>
+            <p className={`font-bold text-sm truncate flex-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>{title()}</p>
+            {role === 'admin' && view === 'conversation' && active && messages.length > 0 && (
+              <button onClick={deleteConversation} title="حذف المحادثة" className="text-slate-400 hover:text-red-400">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {/* المحتوى */}

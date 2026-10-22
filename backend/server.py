@@ -153,7 +153,7 @@ class RegistrationCodeResponse(BaseModel):
 @api_router.post("/auth/generate-code")
 async def generate_registration_code(data: RegistrationCodeCreate, current_user: dict = Depends(get_current_user)):
     """Generate registration code for sheikh/admin/student (admin only)"""
-    ensure_role(current_user, "admin", "فقط المدير يمكنه إنشاء أكواد التسجيل")
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إنشاء رموز التسجيل")
     
     if data.role not in ["sheikh", "admin", "student"]:
         raise HTTPException(status_code=400, detail="الدور يجب أن يكون sheikh أو admin أو student")
@@ -175,7 +175,7 @@ async def generate_registration_code(data: RegistrationCodeCreate, current_user:
     await db.registration_codes.insert_one(code_doc)
     
     role_names = {"student": "طالب", "sheikh": "مشرف", "admin": "مدير"}
-    return {"code": code, "role": data.role, "message": f"تم إنشاء كود تسجيل {role_names.get(data.role, data.role)}"}
+    return {"code": code, "role": data.role, "message": f"تم إنشاء رمز تسجيل {role_names.get(data.role, data.role)}"}
 
 @api_router.get("/auth/codes")
 async def get_registration_codes(current_user: dict = Depends(get_current_user)):
@@ -192,9 +192,9 @@ async def delete_registration_code(code: str, current_user: dict = Depends(get_c
     
     result = await db.registration_codes.delete_one({"code": code, "used": False})
     if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="الكود غير موجود أو مستخدم")
+        raise HTTPException(status_code=404, detail="الرمز غير موجود أو مستخدم")
     
-    return {"message": "تم حذف الكود"}
+    return {"message": "تم حذف الرمز"}
 
 # ============== AUTH ROUTES ==============
 
@@ -229,7 +229,7 @@ async def register_with_code(user_data: UserCreateWithCode):
     if not is_first_admin:
         # All roles require registration code
         if not user_data.registration_code or user_data.registration_code.strip() == "":
-            raise HTTPException(status_code=400, detail="كود التسجيل مطلوب")
+            raise HTTPException(status_code=400, detail="رمز التسجيل مطلوب")
         
         # Verify code
         code_doc = await db.registration_codes.find_one({
@@ -239,7 +239,7 @@ async def register_with_code(user_data: UserCreateWithCode):
         })
         
         if not code_doc:
-            raise HTTPException(status_code=400, detail="كود التسجيل غير صحيح أو مستخدم أو لا يتطابق مع الدور")
+            raise HTTPException(status_code=400, detail="رمز التسجيل غير صحيح أو مستخدم أو لا يتطابق مع الدور")
     
     # Create user with all fields
     user = User(
@@ -302,7 +302,7 @@ async def login(credentials: UserLogin):
     if user.get("role") == "student" and not user.get("is_activated", True):
         raise HTTPException(
             status_code=403, 
-            detail="حسابك غير مفعل بعد. يرجى إدخال كود التفعيل من الإدارة"
+            detail="حسابك غير مفعّل بعد. يرجى إدخال رمز التفعيل من الإدارة"
         )
     
     token = create_access_token({
@@ -381,7 +381,7 @@ async def user_register(data: StudentRegistrationRequest):
     
     return {
         "message": f"تم تسجيل بياناتك كـ{role_name} بنجاح. حسابك غير مفعل حالياً.",
-        "detail": "يرجى التواصل مع إدارة المركز للحصول على كود التفعيل",
+        "detail": "يرجى التواصل مع إدارة المركز للحصول على رمز التفعيل",
         "email": data.email,
         "role": role
     }
@@ -405,7 +405,7 @@ async def activate_account(data: ActivationRequest):
         raise HTTPException(status_code=400, detail="الحساب مفعل بالفعل")
     
     if user.get("activation_code") != data.activation_code:
-        raise HTTPException(status_code=400, detail="كود التفعيل غير صحيح")
+        raise HTTPException(status_code=400, detail="رمز التفعيل غير صحيح")
     
     # Activate the account
     await db.users.update_one(
@@ -477,14 +477,14 @@ async def admin_reset_password(data: PasswordResetRequest, current_user: dict = 
     await create_notification_internal(
         user["id"],
         "تم تغيير كلمة المرور",
-        "تم إعادة تعيين كلمة المرور الخاصة بك من قبل الإدارة. يرجى تسجيل الدخول بكلمة المرور الجديدة.",
+        "تمت إعادة تعيين كلمة المرور الخاصة بك من قبل الإدارة. يرجى تسجيل الدخول بكلمة المرور الجديدة.",
         "warning"
     )
 
     await log_admin_action(current_user, "password_reset", "user", user["id"], user.get("name"),
                            f"إعادة تعيين كلمة المرور ({user.get('role')})")
 
-    return {"message": f"تم إعادة تعيين كلمة المرور للمستخدم {user['name']} بنجاح"}
+    return {"message": f"تمت إعادة تعيين كلمة المرور للمستخدم {user['name']} بنجاح"}
 
 # ============== ADMIN: SHEIKH MANAGEMENT ==============
 
@@ -501,7 +501,7 @@ async def get_all_sheikhs(current_user: dict = Depends(get_current_user)):
     
     # Add group info and student count for each sheikh
     for sheikh in sheikhs:
-        groups = await db.groups.find({"sheikh_id": sheikh["id"]}, {"_id": 0}).to_list(20)
+        groups = await db.groups.find({"sheikh_ids": sheikh["id"]}, {"_id": 0}).to_list(20)
         sheikh["groups"] = groups
         sheikh["groups_count"] = len(groups)
         
@@ -527,7 +527,7 @@ async def get_sheikh_details(sheikh_id: str, current_user: dict = Depends(get_cu
         raise HTTPException(status_code=404, detail="المشرف غير موجود")
     
     # Get sheikh's groups
-    groups = await db.groups.find({"sheikh_id": sheikh_id}, {"_id": 0}).to_list(20)
+    groups = await db.groups.find({"sheikh_ids": sheikh_id}, {"_id": 0}).to_list(20)
     
     # Get students for each group with detailed info
     groups_with_students = []
@@ -583,14 +583,16 @@ async def delete_sheikh(sheikh_id: str, current_user: dict = Depends(get_current
         raise HTTPException(status_code=404, detail="المشرف غير موجود")
     
     # Check if sheikh has groups
-    groups = await db.groups.find({"sheikh_id": sheikh_id}, {"_id": 0}).to_list(20)
+    groups = await db.groups.find({"sheikh_ids": sheikh_id}, {"_id": 0}).to_list(20)
     
     if groups:
-        # Option: Remove sheikh from groups (don't delete the groups)
-        await db.groups.update_many(
-            {"sheikh_id": sheikh_id},
-            {"$set": {"sheikh_id": None}}
-        )
+        # Remove sheikh from groups (don't delete the groups); the next sheikh becomes primary
+        for g in groups:
+            rest = [i for i in group_sheikh_ids(g) if i != sheikh_id]
+            await db.groups.update_one(
+                {"id": g["id"]},
+                {"$set": {"sheikh_id": rest[0] if rest else None, "sheikh_ids": rest}}
+            )
     
     # Delete sheikh
     await db.users.delete_one({"id": sheikh_id})
@@ -736,27 +738,63 @@ async def get_my_full_profile(current_user: dict = Depends(get_current_user)):
 class GroupCreateAdmin(BaseModel):
     name: str
     description: Optional[str] = None
-    sheikh_id: str
+    sheikh_id: Optional[str] = None
+    sheikh_ids: Optional[List[str]] = None  # عدة مشرفين؛ الأول هو المشرف الرئيسي
 
 class GroupUpdateAdmin(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     sheikh_id: Optional[str] = None
+    sheikh_ids: Optional[List[str]] = None
+
+
+def group_sheikh_ids(group: Optional[dict]) -> List[str]:
+    """كل مشرفي المجموعة، والمشرف الرئيسي (sheikh_id) أولًا."""
+    if not group:
+        return []
+    ids = [i for i in (group.get("sheikh_ids") or []) if i]
+    primary = group.get("sheikh_id")
+    if primary and primary not in ids:
+        ids.insert(0, primary)
+    return ids
+
+
+async def group_sheikh_names_str(group: Optional[dict]) -> str:
+    """أسماء كل مشرفي المجموعة مفصولة بفاصلة (للعرض)."""
+    ids = group_sheikh_ids(group)
+    if not ids:
+        return "غير معين"
+    names = {u["id"]: u.get("name") for u in await db.users.find({"id": {"$in": ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(50)}
+    return "، ".join(names[i] for i in ids if names.get(i)) or "غير معين"
+
+
+async def _validated_sheikh_ids(sheikh_id: Optional[str], sheikh_ids: Optional[List[str]]) -> List[str]:
+    """يوحّد sheikh_id/sheikh_ids في قائمة بلا تكرار، ويتحقق أن كلهم مشرفون."""
+    ids = []
+    for i in ([sheikh_id] if sheikh_id else []) + list(sheikh_ids or []):
+        if i and i not in ids:
+            ids.append(i)
+    if not ids:
+        raise HTTPException(status_code=400, detail="يرجى اختيار مشرف واحد على الأقل للمجموعة")
+    found = await db.users.count_documents({"id": {"$in": ids}, "role": "sheikh"})
+    if found != len(ids):
+        raise HTTPException(status_code=404, detail="أحد المشرفين المختارين غير موجود")
+    return ids
 
 @api_router.post("/groups")
 async def create_group(group_data: GroupCreateAdmin, current_user: dict = Depends(get_current_user)):
     """Create a new group (Admin only)"""
     ensure_role(current_user, "admin", "فقط المدير يمكنه إنشاء مجموعة")
     
-    # Verify sheikh exists
-    sheikh = await db.users.find_one({"id": group_data.sheikh_id, "role": "sheikh"})
-    if not sheikh:
-        raise HTTPException(status_code=404, detail="المشرف غير موجود")
-    
+    # Verify sheikhs exist (the first one is the primary)
+    ids = await _validated_sheikh_ids(
+        None if group_data.sheikh_ids else group_data.sheikh_id, group_data.sheikh_ids)
+
     group = Group(
         name=group_data.name,
         description=group_data.description,
-        sheikh_id=group_data.sheikh_id
+        sheikh_id=ids[0],
+        sheikh_ids=ids
     )
     
     group_dict = group.model_dump()
@@ -770,15 +808,18 @@ async def create_group(group_data: GroupCreateAdmin, current_user: dict = Depend
 async def get_groups(current_user: dict = Depends(get_current_user)):
     if current_user["role"] == "admin":
         groups = await db.groups.find({}, {"_id": 0}).to_list(100)
-        # Add sheikh name to each group
+        # Add sheikh names to each group
+        sheikh_names = {u["id"]: u.get("name") for u in await db.users.find(
+            {"role": "sheikh"}, {"_id": 0, "id": 1, "name": 1}).to_list(1000)}
         for group in groups:
-            sheikh = await db.users.find_one({"id": group.get("sheikh_id")}, {"_id": 0, "name": 1})
-            group["sheikh_name"] = sheikh["name"] if sheikh else "غير معين"
+            group["sheikh_ids"] = [i for i in group_sheikh_ids(group) if i in sheikh_names]
+            group["sheikh_names"] = [sheikh_names[i] for i in group["sheikh_ids"]]
+            group["sheikh_name"] = "، ".join(group["sheikh_names"]) or "غير معين"
             # Count students
             student_count = await db.users.count_documents({"group_id": group["id"], "role": "student"})
             group["student_count"] = student_count
     elif current_user["role"] == "sheikh":
-        groups = await db.groups.find({"sheikh_id": current_user["user_id"]}, {"_id": 0}).to_list(100)
+        groups = await db.groups.find({"sheikh_ids": current_user["user_id"]}, {"_id": 0}).to_list(100)
         for group in groups:
             student_count = await db.users.count_documents({"group_id": group["id"], "role": "student"})
             group["student_count"] = student_count
@@ -804,13 +845,16 @@ async def update_group(group_id: str, data: GroupUpdateAdmin, current_user: dict
         update_data["name"] = data.name
     if data.description is not None:
         update_data["description"] = data.description
-    if data.sheikh_id is not None:
-        # Verify sheikh exists
-        sheikh = await db.users.find_one({"id": data.sheikh_id, "role": "sheikh"})
-        if not sheikh:
-            raise HTTPException(status_code=404, detail="المشرف غير موجود")
-        update_data["sheikh_id"] = data.sheikh_id
-    
+    if data.sheikh_ids is not None:
+        ids = await _validated_sheikh_ids(None, data.sheikh_ids)
+        update_data["sheikh_id"] = ids[0]
+        update_data["sheikh_ids"] = ids
+    elif data.sheikh_id is not None:
+        # Changing only the primary keeps the other sheikhs
+        ids = await _validated_sheikh_ids(data.sheikh_id, group_sheikh_ids(group))
+        update_data["sheikh_id"] = ids[0]
+        update_data["sheikh_ids"] = ids
+
     if update_data:
         await db.groups.update_one({"id": group_id}, {"$set": update_data})
     
@@ -859,7 +903,7 @@ async def add_student_to_group(group_id: str, request: AddStudentRequest, curren
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="الطالب غير موجود")
     
-    return {"message": "تم إضافة الطالب للمجموعة بنجاح"}
+    return {"message": "تمت إضافة الطالب للمجموعة بنجاح"}
 
 @api_router.post("/groups/{group_id}/remove-student")
 async def remove_student_from_group(group_id: str, request: AddStudentRequest, current_user: dict = Depends(get_current_user)):
@@ -876,7 +920,7 @@ async def remove_student_from_group(group_id: str, request: AddStudentRequest, c
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="الطالب غير موجود في هذه المجموعة")
     
-    return {"message": "تم إزالة الطالب من المجموعة بنجاح"}
+    return {"message": "تمت إزالة الطالب من المجموعة بنجاح"}
 
 @api_router.get("/groups/{group_id}/students")
 async def get_group_students(group_id: str, current_user: dict = Depends(get_current_user)):
@@ -1100,15 +1144,15 @@ async def get_students_pending_assessment(current_user: dict = Depends(get_curre
     """Get students in sheikh's group who haven't been assessed yet"""
     ensure_role(current_user, "sheikh", "غير مصرح لك")
     
-    # Get sheikh's group
-    group = await db.groups.find_one({"sheikh_id": current_user["user_id"]})
-    if not group:
+    # Get sheikh's groups
+    group_ids = await _sheikh_group_ids(current_user["user_id"])
+    if not group_ids:
         return []
-    
+
     # Get students without initial assessment
     students = await db.users.find(
         {
-            "group_id": group["id"],
+            "group_id": {"$in": group_ids},
             "role": "student",
             "initial_assessment_done": {"$ne": True}
         },
@@ -1186,7 +1230,7 @@ async def _load_points_config():
 # فهارس قاعدة البيانات — أهم إصلاح للأداء: بدونها كل استعلام يمسح المجموعة كاملةً (full scan).
 # لا يغيّر أي وظيفة؛ فقط يسرّع القراءات. آمن للتكرار (create_index لا يعيد الإنشاء إن وُجد).
 DB_INDEXES = {
-    "users": [[("id", 1)], [("email", 1)], [("role", 1)], [("group_id", 1)],
+    "users": [[("id", 1)], [("email", 1)], [("role", 1)], [("group_id", 1)], [("role", 1), ("last_seen", 1)],
               [("role", 1), ("group_id", 1)], [("is_activated", 1)]],
     "recitations": [[("student_id", 1)], [("sheikh_id", 1)], [("term_id", 1)],
                     [("student_id", 1), ("record_date", -1)],
@@ -1204,7 +1248,7 @@ DB_INDEXES = {
     "points_adjustments": [[("student_id", 1)], [("student_id", 1), ("type", 1)],
                            [("type", 1), ("active", 1)], [("created_at", -1)]],
     "points_adjustments_archives": [[("student_id", 1)]],
-    "groups": [[("id", 1)], [("sheikh_id", 1)]],
+    "groups": [[("id", 1)], [("sheikh_id", 1)], [("sheikh_ids", 1)]],
     "notifications": [[("user_id", 1)], [("user_id", 1), ("created_at", -1)]],
     "terms": [[("id", 1)], [("is_active", 1)]],
     "term_archives": [[("student_id", 1)], [("term_id", 1)]],
@@ -1232,6 +1276,8 @@ DB_INDEXES = {
     "chat_messages": [[("student_id", 1), ("created_at", 1)], [("sheikh_id", 1)],
                       [("student_id", 1), ("sheikh_id", 1)],
                       [("kind", 1), ("sheikh_id", 1), ("created_at", 1)]],
+    "annual_competition": [[("year", 1)], [("student_id", 1)], [("id", 1)]],
+    "annual_competition_years": [[("year", 1)]],
     "fees": [[("student_id", 1)], [("year", 1), ("month", 1)],
              [("student_id", 1), ("year", 1), ("month", 1)]],
 }
@@ -1247,7 +1293,17 @@ async def _ensure_indexes():
             except Exception as e:
                 logger.warning(f"index {collection}{keys} failed: {e}")
     logger.info("Database indexes ensured.")
+    await _backfill_group_sheikh_ids()
     await _cleanup_irrelevant_student_notifications()
+
+
+async def _backfill_group_sheikh_ids():
+    """المجموعات القديمة لها sheikh_id فقط — نملأ sheikh_ids منه لتعمل استعلامات تعدد المشرفين."""
+    try:
+        async for g in db.groups.find({"sheikh_ids": {"$exists": False}}, {"_id": 0, "id": 1, "sheikh_id": 1}):
+            await db.groups.update_one({"id": g["id"]}, {"$set": {"sheikh_ids": group_sheikh_ids(g)}})
+    except Exception as e:
+        logger.error(f"backfill group sheikh_ids failed: {e}")
 
 
 # عناوين إشعارات إدارية لا تخصّ الطالب — تُحذف من صناديق الطلاب
@@ -1403,7 +1459,7 @@ async def update_struggling_criteria_settings(data: StrugglingCriteriaUpdate,
 
 
 async def _sheikh_group_ids(sheikh_id):
-    groups = await db.groups.find({"sheikh_id": sheikh_id}, {"_id": 0, "id": 1}).to_list(1000)
+    groups = await db.groups.find({"sheikh_ids": sheikh_id}, {"_id": 0, "id": 1}).to_list(1000)
     return [g["id"] for g in groups]
 
 
@@ -1602,7 +1658,7 @@ async def set_group_alert_days(group_id: str, data: GroupAlertDays,
     group = await db.groups.find_one({"id": group_id}, {"_id": 0})
     if not group:
         raise HTTPException(status_code=404, detail="المجموعة غير موجودة")
-    if current_user["role"] == "sheikh" and group.get("sheikh_id") != current_user["user_id"]:
+    if current_user["role"] == "sheikh" and current_user["user_id"] not in group_sheikh_ids(group):
         raise HTTPException(status_code=403, detail="لا يمكنك تعديل مجموعة ليست لك")
     await db.groups.update_one({"id": group_id}, {"$set": {"recitation_alert_days": data.days}})
     return {"message": f"تم ضبط مدة التنبيه على {data.days} يوم"}
@@ -1671,7 +1727,7 @@ async def late_sheikhs_report(days: int = LATE_ATTENDANCE_DEFAULT_DAYS,
     days = max(1, min(365, days))
 
     sheikhs = await db.users.find({"role": "sheikh"}, {"_id": 0, "id": 1, "name": 1, "email": 1}).to_list(500)
-    groups = await db.groups.find({}, {"_id": 0, "id": 1, "name": 1, "sheikh_id": 1}).to_list(3000)
+    groups = await db.groups.find({}, {"_id": 0, "id": 1, "name": 1, "sheikh_id": 1, "sheikh_ids": 1}).to_list(3000)
     students = await db.users.find({"role": "student"}, {"_id": 0, "id": 1, "group_id": 1}).to_list(5000)
 
     group_sheikh = {g["id"]: g.get("sheikh_id") for g in groups}
@@ -1691,8 +1747,9 @@ async def late_sheikhs_report(days: int = LATE_ATTENDANCE_DEFAULT_DAYS,
     today = datetime.now(timezone.utc).date()
     rows = []
     for sh in sheikhs:
-        sh_groups = [g for g in groups if g.get("sheikh_id") == sh["id"]]
-        students_count = sum(1 for s in students if group_sheikh.get(s.get("group_id")) == sh["id"])
+        sh_groups = [g for g in groups if sh["id"] in group_sheikh_ids(g)]
+        sh_group_ids = {g["id"] for g in sh_groups}
+        students_count = sum(1 for s in students if s.get("group_id") in sh_group_ids)
         last_date = last_by_sheikh.get(sh["id"]) or None
 
         days_since = None
@@ -2407,7 +2464,7 @@ async def student_stats_report(group_id: Optional[str] = None, student_id: Optio
                                current_user: dict = Depends(get_current_user)):
     """جدول إحصائيات الطلاب: الحفظ الكلي/الجديد/المراجعة، الحضور، ورق المتابعة (صلوات + جلوس)، العمر، الصف.
     tracking_period: week | month | term — يحدّد مدى احتساب أعمدة المتابعة.
-    competition: annual | young | any | none — فلترة حسب المشاركة في المسابقات."""
+    competition: annual | young | any | none — تصفية حسب المشاركة في المسابقات."""
     ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
     if tracking_period not in ("week", "month", "term"):
         tracking_period = "term"
@@ -2709,7 +2766,7 @@ async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_
         "prayers_count": data.prayers_count,
         "adhkar_after_prayer": data.adhkar_after_prayer,
         "quran_sitting_days": data.quran_sitting_days,
-        "duha_prayers": data.duha_prayers,  # تم إضافة صلاة الضحى
+        "duha_prayers": data.duha_prayers,  # تمت إضافة صلاة الضحى
         "family_recitation": data.family_recitation,
         "study_hours": data.study_hours,
         "witr_prayers_days": data.witr_prayers_days,
@@ -3248,9 +3305,11 @@ async def update_tracking_sheet(sheet_id: str, data: TrackingSheetUpdate, curren
     if not sheet:
         raise HTTPException(status_code=404, detail="ورقة المتابعة غير موجودة")
     
-    # Verify sheikh owns this sheet
+    # Verify sheikh owns this sheet (or shares the student's group)
     if sheet.get("sheikh_id") and sheet.get("sheikh_id") != current_user["user_id"]:
-        raise HTTPException(status_code=403, detail="لا يمكنك تعديل ورقة متابعة لمشرف آخر")
+        stu = await db.users.find_one({"id": sheet.get("student_id")}, {"_id": 0, "group_id": 1})
+        if not stu or stu.get("group_id") not in await _sheikh_group_ids(current_user["user_id"]):
+            raise HTTPException(status_code=403, detail="لا يمكنك تعديل ورقة متابعة لمشرف آخر")
     
     # Get old points
     old_points = sheet.get("points_earned", 0)
@@ -3739,7 +3798,7 @@ async def get_recitations(
     elif student_id:
         query["student_id"] = student_id
     
-    # فلترة حسب التاريخ
+    # تصفية حسب التاريخ
     if date:
         # البحث عن التسميعات في نفس اليوم
         query["$expr"] = {
@@ -4087,7 +4146,9 @@ async def delete_activity(activity_id: str, current_user: dict = Depends(get_cur
 
 # ============== NOTIFICATIONS ROUTES ==============
 
-async def create_notification_internal(user_id: str, title: str, message: str, type: str = "info"):
+async def create_notification_internal(user_id: str, title: str, message: str, type: str = "info",
+                                       category: str = "system"):
+    """category: system (التسميع والحضور والنقاط...) / announcement (الإعلانات والرسائل الجماعية) / chat."""
     notification = Notification(
         user_id=user_id,
         title=title,
@@ -4097,6 +4158,7 @@ async def create_notification_internal(user_id: str, title: str, message: str, t
     
     notification_dict = notification.model_dump()
     notification_dict["created_at"] = notification_dict["created_at"].isoformat()
+    notification_dict["category"] = category
 
     await db.notifications.insert_one(notification_dict)
 
@@ -4170,7 +4232,7 @@ async def create_announcement(data: AnnouncementCreate, current_user: dict = Dep
     role_filter = {"role": {"$in": ANNOUNCEMENT_AUDIENCES[audience]}}
     targets = await db.users.find(role_filter, {"_id": 0, "id": 1}).to_list(10000)
     for u in targets:
-        await create_notification_internal(u["id"], f"📢 {data.title.strip()}", data.message.strip(), "info")
+        await create_notification_internal(u["id"], f"📢 {data.title.strip()}", data.message.strip(), "info", "announcement")
 
     return {"message": "تم بثّ الإعلان", "id": ann["id"], "recipients": len(targets)}
 
@@ -4198,12 +4260,86 @@ async def delete_announcement(ann_id: str, current_user: dict = Depends(get_curr
     return {"message": "تم حذف الإعلان"}
 
 
+# ============== إعدادات العرض (يتحكم بها المدير) ==============
+# hidden_nav: روابط القائمة الجانبية المخفية لكل دور (المشرف/الطالب).
+# notifications: إظهار الإشعارات لكل دور، ولكل فئة (النظام / الإعلانات / المحادثة).
+NOTIFICATION_CATEGORIES = ("system", "announcement", "chat")
+UI_ROLES = ("sheikh", "student")
+
+
+def _default_ui_settings() -> dict:
+    return {
+        "hidden_nav": {r: [] for r in UI_ROLES},
+        "notifications": {r: {"enabled": True, **{c: True for c in NOTIFICATION_CATEGORIES}} for r in UI_ROLES},
+    }
+
+
+async def get_ui_settings() -> dict:
+    doc = await db.settings.find_one({"key": "ui_settings"}, {"_id": 0}) or {}
+    out = _default_ui_settings()
+    for r in UI_ROLES:
+        hidden = (doc.get("hidden_nav") or {}).get(r)
+        if isinstance(hidden, list):
+            out["hidden_nav"][r] = [str(x) for x in hidden]
+        notif = (doc.get("notifications") or {}).get(r) or {}
+        for k in ("enabled", *NOTIFICATION_CATEGORIES):
+            if k in notif:
+                out["notifications"][r][k] = bool(notif[k])
+    return out
+
+
+class UiSettingsUpdate(BaseModel):
+    hidden_nav: Optional[Dict[str, List[str]]] = None
+    notifications: Optional[Dict[str, Dict[str, bool]]] = None
+
+
+@api_router.get("/ui-settings")
+async def read_ui_settings(current_user: dict = Depends(get_current_user)):
+    return await get_ui_settings()
+
+
+@api_router.put("/admin/ui-settings")
+async def update_ui_settings(data: UiSettingsUpdate, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل إعدادات العرض")
+    current = await get_ui_settings()
+    if data.hidden_nav is not None:
+        for r in UI_ROLES:
+            if r in data.hidden_nav:
+                current["hidden_nav"][r] = [p for p in data.hidden_nav[r] if p != "/dashboard"]
+    if data.notifications is not None:
+        for r in UI_ROLES:
+            for k, v in (data.notifications.get(r) or {}).items():
+                if k in ("enabled", *NOTIFICATION_CATEGORIES):
+                    current["notifications"][r][k] = bool(v)
+    await db.settings.update_one({"key": "ui_settings"}, {"$set": current}, upsert=True)
+    await log_admin_action(current_user, "ui_settings", details="تعديل إعدادات العرض والإشعارات")
+    return {"message": "تم حفظ إعدادات العرض", "settings": current}
+
+
+def _notification_category(n: dict) -> str:
+    """الإشعارات القديمة بلا فئة: تُستنتج من العنوان."""
+    if n.get("category") in NOTIFICATION_CATEGORIES:
+        return n["category"]
+    title = n.get("title") or ""
+    if title.startswith("رسالة من الطالب") or title.startswith("رسالة من الإدارة")             or title.startswith("رسالة من المشرف") or title == "رسالة من مشرفك":
+        return "chat"
+    if title.startswith("📢") or title.startswith("رسالة من مشرفك:"):
+        return "announcement"
+    return "system"
+
+
 @api_router.get("/notifications")
 async def get_notifications(current_user: dict = Depends(get_current_user)):
+    role = current_user["role"]
+    prefs = (await get_ui_settings())["notifications"].get(role) if role in UI_ROLES else None
+    if prefs and not prefs["enabled"]:
+        return []
     notifications = await db.notifications.find(
         {"user_id": current_user["user_id"]},
         {"_id": 0}
-    ).sort("created_at", -1).to_list(50)
+    ).sort("created_at", -1).to_list(200 if prefs else 50)
+    if prefs:
+        notifications = [n for n in notifications if prefs.get(_notification_category(n), True)][:50]
     return notifications
 
 @api_router.put("/notifications/{notification_id}/read")
@@ -4643,7 +4779,7 @@ async def get_users(role: Optional[str] = None, current_user: dict = Depends(get
     
     if current_user["role"] == "sheikh":
         # Sheikh can only see students in their groups
-        groups = await db.groups.find({"sheikh_id": current_user["user_id"]}, {"_id": 0, "id": 1}).to_list(100)
+        groups = await db.groups.find({"sheikh_ids": current_user["user_id"]}, {"_id": 0, "id": 1}).to_list(100)
         group_ids = [g["id"] for g in groups]
         query["$or"] = [
             {"group_id": {"$in": group_ids}},
@@ -5142,7 +5278,7 @@ async def bulk_notify(data: BulkNotifyRequest, current_user: dict = Depends(get_
     if not data.title.strip() or not data.message.strip():
         raise HTTPException(status_code=400, detail="العنوان والنص مطلوبان")
     for uid in data.user_ids:
-        await create_notification_internal(uid, data.title.strip(), data.message.strip(), "info")
+        await create_notification_internal(uid, data.title.strip(), data.message.strip(), "info", "announcement")
     return {"message": f"تم إرسال {len(data.user_ids)} إشعار", "count": len(data.user_ids)}
 
 
@@ -5169,7 +5305,7 @@ async def sheikh_message_students(data: SheikhMessageRequest, current_user: dict
     students = await db.users.find({"role": "student", "group_id": {"$in": target_gids}}, {"_id": 0, "id": 1}).to_list(5000)
     title = f"رسالة من مشرفك: {data.title.strip()}"
     for s in students:
-        await create_notification_internal(s["id"], title, data.message.strip(), "info")
+        await create_notification_internal(s["id"], title, data.message.strip(), "info", "announcement")
     return {"message": f"تم إرسال الرسالة إلى {len(students)} طالب", "count": len(students)}
 
 
@@ -5242,10 +5378,10 @@ async def chat_send(data: ChatSendRequest, current_user: dict = Depends(get_curr
         }
         await db.chat_messages.insert_one(dict(msg))
         if role == "admin":
-            await create_notification_internal(target_sheikh, "رسالة من الإدارة", text[:80], "info")
+            await create_notification_internal(target_sheikh, "رسالة من الإدارة", text[:80], "info", "chat")
         else:
             for adm in await db.users.find({"role": "admin"}, {"_id": 0, "id": 1}).to_list(100):
-                await create_notification_internal(adm["id"], f"رسالة من المشرف {sender_name}", text[:80], "info")
+                await create_notification_internal(adm["id"], f"رسالة من المشرف {sender_name}", text[:80], "info", "chat")
         msg.pop("_id", None)
         return {"message": "تم الإرسال", "chat": msg}
 
@@ -5275,17 +5411,17 @@ async def chat_send(data: ChatSendRequest, current_user: dict = Depends(get_curr
     stu_name = (stu or {}).get("name", "")
     if role == "student":
         if shid:
-            await create_notification_internal(shid, f"رسالة من الطالب {stu_name}", text[:80], "info")
+            await create_notification_internal(shid, f"رسالة من الطالب {stu_name}", text[:80], "info", "chat")
         for adm in await db.users.find({"role": "admin"}, {"_id": 0, "id": 1}).to_list(100):
-            await create_notification_internal(adm["id"], f"رسالة من الطالب {stu_name}", text[:80], "info")
+            await create_notification_internal(adm["id"], f"رسالة من الطالب {stu_name}", text[:80], "info", "chat")
     elif role == "sheikh":
-        await create_notification_internal(sid, "رسالة من مشرفك", text[:80], "info")
+        await create_notification_internal(sid, "رسالة من مشرفك", text[:80], "info", "chat")
         for adm in await db.users.find({"role": "admin"}, {"_id": 0, "id": 1}).to_list(100):
-            await create_notification_internal(adm["id"], f"رسالة من المشرف {sender_name} (محادثة {stu_name})", text[:80], "info")
+            await create_notification_internal(adm["id"], f"رسالة من المشرف {sender_name} (محادثة {stu_name})", text[:80], "info", "chat")
     else:  # admin
-        await create_notification_internal(sid, "رسالة من الإدارة", text[:80], "info")
+        await create_notification_internal(sid, "رسالة من الإدارة", text[:80], "info", "chat")
         if shid:
-            await create_notification_internal(shid, f"رسالة من الإدارة (محادثة {stu_name})", text[:80], "info")
+            await create_notification_internal(shid, f"رسالة من الإدارة (محادثة {stu_name})", text[:80], "info", "chat")
 
     msg.pop("_id", None)
     return {"message": "تم الإرسال", "chat": msg}
@@ -5437,6 +5573,75 @@ async def chat_unread_count(current_user: dict = Depends(get_current_user)):
     return {"unread": n}
 
 
+@api_router.delete("/chat/messages/{message_id}")
+async def chat_delete_message(message_id: str, current_user: dict = Depends(get_current_user)):
+    """المدير يحذف رسالة واحدة من أي محادثة."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف الرسائل")
+    msg = await db.chat_messages.find_one({"id": message_id}, {"_id": 0, "id": 1, "text": 1})
+    if not msg:
+        raise HTTPException(status_code=404, detail="الرسالة غير موجودة")
+    await db.chat_messages.delete_one({"id": message_id})
+    await log_admin_action(current_user, "chat_delete", "chat_message", message_id,
+                           details=f"حذف رسالة: {(msg.get('text') or '')[:60]}")
+    return {"message": "تم حذف الرسالة"}
+
+
+@api_router.delete("/chat/conversation")
+async def chat_delete_conversation(student_id: Optional[str] = None, sheikh_id: Optional[str] = None,
+                                   current_user: dict = Depends(get_current_user)):
+    """المدير يحذف محادثة كاملة: غرفة طالب (`student_id`) أو محادثة الإدارة مع مشرف (`sheikh_id`)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف المحادثات")
+    if student_id:
+        q = {"student_id": student_id, "kind": {"$ne": "admin_sheikh"}}
+        target = await db.users.find_one({"id": student_id}, {"_id": 0, "name": 1})
+    elif sheikh_id:
+        q = {"kind": "admin_sheikh", "sheikh_id": sheikh_id}
+        target = await db.users.find_one({"id": sheikh_id}, {"_id": 0, "name": 1})
+    else:
+        raise HTTPException(status_code=400, detail="يجب تحديد المحادثة")
+    res = await db.chat_messages.delete_many(q)
+    await log_admin_action(current_user, "chat_delete", "chat", student_id or sheikh_id,
+                           (target or {}).get("name"), f"حذف محادثة كاملة ({res.deleted_count} رسالة)")
+    return {"message": f"تم حذف المحادثة ({res.deleted_count} رسالة)", "deleted": res.deleted_count}
+
+
+# ============== المتصلون الآن ==============
+# كل واجهة مفتوحة ترسل نبضة كل دقيقة؛ المستخدم «متصل» إذا وصلت نبضته خلال آخر دقيقتين.
+ONLINE_WINDOW_SECONDS = 120
+
+
+@api_router.post("/presence/ping")
+async def presence_ping(current_user: dict = Depends(get_current_user)):
+    await db.users.update_one({"id": current_user["user_id"]},
+                              {"$set": {"last_seen": datetime.now(timezone.utc).isoformat()}})
+    return {"ok": True}
+
+
+@api_router.post("/presence/offline")
+async def presence_offline(current_user: dict = Depends(get_current_user)):
+    await db.users.update_one({"id": current_user["user_id"]}, {"$set": {"last_seen": None}})
+    return {"ok": True}
+
+
+@api_router.get("/admin/online-users")
+async def online_users(current_user: dict = Depends(get_current_user)):
+    """الطلاب والمشرفون المتصلون الآن (للمدير)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه عرض المتصلين")
+    since = (datetime.now(timezone.utc) - timedelta(seconds=ONLINE_WINDOW_SECONDS)).isoformat()
+    users = await db.users.find(
+        {"role": {"$in": ["student", "sheikh"]}, "last_seen": {"$gte": since}},
+        {"_id": 0, "id": 1, "name": 1, "role": 1, "group_id": 1, "last_seen": 1},
+    ).sort("name", 1).to_list(2000)
+    gids = list({u["group_id"] for u in users if u.get("group_id")})
+    groups = {g["id"]: g["name"] for g in await db.groups.find({"id": {"$in": gids}}, {"_id": 0, "id": 1, "name": 1}).to_list(500)}
+    for u in users:
+        u["group_name"] = groups.get(u.get("group_id"))
+    return {
+        "students": [u for u in users if u["role"] == "student"],
+        "sheikhs": [u for u in users if u["role"] == "sheikh"],
+    }
+
+
 # ============== T5 - مؤشرات الواجبات والاختبارات للمشرف ==============
 @api_router.get("/sheikh/assignment-stats")
 async def sheikh_assignment_stats(current_user: dict = Depends(get_current_user)):
@@ -5539,7 +5744,7 @@ async def admin_create_student(data: AdminCreateStudent, current_user: dict = De
         # إذا كان المشرف هو من أضاف الطالب، نضيفه لمجموعته
         if current_user["role"] == "sheikh" and data.group_id:
             # التحقق من أن المجموعة تابعة للمشرف
-            group = await db.groups.find_one({"id": data.group_id, "sheikh_id": current_user["user_id"]})
+            group = await db.groups.find_one({"id": data.group_id, "sheikh_ids": current_user["user_id"]})
             if group:
                 user_dict["group_id"] = data.group_id
         elif data.group_id:
@@ -5562,7 +5767,7 @@ async def admin_create_student(data: AdminCreateStudent, current_user: dict = De
         fees_created = await auto_generate_fees_for_new_student(user.id, current_user["user_id"])
 
         return {
-            "message": "تم إضافة الطالب بنجاح",
+            "message": "تمت إضافة الطالب بنجاح",
             "student_id": user.id,
             "student_name": user.name,
             "fees_created": fees_created
@@ -5634,7 +5839,7 @@ async def admin_create_sheikh(data: AdminCreateSheikh, current_user: dict = Depe
                            f"إضافة مشرف جديد{' وإسناد مجموعة ' + group['name'] if group else ''}")
 
     return {
-        "message": "تم إضافة المشرف بنجاح",
+        "message": "تمت إضافة المشرف بنجاح",
         "sheikh_id": user.id,
         "sheikh_name": user.name
     }
@@ -6082,7 +6287,7 @@ async def release_freeze(adjustment_id: str, current_user: dict = Depends(get_cu
     result = await recompute_student_points(adj["student_id"])
     await create_notification_internal(
         adj["student_id"], "🔓 فكّ تجميد النقاط",
-        f"تم فكّ تجميد {adj['points']} نقطة — رجعت لرصيدك المتاح.", "success"
+        f"تم فكّ تجميد {adj['points']} نقطة — عادت إلى رصيدك المتاح.", "success"
     )
     return {"message": f"تم فكّ تجميد {adj['points']} نقطة", "points": result}
 
@@ -6289,7 +6494,7 @@ async def recompute_all_points(current_user: dict = Depends(get_current_user)):
         total += r["total_points"]
     await log_admin_action(current_user, "recompute_points", "system", None, None,
                            f"إعادة احتساب نقاط {len(students)} طالب")
-    return {"message": f"تم إعادة احتساب نقاط {len(students)} طالب", "students": len(students), "grand_total": total}
+    return {"message": f"تمت إعادة احتساب نقاط {len(students)} طالب", "students": len(students), "grand_total": total}
 
 
 async def check_and_award_badges(student_id: str, total_points: int) -> list:
@@ -6594,7 +6799,7 @@ async def add_curriculum_entry(curriculum_id: str, data: CurriculumEntryCreate, 
     
     await db.curriculum_entries.insert_one(entry_dict)
     
-    return {"message": "تم إضافة الخطة بنجاح", "entry_id": entry.id}
+    return {"message": "تمت إضافة الخطة بنجاح", "entry_id": entry.id}
 
 @api_router.put("/curriculum/entries/{entry_id}")
 async def update_curriculum_entry(entry_id: str, data: CurriculumEntryCreate, current_user: dict = Depends(get_current_user)):
@@ -6791,7 +6996,7 @@ async def grant_active_student_bonus(data: ActiveStudentBonus, current_user: dic
         raise HTTPException(status_code=404, detail="الطالب غير موجود")
     
     # Check if student is in sheikh's groups
-    groups = await db.groups.find({"sheikh_id": current_user["user_id"]}).to_list(100)
+    groups = await db.groups.find({"sheikh_ids": current_user["user_id"]}).to_list(100)
     group_ids = [g["id"] for g in groups]
     if student.get("group_id") not in group_ids:
         raise HTTPException(status_code=403, detail="الطالب ليس في مجموعاتك")
@@ -6861,7 +7066,7 @@ async def add_schedule_slot(schedule_id: str, data: ScheduleSlotCreate, current_
     
     await db.schedule_slots.insert_one(slot_dict)
     
-    return {"message": "تم إضافة الحصة بنجاح", "slot_id": slot.id}
+    return {"message": "تمت إضافة الحصة بنجاح", "slot_id": slot.id}
 
 @api_router.put("/schedule/slots/{slot_id}")
 async def update_schedule_slot(slot_id: str, data: ScheduleSlotCreate, current_user: dict = Depends(get_current_user)):
@@ -6905,7 +7110,7 @@ async def get_sheikh_students_ranking(current_user: dict = Depends(get_current_u
     ensure_role(current_user, "sheikh", "فقط للمشرفين")
     
     # Get sheikh's groups
-    groups = await db.groups.find({"sheikh_id": current_user["user_id"]}, {"_id": 0}).to_list(20)
+    groups = await db.groups.find({"sheikh_ids": current_user["user_id"]}, {"_id": 0}).to_list(20)
     group_ids = [g["id"] for g in groups]
     
     if not group_ids:
@@ -7024,13 +7229,12 @@ async def get_admin_rankings(
             present_attendance = await db.attendance.count_documents({"student_id": {"$in": student_ids}, "status": "present"})
             attendance_rate = round((present_attendance / total_attendance * 100), 1) if total_attendance > 0 else 0
             
-            # Get sheikh name
-            sheikh = await db.users.find_one({"id": group.get("sheikh_id")}, {"_id": 0, "name": 1})
+            # Get sheikh names (all sheikhs of the group)
             
             group_rankings.append({
                 "group_id": group["id"],
                 "group_name": group["name"],
-                "sheikh_name": sheikh["name"] if sheikh else "غير معين",
+                "sheikh_name": await group_sheikh_names_str(group),
                 "student_count": len(students),
                 "total_points": total_points,
                 "avg_points": avg_points,
@@ -7205,12 +7409,10 @@ async def get_admin_dashboard_stats(current_user: dict = Depends(get_current_use
         ).to_list(500)
         group_points = sum(p.get("total_points", 0) for p in points_data)
         
-        sheikh = await db.users.find_one({"id": group.get("sheikh_id")}, {"_id": 0, "name": 1})
-        
         group_stats.append({
             "group_id": group["id"],
             "group_name": group["name"],
-            "sheikh_name": sheikh["name"] if sheikh else "غير معين",
+            "sheikh_name": await group_sheikh_names_str(group),
             "student_count": len(students),
             "total_points": group_points
         })
@@ -7293,7 +7495,7 @@ async def get_admin_dashboard_stats(current_user: dict = Depends(get_current_use
     empty_stat = {"present": 0, "att_total": 0, "recited": 0, "rec_total": 0, "students": 0}
     sheikh_stats = []
     for sheikh in sheikhs:
-        sheikh_groups = [g for g in groups if g.get("sheikh_id") == sheikh["id"]]
+        sheikh_groups = [g for g in groups if sheikh["id"] in group_sheikh_ids(g)]
         group_rows = []
         t_present = t_att = t_recited = t_rec = t_students = 0
 
@@ -7363,7 +7565,7 @@ async def get_admin_dashboard_stats(current_user: dict = Depends(get_current_use
         week_groups.append({
             "group_id": g["id"],
             "group_name": g["name"],
-            "sheikh_name": sheikh_name_map.get(g.get("sheikh_id"), "غير معين"),
+            "sheikh_name": "، ".join(sheikh_name_map[i] for i in group_sheikh_ids(g) if i in sheikh_name_map) or "غير معين",
             "students_count": st["students"],
             "attendance_rate": _rate(st["present"], st["att_total"]),
             "recitation_rate": _rate(st["recited"], st["rec_total"]),
@@ -7419,7 +7621,7 @@ async def get_sheikh_details(sheikh_id: str, current_user: dict = Depends(get_cu
         raise HTTPException(status_code=404, detail="المشرف غير موجود")
     
     # Get sheikh's groups
-    groups = await db.groups.find({"sheikh_id": sheikh_id}, {"_id": 0}).to_list(20)
+    groups = await db.groups.find({"sheikh_ids": sheikh_id}, {"_id": 0}).to_list(20)
     
     # Get all students in these groups
     group_ids = [g["id"] for g in groups]
@@ -7550,11 +7752,11 @@ async def create_fee(data: FeeCreate, current_user: dict = Depends(get_current_u
         await create_notification_internal(
             data.student_id,
             "رسوم مالية جديدة",
-            f"تم إضافة {fee_types.get(data.fee_type, data.fee_type)} بمبلغ {data.amount}",
+            f"تمت إضافة {fee_types.get(data.fee_type, data.fee_type)} بمبلغ {data.amount}",
             "warning"
         )
         
-        return {"message": "تم إضافة الرسوم بنجاح", "fee_id": fee.id}
+        return {"message": "تمت إضافة الرسوم بنجاح", "fee_id": fee.id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"فشل في إضافة الرسوم: {str(e)}")
 
@@ -8264,7 +8466,7 @@ async def create_homework(data: HomeworkCreate, current_user: dict = Depends(get
     else:
         # All students (for sheikh, only their groups)
         if current_user["role"] == "sheikh":
-            groups = await db.groups.find({"sheikh_id": current_user["user_id"]}, {"_id": 0, "id": 1}).to_list(20)
+            groups = await db.groups.find({"sheikh_ids": current_user["user_id"]}, {"_id": 0, "id": 1}).to_list(20)
             group_ids = [g["id"] for g in groups]
             students = await db.users.find({"group_id": {"$in": group_ids}, "role": "student"}, {"_id": 0, "id": 1}).to_list(500)
             target_students = [s["id"] for s in students]
@@ -8285,11 +8487,11 @@ async def create_homework(data: HomeworkCreate, current_user: dict = Depends(get
         await create_notification_internal(
             student_id,
             "واجب جديد",
-            f"تم إضافة واجب: {data.title} - موعد التسليم: {data.due_date}",
+            f"تمت إضافة واجب: {data.title} - موعد التسليم: {data.due_date}",
             "info"
         )
     
-    return {"message": "تم إضافة الواجب بنجاح", "homework_id": homework.id}
+    return {"message": "تمت إضافة الواجب بنجاح", "homework_id": homework.id}
 
 @api_router.get("/homework")
 async def get_homework(current_user: dict = Depends(get_current_user)):
@@ -8484,7 +8686,7 @@ async def create_admin_exam(data: AdminExamCreate, current_user: dict = Depends(
         "success" if data.result == "pass" else "warning"
     )
     
-    return {"message": "تم إضافة الاختبار بنجاح", "exam_id": exam.id, "grade": final_grade}
+    return {"message": "تمت إضافة الاختبار بنجاح", "exam_id": exam.id, "grade": final_grade}
 
 @api_router.get("/admin-exams")
 async def get_admin_exams(student_id: Optional[str] = None, exam_type: Optional[str] = None, current_user: dict = Depends(get_current_user)):
@@ -8605,7 +8807,7 @@ async def create_tajweed_exam(data: TajweedExamCreate, current_user: dict = Depe
         "success" if data.result == "pass" else "warning"
     )
     
-    return {"message": "تم إضافة اختبار التجويد بنجاح", "exam_id": exam.id}
+    return {"message": "تمت إضافة اختبار التجويد بنجاح", "exam_id": exam.id}
 
 @api_router.get("/tajweed-exams")
 async def get_tajweed_exams(student_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
@@ -9287,7 +9489,7 @@ async def close_term_and_start_new(data: TermCreateRequest, current_user: dict =
         # ─────────────────────────────────────────────
         # 5. أرشفة سجلات الحضور كاملةً ثم حذفها
         # ─────────────────────────────────────────────
-            all_attendance = await db.attendance.find({}, {"_id": 0}).to_list(100000)
+        all_attendance = await db.attendance.find({}, {"_id": 0}).to_list(100000)
         if all_attendance:
             for rec in all_attendance:
                 rec["term_id"] = term_id
@@ -9485,7 +9687,7 @@ async def admin_reset_term(data: TermCreateRequest, current_user: dict = Depends
                                f"إعادة تعيين الفصل وبدء «{data.name}» — أُرشِف {len(archives)} طالب")
 
         return {
-            "message": f"تم إعادة تعيين الفصل بنجاح. الفصل الجديد: {data.name}",
+            "message": f"تمت إعادة تعيين الفصل بنجاح. الفصل الجديد: {data.name}",
             "new_term_id": new_term.id,
             "archived_students_count": len(archives),
             "previous_term_name": term_name
@@ -9714,7 +9916,7 @@ async def remove_badge(data: BadgeRemove, current_user: dict = Depends(get_curre
         new_value=data.reason or ""
     )
     
-    return {"message": "تم إزالة الشارة من الطالب"}
+    return {"message": "تمت إزالة الشارة من الطالب"}
 
 # ============== SHEIKH UPDATE STUDENT ROUTES ==============
 
@@ -10477,6 +10679,325 @@ async def export_student_recitations_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+# ============== ملف المسابقة السنوية (أرشيف النتائج حسب السنة) ==============
+# كل صف = مشاركة طالب في المسابقة السنوية لسنة معيّنة: الاسم، المستوى، العلامة، النتيجة.
+# يُربط الصف بحساب الطالب (student_id) عند تطابق الاسم، فيظهر في صفحة الطالب بجانب تقييمه.
+
+ANNUAL_DEFAULT_PASS_MARK = 70.0
+
+
+class AnnualCompetitionRow(BaseModel):
+    year: int
+    student_name: str
+    level: Optional[str] = None          # مثال: 5 أجزاء، 10 أجزاء، القرآن كاملًا
+    score: Optional[float] = None        # العلامة من 100
+    passed: Optional[bool] = None        # إن لم تُحدَّد تُحسب من العلامة وعلامة النجاح
+    student_id: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class AnnualCompetitionImport(BaseModel):
+    year: int
+    pass_mark: Optional[float] = None
+    rows: List[AnnualCompetitionRow] = []
+
+
+def _norm_ar_name(name: str) -> str:
+    """توحيد كتابة الاسم للمطابقة: الهمزات، التاء المربوطة، الألف المقصورة، والمسافات."""
+    s = (name or "").strip()
+    for a, b in (("أ", "ا"), ("إ", "ا"), ("آ", "ا"), ("ة", "ه"), ("ى", "ي"), ("ـ", "")):
+        s = s.replace(a, b)
+    return " ".join(s.split())
+
+
+async def _annual_pass_mark(year: int) -> float:
+    doc = await db.annual_competition_years.find_one({"year": year}, {"_id": 0, "pass_mark": 1})
+    return float(doc["pass_mark"]) if doc and doc.get("pass_mark") is not None else ANNUAL_DEFAULT_PASS_MARK
+
+
+async def _annual_row_doc(row: AnnualCompetitionRow, pass_mark: float, students_by_name: dict) -> dict:
+    name = " ".join((row.student_name or "").split())
+    if not name:
+        raise HTTPException(status_code=400, detail="اسم الطالب مطلوب")
+    if row.score is not None and not (0 <= row.score <= 100):
+        raise HTTPException(status_code=400, detail=f"العلامة يجب أن تكون بين 0 و100 ({name})")
+    student_id = row.student_id or students_by_name.get(_norm_ar_name(name))
+    passed = row.passed
+    if passed is None and row.score is not None:
+        passed = row.score >= pass_mark
+    return {
+        "year": row.year,
+        "student_name": name,
+        "student_id": student_id,
+        "level": (row.level or "").strip() or None,
+        "score": row.score,
+        "passed": passed,
+        "notes": (row.notes or "").strip() or None,
+    }
+
+
+async def _students_by_norm_name() -> dict:
+    students = await db.users.find({"role": "student"}, {"_id": 0, "id": 1, "name": 1}).to_list(10000)
+    return {_norm_ar_name(s.get("name")): s["id"] for s in students if s.get("name")}
+
+
+@api_router.get("/annual-competition/years")
+async def annual_competition_years(current_user: dict = Depends(get_current_user)):
+    """السنوات المسجّلة مع عدد المشاركين والناجحين في كل سنة."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
+    agg = await db.annual_competition.aggregate([
+        {"$group": {"_id": "$year", "total": {"$sum": 1},
+                    "passed": {"$sum": {"$cond": [{"$eq": ["$passed", True]}, 1, 0]}},
+                    "failed": {"$sum": {"$cond": [{"$eq": ["$passed", False]}, 1, 0]}}}},
+    ]).to_list(200)
+    years = {a["_id"]: {"year": a["_id"], "total": a["total"], "passed": a["passed"], "failed": a["failed"]} for a in agg}
+    async for y in db.annual_competition_years.find({}, {"_id": 0}):
+        years.setdefault(y["year"], {"year": y["year"], "total": 0, "passed": 0, "failed": 0})
+        years[y["year"]]["pass_mark"] = y.get("pass_mark")
+    for y in years.values():
+        y.setdefault("pass_mark", None)
+        if y["pass_mark"] is None:
+            y["pass_mark"] = ANNUAL_DEFAULT_PASS_MARK
+    return sorted(years.values(), key=lambda y: y["year"], reverse=True)
+
+
+class AnnualYearRequest(BaseModel):
+    year: int
+    pass_mark: Optional[float] = None
+
+
+@api_router.post("/annual-competition/years")
+async def annual_competition_add_year(data: AnnualYearRequest, current_user: dict = Depends(get_current_user)):
+    """إضافة سنة جديدة (أو تعديل علامة النجاح لسنة موجودة)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الإضافة")
+    if not (2000 <= data.year <= 2100):
+        raise HTTPException(status_code=400, detail="السنة غير صحيحة")
+    pass_mark = data.pass_mark if data.pass_mark is not None else ANNUAL_DEFAULT_PASS_MARK
+    if not (0 <= pass_mark <= 100):
+        raise HTTPException(status_code=400, detail="علامة النجاح يجب أن تكون بين 0 و100")
+    await db.annual_competition_years.update_one(
+        {"year": data.year}, {"$set": {"year": data.year, "pass_mark": pass_mark}}, upsert=True)
+    return {"message": f"تم حفظ سنة {data.year}", "year": data.year, "pass_mark": pass_mark}
+
+
+@api_router.get("/annual-competition")
+async def annual_competition_list(year: int, status: Optional[str] = None, search: Optional[str] = None,
+                                  current_user: dict = Depends(get_current_user)):
+    """المشاركون في سنة معيّنة. status: passed | failed | pending."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
+    q = {"year": year}
+    if status == "passed":
+        q["passed"] = True
+    elif status == "failed":
+        q["passed"] = False
+    elif status == "pending":
+        q["passed"] = None
+    rows = await db.annual_competition.find(q, {"_id": 0}).sort([("score", -1), ("student_name", 1)]).to_list(5000)
+    if search:
+        needle = _norm_ar_name(search)
+        rows = [r for r in rows if needle in _norm_ar_name(r.get("student_name"))]
+    # الربط بتقييم الطالب الحالي: أجزاء المسابقة السنوية المسجّلة في تقييمه، ومجموعته
+    sids = [r["student_id"] for r in rows if r.get("student_id")]
+    students = {s["id"]: s for s in await db.users.find(
+        {"id": {"$in": sids}},
+        {"_id": 0, "id": 1, "group_id": 1, "annual_competition": 1, "annual_competition_juz": 1, "tajweed_level": 1}
+    ).to_list(5000)}
+    groups = {g["id"]: g["name"] for g in await db.groups.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(3000)}
+    for r in rows:
+        s = students.get(r.get("student_id"))
+        r["linked"] = bool(s)
+        r["group_name"] = groups.get(s.get("group_id")) if s else None
+        r["assessment_competition_juz"] = (s.get("annual_competition_juz") or []) if s and s.get("annual_competition") else []
+        r["tajweed_level"] = s.get("tajweed_level") if s else None
+    return {"year": year, "pass_mark": await _annual_pass_mark(year), "rows": rows}
+
+
+@api_router.post("/annual-competition")
+async def annual_competition_add(data: AnnualCompetitionRow, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الإضافة")
+    doc = await _annual_row_doc(data, await _annual_pass_mark(data.year), await _students_by_norm_name())
+    doc["id"] = str(uuid.uuid4())
+    doc["created_at"] = datetime.now(timezone.utc).isoformat()
+    await db.annual_competition.insert_one(dict(doc))
+    await db.annual_competition_years.update_one(
+        {"year": data.year}, {"$setOnInsert": {"year": data.year, "pass_mark": ANNUAL_DEFAULT_PASS_MARK}}, upsert=True)
+    return {"message": "تمت إضافة المشارك", "row": doc}
+
+
+@api_router.put("/annual-competition/{row_id}")
+async def annual_competition_update(row_id: str, data: AnnualCompetitionRow, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه التعديل")
+    if not await db.annual_competition.find_one({"id": row_id}):
+        raise HTTPException(status_code=404, detail="السجل غير موجود")
+    doc = await _annual_row_doc(data, await _annual_pass_mark(data.year), await _students_by_norm_name())
+    await db.annual_competition.update_one({"id": row_id}, {"$set": doc})
+    return {"message": "تم تعديل السجل"}
+
+
+@api_router.delete("/annual-competition/{row_id}")
+async def annual_competition_delete(row_id: str, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الحذف")
+    result = await db.annual_competition.delete_one({"id": row_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="السجل غير موجود")
+    return {"message": "تم حذف السجل"}
+
+
+# أسماء الأعمدة المقبولة في ملف الاستيراد (Excel)
+ANNUAL_IMPORT_HEADERS = {
+    "student_name": ("الاسم", "اسم الطالب", "الطالب", "name"),
+    "level": ("المستوى", "المستوي", "الفئة", "level"),
+    "score": ("العلامة", "العلامه", "الدرجة", "الدرجه", "score", "mark"),
+    "result": ("النتيجة", "النتيجه", "الحالة", "result"),
+    "notes": ("ملاحظات", "ملاحظة", "notes"),
+}
+
+
+def _parse_annual_xlsx(content: bytes) -> List[dict]:
+    """يقرأ أول ورقة: يبحث عن صف العناوين في أول 10 صفوف ثم يقرأ البيانات تحته."""
+    import openpyxl
+    try:
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="تعذّرت قراءة الملف — يجب أن يكون ملف Excel بصيغة xlsx")
+    ws = wb.worksheets[0]
+    all_rows = list(ws.iter_rows(values_only=True))
+    header_idx, cols = None, {}
+    for i, row in enumerate(all_rows[:10]):
+        found = {}
+        for c, val in enumerate(row):
+            label = _norm_ar_name(str(val or "")).lower()
+            for key, names in ANNUAL_IMPORT_HEADERS.items():
+                if key not in found and label in {_norm_ar_name(n).lower() for n in names}:
+                    found[key] = c
+        if "student_name" in found:
+            header_idx, cols = i, found
+            break
+    if header_idx is None:
+        raise HTTPException(status_code=400, detail="لم يُعثر على عمود «الاسم» في أول عشرة صفوف من الملف")
+
+    def cell(row, key):
+        c = cols.get(key)
+        return row[c] if c is not None and c < len(row) else None
+
+    out = []
+    for row in all_rows[header_idx + 1:]:
+        name = str(cell(row, "student_name") or "").strip()
+        if not name:
+            continue
+        score = cell(row, "score")
+        try:
+            score = float(str(score).replace("%", "").strip()) if score not in (None, "") else None
+        except ValueError:
+            score = None
+        result = _norm_ar_name(str(cell(row, "result") or ""))
+        passed = True if result in ("ناجح", "ناجحه", "نجح", "pass", "passed") else \
+            False if result in ("راسب", "راسبه", "رسب", "fail", "failed") else None
+        level = cell(row, "level")
+        notes = cell(row, "notes")
+        out.append({"student_name": name, "level": str(level).strip() if level not in (None, "") else None,
+                    "score": score, "passed": passed, "notes": str(notes).strip() if notes not in (None, "") else None})
+    return out
+
+
+@api_router.post("/annual-competition/import")
+async def annual_competition_import(year: int, pass_mark: Optional[float] = None, replace: bool = False,
+                                    file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    """استيراد كشف سنة من ملف Excel (أعمدة: الاسم، المستوى، العلامة، النتيجة، ملاحظات).
+    replace=true يحذف كشف السنة القديم أولًا؛ وإلا يُحدَّث الطالب الموجود بالاسم نفسه ويُضاف الجديد."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الاستيراد")
+    if not (2000 <= year <= 2100):
+        raise HTTPException(status_code=400, detail="السنة غير صحيحة")
+    parsed = _parse_annual_xlsx(await file.read())
+    if not parsed:
+        raise HTTPException(status_code=400, detail="الملف لا يحتوي على أسماء")
+
+    if pass_mark is not None:
+        await db.annual_competition_years.update_one(
+            {"year": year}, {"$set": {"year": year, "pass_mark": pass_mark}}, upsert=True)
+    else:
+        await db.annual_competition_years.update_one(
+            {"year": year}, {"$setOnInsert": {"year": year, "pass_mark": ANNUAL_DEFAULT_PASS_MARK}}, upsert=True)
+    mark = await _annual_pass_mark(year)
+    by_name = await _students_by_norm_name()
+
+    if replace:
+        await db.annual_competition.delete_many({"year": year})
+    existing = {_norm_ar_name(r["student_name"]): r["id"] for r in await db.annual_competition.find(
+        {"year": year}, {"_id": 0, "id": 1, "student_name": 1}).to_list(5000)}
+
+    added = updated = linked = 0
+    now = datetime.now(timezone.utc).isoformat()
+    for p in parsed:
+        doc = await _annual_row_doc(AnnualCompetitionRow(year=year, **p), mark, by_name)
+        linked += 1 if doc["student_id"] else 0
+        key = _norm_ar_name(doc["student_name"])
+        if key in existing:
+            await db.annual_competition.update_one({"id": existing[key]}, {"$set": doc})
+            updated += 1
+        else:
+            doc["id"] = str(uuid.uuid4())
+            doc["created_at"] = now
+            await db.annual_competition.insert_one(dict(doc))
+            existing[key] = doc["id"]
+            added += 1
+
+    await log_admin_action(current_user, "annual_competition_import", "annual_competition", str(year), str(year),
+                           f"استيراد كشف المسابقة السنوية {year}: {added} جديد، {updated} مُحدَّث، {linked} مرتبط بحساب طالب")
+    return {"message": f"تم الاستيراد: {added} جديد، {updated} مُحدَّث، {linked} مرتبط بحساب طالب",
+            "added": added, "updated": updated, "linked": linked, "total": len(parsed)}
+
+
+@api_router.get("/annual-competition/template")
+async def annual_competition_template(current_user: dict = Depends(get_current_user)):
+    """نموذج Excel فارغ بالأعمدة المطلوبة للاستيراد."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
+    output = io.BytesIO()
+    wb = xlsxwriter.Workbook(output, {'in_memory': True})
+    head_f = wb.add_format({'bold': True, 'bg_color': '#1e3a5f', 'font_color': 'white', 'border': 1, 'align': 'center'})
+    sh = wb.add_worksheet('كشف المسابقة')
+    sh.right_to_left()
+    for c, h in enumerate(['الاسم', 'المستوى', 'العلامة', 'النتيجة', 'ملاحظات']):
+        sh.write(0, c, h, head_f)
+    sh.write_row(1, 0, ['محمد أحمد علي', '5 أجزاء', 85, 'ناجح', ''])
+    sh.set_column('A:A', 26); sh.set_column('B:E', 14)
+    wb.close()
+    return _xlsx_response(output, "annual_competition_template.xlsx")
+
+
+@api_router.get("/annual-competition/export")
+async def annual_competition_export(year: int, status: Optional[str] = None,
+                                    current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه التصدير")
+    data = await annual_competition_list(year, status, None, current_user)
+    output = io.BytesIO()
+    wb = xlsxwriter.Workbook(output, {'in_memory': True})
+    title_f = wb.add_format({'bold': True, 'font_size': 15, 'align': 'center', 'bg_color': '#0d9488', 'font_color': 'white'})
+    head_f = wb.add_format({'bold': True, 'bg_color': '#1e3a5f', 'font_color': 'white', 'border': 1, 'align': 'center'})
+    cell_f = wb.add_format({'border': 1, 'align': 'center'})
+    sh = wb.add_worksheet(f'المسابقة {year}')
+    sh.right_to_left()
+    sh.merge_range('A1:G1', f'كشف المسابقة السنوية {year} — علامة النجاح {data["pass_mark"]:g}', title_f)
+    for c, h in enumerate(['#', 'الاسم', 'المستوى', 'العلامة', 'النتيجة', 'المجموعة', 'ملاحظات']):
+        sh.write(2, c, h, head_f)
+    for i, r in enumerate(data["rows"], 1):
+        result = "ناجح" if r.get("passed") is True else "راسب" if r.get("passed") is False else "—"
+        sh.write_row(i + 2, 0, [i, r["student_name"], r.get("level") or "", r.get("score") if r.get("score") is not None else "",
+                                result, r.get("group_name") or "", r.get("notes") or ""], cell_f)
+    sh.set_column('A:A', 5); sh.set_column('B:B', 26); sh.set_column('C:G', 14)
+    wb.close()
+    return _xlsx_response(output, f"annual_competition_{year}.xlsx")
+
+
+@api_router.get("/students/{student_id}/annual-competition")
+async def student_annual_competition(student_id: str, current_user: dict = Depends(get_current_user)):
+    """سجل الطالب في المسابقة السنوية عبر السنوات (يظهر في صفحة الطالب)."""
+    ensure_role(current_user, ["admin", "sheikh", "student"], "غير مصرح لك")
+    if current_user["role"] == "student" and current_user["user_id"] != student_id:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    return await db.annual_competition.find({"student_id": student_id}, {"_id": 0}).sort("year", -1).to_list(100)
 
 
 # TEMPORARY — full database backup for migrating off the old host. Remove after migration.

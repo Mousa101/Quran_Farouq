@@ -13,6 +13,9 @@ import {
   Briefcase, MapPin, Star, UserCheck, FileText, Key, Edit, Loader2, UserPlus
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { EMAIL_PLACEHOLDER, PHONE_PLACEHOLDER, normalizePhone, phoneError } from '../lib/constants';
+import { formatDate as fmtDate } from '../lib/utils';
+import { defaultAvatar, onAvatarError } from '../lib/avatar';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -60,6 +63,8 @@ const SheikhManagement = () => {
       toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
       return;
     }
+    const badPhone = phoneError([['رقم الهاتف', addForm.student_phone]]);
+    if (badPhone) { toast.error(badPhone); return; }
     setAddingSheikh(true);
     try {
       const payload = {
@@ -68,7 +73,7 @@ const SheikhManagement = () => {
         group_id: addForm.group_id || null,
       };
       await axios.post(`${API}/admin/sheikhs`, payload);
-      toast.success('تم إضافة المشرف بنجاح');
+      toast.success('تمت إضافة المشرف بنجاح');
       setAddOpen(false);
       fetchSheikhs();
     } catch (error) {
@@ -89,6 +94,8 @@ const SheikhManagement = () => {
   };
 
   const saveEditSheikh = async () => {
+    const badPhone = phoneError([['رقم الهاتف', editForm.student_phone]]);
+    if (badPhone) { toast.error(badPhone); return; }
     setSavingEdit(true);
     try {
       await axios.put(`${API}/admin/sheikhs/${editTarget.id}`, editForm);
@@ -183,10 +190,7 @@ const SheikhManagement = () => {
     s.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('ar-SA');
-  };
+  const formatDate = (dateStr) => fmtDate(dateStr);
 
   if (loading) {
     return (
@@ -235,13 +239,7 @@ const SheikhManagement = () => {
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
                 {/* Profile Image */}
-                {sheikh.profile_image ? (
-                  <img src={sheikh.profile_image} alt={sheikh.name} className="w-14 h-14 rounded-xl object-cover border-2 border-blue-500/30" />
-                ) : (
-                  <div className="w-14 h-14 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                    <BookUser className="w-7 h-7 text-blue-400" />
-                  </div>
-                )}
+                <img src={sheikh.profile_image || defaultAvatar('sheikh')} onError={onAvatarError('sheikh')} alt={sheikh.name} className="w-14 h-14 rounded-xl object-cover border-2 border-blue-500/30 flex-shrink-0" />
                 
                 <div className="flex-1 min-w-0">
                   <h3 className={`font-bold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{sheikh.name}</h3>
@@ -307,7 +305,7 @@ const SheikhManagement = () => {
       {filteredSheikhs.length === 0 && (
         <div className={`text-center py-12 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
           <BookUser className="w-12 h-12 mx-auto text-slate-500 mb-3" />
-          <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>لا يوجد مشرفين</p>
+          <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>لا يوجد مشرفون</p>
         </div>
       )}
 
@@ -326,13 +324,7 @@ const SheikhManagement = () => {
               {/* Sheikh Info */}
               <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
                 <div className="flex items-start gap-4">
-                  {sheikhDetails.sheikh.profile_image ? (
-                    <img src={sheikhDetails.sheikh.profile_image} alt={sheikhDetails.sheikh.name} className="w-20 h-20 rounded-xl object-cover" />
-                  ) : (
-                    <div className="w-20 h-20 rounded-xl bg-blue-500/20 flex items-center justify-center">
-                      <BookUser className="w-10 h-10 text-blue-400" />
-                    </div>
-                  )}
+                  <img src={sheikhDetails.sheikh.profile_image || defaultAvatar('sheikh')} onError={onAvatarError('sheikh')} alt={sheikhDetails.sheikh.name} className="w-20 h-20 rounded-xl object-cover" />
                   <div className="flex-1">
                     <h3 className={`text-xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{sheikhDetails.sheikh.name}</h3>
                     <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
@@ -462,7 +454,7 @@ const SheikhManagement = () => {
               <UserPlus className="w-5 h-5 text-blue-400" />إضافة مشرف جديد
             </DialogTitle>
             <DialogDescription className={isDark ? 'text-slate-400' : 'text-slate-600'}>
-              الحساب بينفتح مفعّل مباشرة — المشرف بقدر يسجّل دخول فورًا.
+              يُنشأ الحساب مفعّلًا مباشرة، ويستطيع المشرف تسجيل الدخول فورًا.
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 gap-3 mt-2">
@@ -472,7 +464,7 @@ const SheikhManagement = () => {
             </div>
             <div>
               <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>البريد الإلكتروني *</Label>
-              <Input value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} dir="ltr" placeholder="name@faruq.com" className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+              <Input value={addForm.email} onChange={(e) => setAddForm({ ...addForm, email: e.target.value })} dir="ltr" placeholder={EMAIL_PLACEHOLDER} className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
             </div>
             <div>
               <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>كلمة المرور *</Label>
@@ -480,7 +472,7 @@ const SheikhManagement = () => {
             </div>
             <div>
               <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>الهاتف</Label>
-              <Input value={addForm.student_phone} onChange={(e) => setAddForm({ ...addForm, student_phone: e.target.value })} dir="ltr" className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+              <Input value={addForm.student_phone} onChange={(e) => setAddForm({ ...addForm, student_phone: normalizePhone(e.target.value) })} placeholder={PHONE_PLACEHOLDER} dir="ltr" className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
             </div>
             <div>
               <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>تاريخ الميلاد</Label>
@@ -511,7 +503,7 @@ const SheikhManagement = () => {
                 ))}
               </select>
               <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
-                إذا كانت المجموعة مُسندة لمشرف آخر، رح تنتقل للمشرف الجديد.
+                إذا كانت المجموعة مُسندة إلى مشرف آخر، فستنتقل إلى المشرف الجديد.
               </p>
             </div>
           </div>
@@ -542,7 +534,7 @@ const SheikhManagement = () => {
             </div>
             <div>
               <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>الهاتف</Label>
-              <Input value={editForm.student_phone} onChange={(e) => setEditForm({ ...editForm, student_phone: e.target.value })} dir="ltr" className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
+              <Input value={editForm.student_phone} onChange={(e) => setEditForm({ ...editForm, student_phone: normalizePhone(e.target.value) })} placeholder={PHONE_PLACEHOLDER} dir="ltr" className={isDark ? 'bg-slate-800 border-slate-700 text-white' : ''} />
             </div>
             <div>
               <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>تاريخ الميلاد</Label>
@@ -606,7 +598,7 @@ const SheikhManagement = () => {
               onClick={handleChangePassword} 
               disabled={passwordSubmitting || newPassword.length < 6}
             >
-              {passwordSubmitting ? 'جاري التغيير...' : 'تغيير كلمة المرور'}
+              {passwordSubmitting ? 'جارٍ التغيير...' : 'تغيير كلمة المرور'}
             </Button>
           </DialogFooter>
         </DialogContent>

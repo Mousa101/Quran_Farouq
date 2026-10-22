@@ -11,9 +11,11 @@ import {
   BookOpen, FileText, TrendingUp, Award, ArrowRight,
   Phone, Mail, School, Home, Clock, Star, Target, Sparkles, Download, Loader2
 } from 'lucide-react';
+import { defaultAvatar, onAvatarError } from '../lib/avatar';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -53,14 +55,7 @@ const StudentRecord = () => {
     }
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('ar-SA', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
+  const formatDate = (dateStr) => fmtDate(dateStr);
 
   // تحديد بداية ونهاية الفصل الحالي
   const getSemesterDates = () => {
@@ -275,17 +270,12 @@ const StudentRecord = () => {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          {student.profile_image ? (
-            <img 
-              src={student.profile_image} 
-              alt={student.name}
-              className="w-16 h-16 rounded-xl object-cover border-2 border-emerald-500/30"
-            />
-          ) : (
-            <div className="w-16 h-16 rounded-xl bg-emerald-500/20 flex items-center justify-center">
-              <User className="w-8 h-8 text-emerald-400" />
-            </div>
-          )}
+          <img
+            src={student.profile_image || defaultAvatar('student')}
+            onError={onAvatarError('student')}
+            alt={student.name}
+            className="w-16 h-16 rounded-xl object-cover border-2 border-emerald-500/30"
+          />
           <div>
             <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
               السجل العام - {student.name}

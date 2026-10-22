@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { User, Phone, School, Camera, Save, ArrowRight, Loader2, Calendar, Building } from 'lucide-react';
+import { User, Phone, School, Camera, Save, ArrowRight, Loader2, Calendar, Building, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES } from '../lib/constants';
+import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES, PHONE_PLACEHOLDER, normalizePhone, phoneError } from '../lib/constants';
+import { defaultAvatar, readImageFile } from '../lib/avatar';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -18,6 +19,8 @@ const StudentEditProfile = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [mosqueOther, setMosqueOther] = useState(false); // #5
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
     name: '',
     student_phone: '',
@@ -67,12 +70,53 @@ const StudentEditProfile = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handlePhoneChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: normalizePhone(value) }));
+  };
+
+  // رفع الصورة الشخصية من ملف (تُصغَّر قبل الحفظ)
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error('يرجى اختيار صورة صالحة');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('حجم الصورة يجب أن يكون أقل من 5 ميجابايت');
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const dataUrl = await readImageFile(file);
+      setFormData(prev => ({ ...prev, profile_image: dataUrl }));
+      toast.success('تم تحميل الصورة — اضغط «حفظ التغييرات» لاعتمادها');
+    } catch (error) {
+      toast.error('فشل في قراءة الصورة');
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const removeImage = () => setFormData(prev => ({ ...prev, profile_image: '' }));
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Validation
     if (!formData.name || !formData.name.trim()) {
       toast.error('الاسم مطلوب');
+      return;
+    }
+    const badPhone = phoneError([
+      ['رقم هاتف الطالب', formData.student_phone],
+      ['رقم هاتف الأب', formData.father_phone],
+      ['رقم هاتف الأم', formData.mother_phone],
+    ]);
+    if (badPhone) {
+      toast.error(badPhone);
       return;
     }
     
@@ -123,32 +167,47 @@ const StudentEditProfile = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Profile Image URL */}
-            <div className="space-y-2">
-              <Label className="text-slate-300 flex items-center gap-2">
-                <Camera className="w-4 h-4" />
-                رابط الصورة الشخصية
-              </Label>
-              <Input
-                name="profile_image"
-                value={formData.profile_image}
-                onChange={handleChange}
-                placeholder="https://example.com/image.jpg"
-                className="bg-slate-800 border-slate-700 text-white"
-                dir="ltr"
+            {/* الصورة الشخصية — رفع ملف */}
+            <div className="flex flex-col items-center gap-3">
+              <div className="relative">
+                <img
+                  src={formData.profile_image || defaultAvatar('student')}
+                  alt="صورة شخصية"
+                  className="w-28 h-28 rounded-2xl object-cover border-2 border-emerald-500/30"
+                />
+                {formData.profile_image && (
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    title="إزالة الصورة"
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
               />
-              {formData.profile_image && (
-                <div className="mt-2 flex justify-center">
-                  <div className="w-24 h-24 rounded-xl overflow-hidden border-2 border-emerald-500/30">
-                    <img 
-                      src={formData.profile_image} 
-                      alt="صورة شخصية"
-                      className="w-full h-full object-cover"
-                      onError={(e) => e.target.style.display = 'none'}
-                    />
-                  </div>
-                </div>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingImage}
+                className="border-slate-700"
+              >
+                {uploadingImage ? (
+                  <><Loader2 className="w-4 h-4 ml-2 animate-spin" />جارٍ الرفع...</>
+                ) : (
+                  <><Camera className="w-4 h-4 ml-2" />{formData.profile_image ? 'تغيير الصورة' : 'رفع صورة شخصية'}</>
+                )}
+              </Button>
+              <p className="text-xs text-slate-500">الحد الأقصى: 5 ميجابايت | JPG, PNG</p>
             </div>
 
             {/* Name */}
@@ -195,9 +254,11 @@ const StudentEditProfile = () => {
                 <Label className="text-slate-300">رقم هاتف الطالب</Label>
                 <Input
                   name="student_phone"
+                  type="tel"
+                  inputMode="numeric"
                   value={formData.student_phone}
-                  onChange={handleChange}
-                  placeholder="05XXXXXXXX"
+                  onChange={handlePhoneChange}
+                  placeholder={PHONE_PLACEHOLDER}
                   className="bg-slate-800 border-slate-700 text-white"
                   dir="ltr"
                 />
@@ -208,9 +269,11 @@ const StudentEditProfile = () => {
                 <Label className="text-slate-300">رقم هاتف الأب</Label>
                 <Input
                   name="father_phone"
+                  type="tel"
+                  inputMode="numeric"
                   value={formData.father_phone}
-                  onChange={handleChange}
-                  placeholder="05XXXXXXXX"
+                  onChange={handlePhoneChange}
+                  placeholder={PHONE_PLACEHOLDER}
                   className="bg-slate-800 border-slate-700 text-white"
                   dir="ltr"
                 />
@@ -221,9 +284,11 @@ const StudentEditProfile = () => {
                 <Label className="text-slate-300">رقم هاتف الأم</Label>
                 <Input
                   name="mother_phone"
+                  type="tel"
+                  inputMode="numeric"
                   value={formData.mother_phone}
-                  onChange={handleChange}
-                  placeholder="05XXXXXXXX"
+                  onChange={handlePhoneChange}
+                  placeholder={PHONE_PLACEHOLDER}
                   className="bg-slate-800 border-slate-700 text-white"
                   dir="ltr"
                 />
@@ -326,7 +391,7 @@ const StudentEditProfile = () => {
               {saving ? (
                 <>
                   <Loader2 className="w-5 h-5 ml-2 animate-spin" />
-                  جاري الحفظ...
+                  جارٍ الحفظ...
                 </>
               ) : (
                 <>

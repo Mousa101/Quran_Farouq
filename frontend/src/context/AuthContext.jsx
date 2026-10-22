@@ -6,14 +6,10 @@ const AuthContext = createContext(null);
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const TOKEN_KEY = 'hafiz_token';
 
-// جلسة مستقلة لكل تبويب (sessionStorage) — تسمح بفتح حساب مدير ومشرف وطالب في تبويبات مختلفة معاً.
-// مع بقاء "تذكّر الدخول" عبر localStorage للتبويب الأول (إلا إذا فُتح التبويب بـ ?login=new).
+// جلسة لكل تبويب (sessionStorage) مع "تذكّر الدخول" عبر localStorage للتبويبات الجديدة.
 const getInitialToken = () => {
   const sessionToken = sessionStorage.getItem(TOKEN_KEY);
   if (sessionToken) return sessionToken;
-  // تبويب فُتح صراحةً لتسجيل حساب آخر → لا تعبئة تلقائية
-  const forceLogin = new URLSearchParams(window.location.search).get('login') === 'new';
-  if (forceLogin) return null;
   const remembered = localStorage.getItem(TOKEN_KEY);
   if (remembered) {
     sessionStorage.setItem(TOKEN_KEY, remembered); // ثبّتها لهذا التبويب
@@ -36,6 +32,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(getInitialToken());
   const [loading, setLoading] = useState(true);
+  const [uiSettings, setUiSettings] = useState(null); // إعدادات العرض التي يضبطها المدير
 
   useEffect(() => {
     if (token) {
@@ -50,6 +47,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await axios.get(`${API}/auth/me`);
       setUser(response.data);
+      await refreshUiSettings();
     } catch (error) {
       console.error('Failed to fetch user:', error);
       logout();
@@ -66,8 +64,16 @@ export const AuthProvider = ({ children }) => {
     axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
     setToken(newToken);
     setUser(userData);
+    refreshUiSettings();
 
     return userData;
+  };
+
+  const refreshUiSettings = async () => {
+    try {
+      const res = await axios.get(`${API}/ui-settings`);
+      setUiSettings(res.data);
+    } catch (e) { /* القيم الافتراضية: كل شيء ظاهر */ }
   };
 
   const register = async (name, email, password, role, registrationCode = '', mosqueName = '', schoolName = '', schoolGrade = '', birthDate = '', profileImage = '', studentPhone = '', fatherPhone = '', motherPhone = '') => {
@@ -97,19 +103,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    if (axios.defaults.headers.common['Authorization']) {
+      axios.post(`${API}/presence/offline`).catch(() => {});
+    }
     clearToken();
     delete axios.defaults.headers.common['Authorization'];
     setToken(null);
     setUser(null);
   };
 
-  // فتح حساب آخر في تبويب جديد (للاختبار) — جلسة مستقلة لا تؤثر على هذا التبويب
-  const openAnotherAccount = () => {
-    window.open(`${window.location.origin}/login?login=new`, '_blank');
-  };
-
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, openAnotherAccount }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, uiSettings, refreshUiSettings }}>
       {children}
     </AuthContext.Provider>
   );

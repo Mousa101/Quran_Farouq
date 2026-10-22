@@ -12,7 +12,7 @@ import { Calendar } from '../components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { 
   BookOpen, CheckCircle, XCircle, Loader2, Info, Users,
-  FileText, RotateCcw, Clock, Trash2, Archive, Eye, RefreshCw
+  FileText, RotateCcw, Clock, Trash2, Archive, Eye, RefreshCw, UserX
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -59,6 +59,7 @@ const RecitationsNew = () => {
   const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [recitations, setRecitations] = useState({});
+  const [attendanceMap, setAttendanceMap] = useState({}); // حالة حضور كل طالب في التاريخ المختار
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -98,8 +99,16 @@ const RecitationsNew = () => {
   useEffect(() => {
     if (students.length > 0) {
       fetchRecitations();
+      fetchAttendance();
     }
   }, [selectedDate, students, selectedTermId]);
+
+  // انعكاس الغياب تلقائيًا: يُحدَّث كل 15 ثانية ليظهر أثر تسجيل الحضور دون تحديث الصفحة
+  useEffect(() => {
+    if (students.length === 0) return;
+    const t = setInterval(fetchAttendance, 15000);
+    return () => clearInterval(t);
+  }, [selectedDate, students, selectedTermId]); // eslint-disable-line
 
   const fetchTerms = async () => {
     try {
@@ -174,6 +183,22 @@ const RecitationsNew = () => {
       console.error('Error fetching recitations:', error);
     }
   };
+
+  const fetchAttendance = async () => {
+    try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      let url = `${API}/attendance?date=${dateStr}`;
+      if (selectedTermId) url += `&term_id=${selectedTermId}`;
+      const res = await axios.get(url);
+      const map = {};
+      (res.data || []).forEach((a) => { map[a.student_id] = a.status; });
+      setAttendanceMap(map);
+    } catch (error) {
+      console.error('Error fetching attendance:', error);
+    }
+  };
+
+  const isAbsent = (studentId) => ['absent', 'excused'].includes(attendanceMap[studentId]);
 
   const handleDidNotRecite = async (student) => {
     if (isViewingOldTerm) {
@@ -327,7 +352,9 @@ const RecitationsNew = () => {
 
   const getStudentStatus = (studentId) => {
     const studentRecitations = recitations[studentId];
-    if (!studentRecitations || studentRecitations.length === 0) return 'not_recorded';
+    if (!studentRecitations || studentRecitations.length === 0) {
+      return isAbsent(studentId) ? 'absent' : 'not_recorded';
+    }
     
     const didNotRecite = studentRecitations.some(r => r.did_not_recite);
     if (didNotRecite) return 'did_not_recite';
@@ -340,17 +367,21 @@ const RecitationsNew = () => {
         return <CheckCircle className="w-5 h-5 text-emerald-400" />;
       case 'did_not_recite':
         return <XCircle className="w-5 h-5 text-red-400" />;
+      case 'absent':
+        return <UserX className="w-5 h-5 text-orange-400" />;
       default:
         return <Clock className="w-5 h-5 text-slate-400" />;
     }
   };
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status, studentId) => {
     switch (status) {
       case 'recited':
         return <span className="px-2 py-1 text-xs rounded-full bg-emerald-500/20 text-emerald-400">سمّع</span>;
       case 'did_not_recite':
         return <span className="px-2 py-1 text-xs rounded-full bg-red-500/20 text-red-400">لم يسمّع</span>;
+      case 'absent':
+        return <span className="px-2 py-1 text-xs rounded-full bg-orange-500/20 text-orange-400">{attendanceMap[studentId] === 'excused' ? 'غائب بعذر' : 'غائب'}</span>;
       default:
         return <span className="px-2 py-1 text-xs rounded-full bg-slate-500/20 text-slate-400">لم يُسجل</span>;
     }
@@ -365,6 +396,7 @@ const RecitationsNew = () => {
   const stats = {
     recited: students.filter(s => getStudentStatus(s.id) === 'recited').length,
     didNotRecite: students.filter(s => getStudentStatus(s.id) === 'did_not_recite').length,
+    absent: students.filter(s => getStudentStatus(s.id) === 'absent').length,
     notRecorded: students.filter(s => getStudentStatus(s.id) === 'not_recorded').length
   };
 
@@ -436,7 +468,7 @@ const RecitationsNew = () => {
             />
             
             {/* Summary Stats */}
-            <div className="grid grid-cols-3 gap-2 pt-4 border-t border-slate-700">
+            <div className="grid grid-cols-4 gap-2 pt-4 border-t border-slate-700">
               <div className="text-center p-2 rounded-lg bg-emerald-500/10">
                 <p className="text-lg font-bold text-emerald-400">{stats.recited}</p>
                 <p className="text-xs text-slate-400">سمّع</p>
@@ -444,6 +476,10 @@ const RecitationsNew = () => {
               <div className="text-center p-2 rounded-lg bg-red-500/10">
                 <p className="text-lg font-bold text-red-400">{stats.didNotRecite}</p>
                 <p className="text-xs text-slate-400">لم يسمّع</p>
+              </div>
+              <div className="text-center p-2 rounded-lg bg-orange-500/10">
+                <p className="text-lg font-bold text-orange-400">{stats.absent}</p>
+                <p className="text-xs text-slate-400">غائب</p>
               </div>
               <div className="text-center p-2 rounded-lg bg-slate-500/10">
                 <p className="text-lg font-bold text-slate-400">{stats.notRecorded}</p>
@@ -487,7 +523,7 @@ const RecitationsNew = () => {
                               <span className="text-slate-500 text-sm mr-2">({student.group_name})</span>
                             )}
                           </div>
-                          {getStatusBadge(status)}
+                          {getStatusBadge(status, student.id)}
                         </div>
                         
                         <div className="flex gap-2">
@@ -495,7 +531,8 @@ const RecitationsNew = () => {
                             size="sm"
                             onClick={() => openRecitationDialog(student)}
                             className="bg-emerald-500 hover:bg-emerald-600"
-                            disabled={saving}
+                            disabled={saving || isAbsent(student.id)}
+                            title={isAbsent(student.id) ? 'الطالب مسجّل غائبًا في هذا اليوم' : undefined}
                           >
                             <BookOpen className="w-4 h-4 ml-1" />
                             سمّع
@@ -505,7 +542,7 @@ const RecitationsNew = () => {
                             variant="outline"
                             onClick={() => handleDidNotRecite(student)}
                             className="border-red-500/30 text-red-400 hover:bg-red-500/20"
-                            disabled={saving}
+                            disabled={saving || isAbsent(student.id)}
                           >
                             <XCircle className="w-4 h-4 ml-1" />
                             لم يسمّع

@@ -9,6 +9,7 @@ import {
   BookOpen, BookMarked, Trophy, Target, Calendar, CheckCircle, 
   Award, Star, TrendingUp, Clock, Users, Sparkles
 } from 'lucide-react';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -84,8 +85,8 @@ const MyProgress = () => {
             <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>تقدمي في الفصل</h1>
             <p className={isDark ? 'text-slate-400' : 'text-slate-600'}>
               {term
-                ? `${term.name}${term.start_date ? ` (${String(term.start_date).slice(0, 10)}${term.end_date ? ' - ' + String(term.end_date).slice(0, 10) : ''})` : ''}`
-                : (schedule ? `${schedule.name} (${schedule.start_date} - ${schedule.end_date})` : 'لا يوجد فصل نشط')}
+                ? `${term.name}${term.start_date ? ` (${fmtDate(String(term.start_date).slice(0, 10))}${term.end_date ? ' - ' + fmtDate(String(term.end_date).slice(0, 10)) : ''})` : ''}`
+                : (schedule ? `${schedule.name} (${fmtDate(schedule.start_date)} - ${fmtDate(schedule.end_date)})` : 'لا يوجد فصل نشط')}
             </p>
           </div>
         </div>
@@ -112,7 +113,7 @@ const MyProgress = () => {
               <div className="grid grid-cols-3 gap-4 mt-4">
                 <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
                   <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>بداية الفصل</p>
-                  <p className="text-blue-400 font-bold">{schedule.start_date}</p>
+                  <p className="text-blue-400 font-bold">{fmtDate(schedule.start_date)}</p>
                 </div>
                 <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
                   <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>أيام الدروس</p>
@@ -120,7 +121,7 @@ const MyProgress = () => {
                 </div>
                 <div className={`p-3 rounded-lg text-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
                   <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>نهاية الفصل</p>
-                  <p className="text-amber-400 font-bold">{schedule.end_date}</p>
+                  <p className="text-amber-400 font-bold">{fmtDate(schedule.end_date)}</p>
                 </div>
               </div>
             </div>

@@ -11,6 +11,7 @@ import {
   Save, Loader2, Upload, Camera, Check, X
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { PHONE_PLACEHOLDER, normalizePhone, phoneError } from '../lib/constants';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -109,6 +110,8 @@ const SheikhEditProfile = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const badPhone = phoneError([['رقم الهاتف', formData.phone]]);
+    if (badPhone) { toast.error(badPhone); return; }
     setSaving(true);
 
     try {
@@ -214,7 +217,7 @@ const SheikhEditProfile = () => {
                 className={isDark ? 'border-slate-700' : ''}
               >
                 {uploadingImage ? (
-                  <><Loader2 className="w-4 h-4 ml-2 animate-spin" />جاري الرفع...</>
+                  <><Loader2 className="w-4 h-4 ml-2 animate-spin" />جارٍ الرفع...</>
                 ) : (
                   <><Upload className="w-4 h-4 ml-2" />{imagePreview ? 'تغيير الصورة' : 'رفع صورة'}</>
                 )}
@@ -263,8 +266,11 @@ const SheikhEditProfile = () => {
                   رقم الهاتف
                 </Label>
                 <Input
+                  type="tel"
+                  inputMode="numeric"
                   value={formData.phone}
-                  onChange={(e) => handleChange('phone', e.target.value)}
+                  onChange={(e) => handleChange('phone', normalizePhone(e.target.value))}
+                  placeholder={PHONE_PLACEHOLDER}
                   className={isDark ? 'bg-slate-800/50 border-slate-700 text-white' : ''}
                   dir="ltr"
                 />
@@ -330,7 +336,7 @@ const SheikhEditProfile = () => {
               <div className="space-y-2">
                 <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>
                   <Calendar className="w-4 h-4 inline ml-1" />
-                  تاريخ الإلتحاق
+                  تاريخ الالتحاق
                 </Label>
                 <Input
                   type="date"
@@ -348,7 +354,7 @@ const SheikhEditProfile = () => {
               className="w-full h-12 bg-blue-600 hover:bg-blue-700 text-white font-bold"
             >
               {saving ? (
-                <><Loader2 className="w-5 h-5 ml-2 animate-spin" />جاري الحفظ...</>
+                <><Loader2 className="w-5 h-5 ml-2 animate-spin" />جارٍ الحفظ...</>
               ) : (
                 <><Save className="w-5 h-5 ml-2" />حفظ التغييرات</>
               )}

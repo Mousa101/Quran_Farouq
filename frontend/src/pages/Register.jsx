@@ -7,18 +7,26 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { BookOpen, Mail, Lock, User, Loader2, Phone, Calendar, School, Home, CheckCircle, Key, Image, Upload, UserPlus, GraduationCap, Shield, Briefcase, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
-import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES, EMAIL_DOMAIN, emailLocalPart, buildEmail } from '../lib/constants';
+import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES, EMAIL_DOMAIN, emailLocalPart, buildEmail, PHONE_PLACEHOLDER, normalizePhone, phoneError } from '../lib/constants';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-const Register = () => {
+// لكل نوع حساب رابط تسجيل مستقل: /register (طالب)، /register/teacher (مشرف)، /register/admin (مدير)
+const ROLE_PAGES = {
+  student: { label: 'طالب', icon: GraduationCap, title: 'تسجيل طالب جديد', description: 'التسجيل طالبًا في حلقات التحفيظ' },
+  sheikh: { label: 'مشرف', icon: BookOpen, title: 'تسجيل مشرف جديد', description: 'التسجيل مشرفًا في حلقات القرآن الكريم' },
+  admin: { label: 'مدير', icon: Shield, title: 'تسجيل مدير جديد', description: 'التسجيل مديرًا للمركز' },
+};
+
+const Register = ({ role = 'student' }) => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1); // 1: Registration, 2: Waiting/Activation
   const [loading, setLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState('');
   const [activationCode, setActivationCode] = useState('');
-  const [selectedRole, setSelectedRole] = useState('student');
+  const selectedRole = ROLE_PAGES[role] ? role : 'student';
+  const rolePage = ROLE_PAGES[selectedRole];
   const [mosqueOther, setMosqueOther] = useState(false); // #5 هل اختار "أخرى" لكتابة اسم مسجده
   const [showPassword, setShowPassword] = useState(false); // إظهار/إخفاء كلمة المرور
   const fileInputRef = useRef(null);
@@ -43,12 +51,6 @@ const Register = () => {
     specialization: '',
     experienceYears: ''
   });
-
-  const roles = [
-    { id: 'student', label: 'طالب', icon: GraduationCap, color: 'emerald', description: 'التسجيل كطالب في حلقات التحفيظ' },
-    { id: 'sheikh', label: 'مشرف', icon: BookOpen, color: 'blue', description: 'التسجيل كمشرف قرآن كريم' },
-    { id: 'admin', label: 'مدير', icon: Shield, color: 'purple', description: 'التسجيل كمدير للمركز' }
-  ];
 
   const handleChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -115,6 +117,14 @@ const Register = () => {
       toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
       return;
     }
+
+    const badPhone = selectedRole === 'student'
+      ? phoneError([['هاتف الطالب', formData.studentPhone], ['هاتف الأب', formData.fatherPhone], ['هاتف الأم', formData.motherPhone]])
+      : phoneError([['رقم الهاتف', formData.studentPhone]]);
+    if (badPhone) {
+      toast.error(badPhone);
+      return;
+    }
     
     setLoading(true);
     
@@ -146,8 +156,7 @@ const Register = () => {
 
       const response = await axios.post(`${API}/auth/register`, payload);
       
-      const roleLabel = selectedRole === 'student' ? 'طالب' : (selectedRole === 'sheikh' ? 'مشرف' : 'مدير');
-      toast.success(`تم تسجيل بياناتك كـ${roleLabel} بنجاح`);
+      toast.success(`تم تسجيل بياناتك (${rolePage.label}) بنجاح`);
       setRegisteredEmail(formData.email);
       setStep(2);
     } catch (error) {
@@ -173,7 +182,7 @@ const Register = () => {
     e.preventDefault();
     
     if (activationCode.length !== 6) {
-      toast.error('كود التفعيل يجب أن يكون 6 أرقام');
+      toast.error('رمز التفعيل يجب أن يكون 6 أرقام');
       return;
     }
     
@@ -185,8 +194,9 @@ const Register = () => {
         activation_code: activationCode
       });
       
-      // Save token and redirect
-      localStorage.setItem('token', response.data.token);
+      // حفظ الجلسة بنفس مفتاح AuthContext ثم الانتقال للوحة
+      localStorage.setItem('hafiz_token', response.data.token);
+      sessionStorage.setItem('hafiz_token', response.data.token);
       axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
       
       toast.success('تم تفعيل حسابك بنجاح!');
@@ -194,7 +204,7 @@ const Register = () => {
     } catch (error) {
       // Handle error - detail might be string or object
       const detail = error.response?.data?.detail;
-      let errorMessage = 'كود التفعيل غير صحيح';
+      let errorMessage = 'رمز التفعيل غير صحيح';
       
       if (typeof detail === 'string') {
         errorMessage = detail;
@@ -225,7 +235,7 @@ const Register = () => {
             <CardDescription className="text-slate-400">
               تم تسجيل بياناتك بنجاح!
               <br />
-              يرجى التواصل مع إدارة المركز للحصول على كود التفعيل
+              يرجى التواصل مع إدارة المركز للحصول على رمز التفعيل
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -236,10 +246,10 @@ const Register = () => {
               </div>
               
               <div className="space-y-2">
-                <Label className="text-slate-300">كود التفعيل</Label>
+                <Label className="text-slate-300">رمز التفعيل</Label>
                 <Input
                   type="text"
-                  placeholder="أدخل الكود من 6 أرقام"
+                  placeholder="أدخل الرمز المكوّن من 6 أرقام"
                   value={activationCode}
                   onChange={(e) => setActivationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   className="text-center text-2xl tracking-[0.5em] bg-slate-800 border-emerald-500/50 text-white h-14"
@@ -291,7 +301,7 @@ const Register = () => {
             <h1 className="text-4xl font-bold text-white mb-2 font-cairo">مركز الفاروق</h1>
             <h2 className="text-2xl font-bold text-emerald-400 mb-4 font-cairo">القرآني</h2>
             <p className="text-lg text-slate-300 max-w-md">
-              ابدأ رحلتك في حفظ كتاب الله
+              {selectedRole === 'student' ? 'ابدأ رحلتك في حفظ كتاب الله' : 'منصة متكاملة لإدارة حلقات تحفيظ القرآن الكريم'}
             </p>
           </div>
         </div>
@@ -304,45 +314,14 @@ const Register = () => {
             <div className="lg:hidden w-20 h-20 mx-auto mb-2 rounded-full bg-white flex items-center justify-center overflow-hidden p-1.5">
               <img src="/logo.png" alt="شعار المركز" className="w-16 h-16 object-contain" />
             </div>
-            <CardTitle className="text-xl font-bold text-white font-cairo">تسجيل مستخدم جديد</CardTitle>
-            <CardDescription className="text-slate-400 text-sm">اختر نوع حسابك وأدخل بياناتك</CardDescription>
+            <CardTitle className="text-xl font-bold text-white font-cairo flex items-center justify-center gap-2">
+              <rolePage.icon className="w-5 h-5 text-emerald-400" />
+              {rolePage.title}
+            </CardTitle>
+            <CardDescription className="text-slate-400 text-sm">{rolePage.description} — أدخل بياناتك</CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Role Selection */}
-              <div className="space-y-2">
-                <Label className="text-slate-300 text-sm">نوع الحساب <span className="text-red-400">*</span></Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {roles.map((role) => (
-                    <button
-                      key={role.id}
-                      type="button"
-                      onClick={() => setSelectedRole(role.id)}
-                      className={`p-3 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-1 ${
-                        selectedRole === role.id
-                          ? `bg-${role.color}-500/20 border-${role.color}-500 text-${role.color}-400`
-                          : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:border-slate-600'
-                      }`}
-                      style={{
-                        backgroundColor: selectedRole === role.id ? `var(--${role.color}-500-20, rgba(16, 185, 129, 0.2))` : undefined,
-                        borderColor: selectedRole === role.id ? 
-                          (role.color === 'emerald' ? '#10b981' : role.color === 'blue' ? '#3b82f6' : '#a855f7') 
-                          : undefined,
-                        color: selectedRole === role.id ? 
-                          (role.color === 'emerald' ? '#34d399' : role.color === 'blue' ? '#60a5fa' : '#c084fc') 
-                          : undefined
-                      }}
-                    >
-                      <role.icon className="w-5 h-5" />
-                      <span className="text-xs font-medium">{role.label}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="text-slate-500 text-[10px] text-center">
-                  {roles.find(r => r.id === selectedRole)?.description}
-                </p>
-              </div>
-
               {/* Basic Info */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -364,7 +343,7 @@ const Register = () => {
                   <div className="flex items-center" dir="ltr">
                     <Input
                       type="text"
-                      placeholder="اسم المستخدم"
+                      placeholder="example"
                       value={emailLocalPart(formData.email)}
                       onChange={(e) => handleChange('email', buildEmail(e.target.value))}
                       className="h-9 text-sm bg-slate-800/50 border-slate-700 text-white text-left rounded-r-none flex-1"
@@ -461,30 +440,24 @@ const Register = () => {
                     أرقام الهواتف
                   </Label>
                   <div className="grid grid-cols-3 gap-2">
-                    <Input
-                      type="tel"
-                      placeholder="هاتف الطالب"
-                      value={formData.studentPhone}
-                      onChange={(e) => handleChange('studentPhone', e.target.value)}
-                      className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
-                      dir="ltr"
-                    />
-                    <Input
-                      type="tel"
-                      placeholder="هاتف الأب"
-                      value={formData.fatherPhone}
-                      onChange={(e) => handleChange('fatherPhone', e.target.value)}
-                      className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
-                      dir="ltr"
-                    />
-                    <Input
-                      type="tel"
-                      placeholder="هاتف الأم"
-                      value={formData.motherPhone}
-                      onChange={(e) => handleChange('motherPhone', e.target.value)}
-                      className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
-                      dir="ltr"
-                    />
+                    {[
+                      ['studentPhone', 'هاتف الطالب'],
+                      ['fatherPhone', 'هاتف الأب'],
+                      ['motherPhone', 'هاتف الأم'],
+                    ].map(([field, label]) => (
+                      <div key={field} className="space-y-0.5">
+                        <span className="text-slate-500 text-[10px]">{label}</span>
+                        <Input
+                          type="tel"
+                          inputMode="numeric"
+                          placeholder={PHONE_PLACEHOLDER}
+                          value={formData[field]}
+                          onChange={(e) => handleChange(field, normalizePhone(e.target.value))}
+                          className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
+                          dir="ltr"
+                        />
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : (
@@ -495,9 +468,9 @@ const Register = () => {
                   </Label>
                   <Input
                     type="tel"
-                    placeholder="رقم الهاتف"
+                    placeholder={PHONE_PLACEHOLDER}
                     value={formData.studentPhone}
-                    onChange={(e) => handleChange('studentPhone', e.target.value)}
+                    onChange={(e) => handleChange('studentPhone', normalizePhone(e.target.value))}
                     className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white text-left"
                     dir="ltr"
                   />
@@ -685,7 +658,7 @@ const Register = () => {
                       {uploadingImage ? (
                         <>
                           <Loader2 className="w-3 h-3 ml-1 animate-spin" />
-                          جاري الرفع...
+                          جارٍ الرفع...
                         </>
                       ) : (
                         <>
@@ -702,7 +675,7 @@ const Register = () => {
               {/* Notice */}
               <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
                 <p className="text-xs text-amber-300">
-                  <strong>ملاحظة:</strong> بعد التسجيل، ستحتاج للحصول على كود التفعيل من إدارة المركز لتتمكن من استخدام حسابك.
+                  <strong>ملاحظة:</strong> بعد التسجيل، ستحتاج إلى الحصول على رمز التفعيل من إدارة المركز لتتمكن من استخدام حسابك.
                 </p>
               </div>
 
@@ -724,7 +697,7 @@ const Register = () => {
               </p>
               <div className="flex items-center justify-center gap-3 mt-2">
                 <Link to="/activate" className="text-emerald-400 hover:text-emerald-300 text-xs">
-                  لديك كود تفعيل؟
+                  لديك رمز تفعيل؟
                 </Link>
                 <span className="text-slate-600">|</span>
                 <Link to="/forgot-password" className="text-amber-400 hover:text-amber-300 text-xs">

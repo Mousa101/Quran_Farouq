@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AnnouncementBanner from '../components/AnnouncementBanner';
+import { defaultAvatar, onAvatarError } from '../lib/avatar';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -59,10 +61,7 @@ const SheikhDashboard = () => {
     
   ];
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('ar-SA');
-  };
+  const formatDate = (dateStr) => fmtDate(dateStr);
 
   if (loading) {
     return (
@@ -81,17 +80,12 @@ const SheikhDashboard = () => {
         <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
           {/* Profile Image & Name */}
           <div className="flex items-center gap-3 md:gap-4">
-            {profile?.profile_image ? (
-              <img 
-                src={profile.profile_image} 
-                alt="صورة شخصية"
-                className="w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl object-cover border-2 border-blue-500/30"
-              />
-            ) : (
-              <div className="w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl bg-blue-500/20 flex items-center justify-center">
-                <User className="w-8 h-8 md:w-10 md:h-10 text-blue-400" />
-              </div>
-            )}
+            <img
+              src={profile?.profile_image || defaultAvatar('sheikh')}
+              onError={onAvatarError('sheikh')}
+              alt="صورة شخصية"
+              className="w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl object-cover border-2 border-blue-500/30"
+            />
             <div>
               <h1 className="text-lg md:text-2xl font-bold text-white">المشرف {user?.name}</h1>
               <div className="flex flex-wrap gap-1 md:gap-2 mt-1 md:mt-2">

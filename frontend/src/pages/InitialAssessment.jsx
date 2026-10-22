@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { BookOpen, User, CheckCircle, Loader2, AlertCircle, Star, RefreshCw, History, Trophy } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -551,7 +552,7 @@ const InitialAssessment = () => {
                 <div key={rec.id} className="p-4 rounded-xl bg-slate-800/50 border border-white/5 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-white font-bold">
-                      {new Date(rec.date).toLocaleString('ar-SA')}
+                      {fmtDate(rec.date, { withTime: true })}
                     </span>
                     <span className={`text-xs px-2 py-0.5 rounded ${rec.is_reassessment ? 'bg-blue-500/20 text-blue-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
                       {rec.is_reassessment ? 'إعادة تقييم' : 'تقييم أولي'}

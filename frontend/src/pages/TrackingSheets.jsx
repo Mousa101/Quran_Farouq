@@ -9,11 +9,13 @@ import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
-  FileText, Upload, Plus, Loader2, BookOpen, Moon, Star, Hand, Clock, Eye, 
+  FileText, Upload, Plus, Loader2, BookOpen, Moon, Star, Clock, Eye, 
   Sunrise, Users, GraduationCap, Calendar, Sparkles, MessageCircle, Edit, History
 } from 'lucide-react';
 import { toast } from 'sonner';
 import StudentLink from '../components/StudentLink';
+import { formatDate as fmtDate } from '../lib/utils';
+import MosqueIcon from '../components/icons/MosqueIcon';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -97,7 +99,7 @@ const TrackingSheets = () => {
     setAddingItem(true);
     try {
       await axios.post(`${API}/tracking-items`, { name: newItem.name.trim(), max_points: points, icon: newItem.icon || '⭐' });
-      toast.success('تم إضافة البند');
+      toast.success('تمت إضافة البند');
       setNewItem({ name: '', max_points: '', icon: '⭐' });
       fetchCustomItems();
     } catch (error) {
@@ -374,7 +376,7 @@ const TrackingSheets = () => {
                         {/* الصلوات */}
                         <div>
                           <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                            <Hand className="w-4 h-4 text-emerald-400" />
+                            <MosqueIcon className="w-4 h-4 text-emerald-400" />
                             الصلوات (من 35)
                           </Label>
                           <Input
@@ -525,7 +527,7 @@ const TrackingSheets = () => {
         <CardContent>
           <div className="grid grid-cols-2 gap-2">
             <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-              <div className="text-lg">🤲</div>
+              <div className="text-lg">🕌</div>
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصلوات</p>
               <p className="text-sm font-bold text-emerald-400">35</p>
             </div>
@@ -601,7 +603,7 @@ const TrackingSheets = () => {
             آخر ورقة متابعة لكل طالب
             {lastSheets.filter((r) => !r.last_sheet).length > 0 && (
               <span className="text-xs font-normal text-amber-400">
-                ({lastSheets.filter((r) => !r.last_sheet).length} ما سلّموا)
+                ({lastSheets.filter((r) => !r.last_sheet).length} لم يسلّموا)
               </span>
             )}
           </CardTitle>
@@ -627,7 +629,7 @@ const TrackingSheets = () => {
                     </div>
                     {r.last_sheet ? (
                       <div className="text-left">
-                        <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>أسبوع {r.last_sheet.week_start}</p>
+                        <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>أسبوع {fmtDate(r.last_sheet.week_start)}</p>
                         <div className="flex items-center gap-2 text-[11px] justify-end mt-0.5">
                           <span className="text-emerald-400">🕌 {r.last_sheet.prayers_count}</span>
                           <span className="text-blue-400">📖 {r.last_sheet.quran_sitting_days}</span>
@@ -667,7 +669,7 @@ const TrackingSheets = () => {
                     <div>
                       <StudentLink studentId={sheet.student_id} name={getStudentName(sheet.student_id)} className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`} />
                       <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                        أسبوع {sheet.week_start}
+                        أسبوع {fmtDate(sheet.week_start)}
                         {sheet.submitted_by_student && <span className="text-emerald-400 mr-2">• سجّلها الطالب</span>}
                         {sheet.updated_by_sheikh && <span className="text-blue-400 mr-2">• عدّلها المشرف</span>}
                       </p>
@@ -709,7 +711,7 @@ const TrackingSheets = () => {
                 </div>
                 <div className={`p-3 rounded-lg ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
                   <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الأسبوع</p>
-                  <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{selectedSheet.week_start}</p>
+                  <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmtDate(selectedSheet.week_start)}</p>
                 </div>
               </div>
               
@@ -729,7 +731,7 @@ const TrackingSheets = () => {
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div className="flex justify-between items-center">
                       <span className={`flex items-center gap-2 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                        <Hand className="w-4 h-4 text-emerald-400" /> الصلوات
+                        <MosqueIcon className="w-4 h-4 text-emerald-400" /> الصلوات
                       </span>
                       <span className="text-emerald-400 font-bold">{selectedSheet.points_breakdown.prayers ?? selectedSheet.data?.prayers_count ?? 0}/35</span>
                     </div>
@@ -774,7 +776,7 @@ const TrackingSheets = () => {
                 {/* الصلوات */}
                 <div>
                   <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                    <Hand className="w-4 h-4 text-emerald-400" />
+                    <MosqueIcon className="w-4 h-4 text-emerald-400" />
                     الصلوات (من 35)
                   </Label>
                   <Input

@@ -255,7 +255,7 @@ const AdminRankings = () => {
         <CardContent className="p-4">
           <div className="flex items-center gap-2 flex-wrap">
             <Filter className={`w-5 h-5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`} />
-            <span className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>فلتر:</span>
+            <span className={`text-sm font-medium ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>تصفية:</span>
             {filters.map((filter) => (
               <Button
                 key={filter.id}

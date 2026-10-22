@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { ScrollText, Trash2, KeyRound, AlertTriangle, RotateCcw, Shield } from 'lucide-react';
+import { ScrollText, Trash2, KeyRound, AlertTriangle, RotateCcw, Shield, MessageSquareX, SlidersHorizontal } from 'lucide-react';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -12,6 +13,8 @@ const ACTIONS = {
   password_reset: { label: 'إعادة تعيين كلمة مرور', color: 'bg-amber-500/20 text-amber-400', icon: KeyRound },
   user_delete: { label: 'حذف مستخدم', color: 'bg-red-500/20 text-red-400', icon: Trash2 },
   warning: { label: 'إنذار', color: 'bg-orange-500/20 text-orange-400', icon: AlertTriangle },
+  chat_delete: { label: 'حذف محادثة/رسالة', color: 'bg-red-500/20 text-red-400', icon: MessageSquareX },
+  ui_settings: { label: 'تعديل إعدادات العرض', color: 'bg-emerald-500/20 text-emerald-400', icon: SlidersHorizontal },
 };
 
 const AuditLog = () => {
@@ -35,11 +38,7 @@ const AuditLog = () => {
     }
   };
 
-  const fmt = (iso) => {
-    if (!iso) return '';
-    try { return new Date(iso).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }); }
-    catch { return iso.slice(0, 16).replace('T', ' '); }
-  };
+  const fmt = (iso) => (iso ? fmtDate(iso, { withTime: true }) : '');
 
   return (
     <div className="space-y-6 animate-fadeIn">

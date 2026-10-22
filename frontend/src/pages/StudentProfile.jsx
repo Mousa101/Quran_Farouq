@@ -14,10 +14,13 @@ import {
   CheckCircle, XCircle, Clock, FileText, AlertTriangle, School, Home, Phone, TrendingUp,
   ChevronDown, ChevronUp, Edit, Loader2
 } from 'lucide-react';
+import { defaultAvatar, onAvatarError } from '../lib/avatar';
 import { toast } from 'sonner';
-import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES } from '../lib/constants';
+import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES, PHONE_PLACEHOLDER, normalizePhone, phoneError } from '../lib/constants';
 import { format, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
+import { formatDate as fmtDate } from '../lib/utils';
+import MemorizationBar from '../components/MemorizationBar';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -27,6 +30,7 @@ const StudentProfile = () => {
   const { user } = useAuth();
   const [profileData, setProfileData] = useState(null);
   const [progressData, setProgressData] = useState(null);
+  const [annualResults, setAnnualResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAllPersonalInfo, setShowAllPersonalInfo] = useState(false);
   // تعديل البيانات الشخصية (المدير والمشرف)
@@ -53,6 +57,10 @@ const StudentProfile = () => {
   };
 
   const saveEdit = async () => {
+    const badPhone = phoneError([
+      ['هاتف الطالب', editForm.student_phone], ['هاتف الأب', editForm.father_phone], ['هاتف الأم', editForm.mother_phone],
+    ]);
+    if (badPhone) { toast.error(badPhone); return; }
     setSavingEdit(true);
     try {
       // المشرف يستخدم نقطة نهاية المشرف، والمدير نقطة نهاية الطالب — كلاهما يعدّل كل البيانات الشخصية
@@ -76,6 +84,10 @@ const StudentProfile = () => {
       ]);
       setProfileData(profileRes.data);
       setProgressData(progressRes.data);
+      // سجل الطالب في المسابقة السنوية (من ملف المسابقة) — لا يمنع تحميل الصفحة عند فشله
+      axios.get(`${API}/students/${studentId}/annual-competition`)
+        .then((r) => setAnnualResults(r.data || []))
+        .catch(() => setAnnualResults([]));
     } catch (error) {
       console.error('Error:', error);
       toast.error('فشل في تحميل بيانات الطالب');
@@ -84,10 +96,7 @@ const StudentProfile = () => {
     }
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '-';
-    return new Date(dateStr).toLocaleDateString('ar-SA');
-  };
+  const formatDate = (dateStr) => fmtDate(dateStr);
 
   // Format date with day name for records
   const formatDateWithDay = (dateStr) => {
@@ -162,13 +171,7 @@ const StudentProfile = () => {
           <div className="flex flex-col md:flex-row gap-6 items-start -mt-12">
             {/* Profile Image */}
             <div className="w-24 h-24 rounded-2xl bg-slate-800 border-4 border-slate-900 flex items-center justify-center overflow-hidden">
-              {student.profile_image ? (
-                <img src={student.profile_image} alt={student.name} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-4xl font-bold text-emerald-400">
-                  {student.name?.charAt(0)}
-                </span>
-              )}
+              <img src={student.profile_image || defaultAvatar('student')} onError={onAvatarError('student')} alt={student.name} className="w-full h-full object-cover" />
             </div>
 
             {/* Basic Info */}
@@ -224,14 +227,12 @@ const StudentProfile = () => {
                 <p className="text-emerald-400 text-lg font-bold mt-2">
                   {progressData.total_progress?.description || ''}
                 </p>
-                {/* Progress Bar */}
-                <div className="mt-3 h-3 bg-slate-700 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-emerald-500 to-blue-500 rounded-full transition-all"
-                    style={{ width: `${Math.min(progressData.total_progress?.percentage || 0, 100)}%` }}
-                  />
-                </div>
-                <p className="text-slate-400 text-xs mt-1">{progressData.total_progress?.percentage || 0}% من القرآن</p>
+                {/* شريط التقدم: الحفظ قبل الفصل بلون، وإنجاز الفصل الحالي بلون مختلف */}
+                <MemorizationBar
+                  className="mt-3 text-right"
+                  previousPages={progressData.previous_memorization?.total_pages || 0}
+                  termPages={progressData.new_memorization?.total_pages || 0}
+                />
               </div>
 
               {/* Previous Memorization */}
@@ -252,6 +253,22 @@ const StudentProfile = () => {
                 </p>
               </div>
             </div>
+
+            {/* سجل المسابقة السنوية عبر السنوات (من ملف المسابقة السنوية) */}
+            {annualResults.length > 0 && (
+              <div className="mt-4 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20" data-testid="student-annual-results">
+                <p className="text-amber-400 text-sm font-bold mb-2">سجل المسابقة السنوية</p>
+                <div className="flex flex-wrap gap-2">
+                  {annualResults.map((r) => (
+                    <span key={r.id} className="px-2 py-1 rounded bg-slate-800/60 text-xs text-slate-200">
+                      {r.year} · {r.level || '—'} · {r.score ?? '—'}
+                      {r.passed === true && <span className="text-emerald-400 mr-1">ناجح</span>}
+                      {r.passed === false && <span className="text-red-400 mr-1">راسب</span>}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Tajweed Level */}
             {progressData.tajweed_level && (
@@ -464,7 +481,7 @@ const StudentProfile = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="p-3 rounded-lg bg-slate-800/50 text-center">
                 <p className="text-slate-400 text-xs">أسبوع الورقة</p>
-                <p className="text-white font-bold">{last_tracking_sheet.week_start}</p>
+                <p className="text-white font-bold">{fmtDate(last_tracking_sheet.week_start)}</p>
               </div>
               <div className="p-3 rounded-lg bg-emerald-500/10 text-center">
                 <p className="text-slate-400 text-xs">🕌 الصلوات</p>
@@ -636,15 +653,15 @@ const StudentProfile = () => {
             </div>
             <div>
               <Label className="text-slate-300 text-sm">هاتف الطالب</Label>
-              <Input value={editForm.student_phone} onChange={(e) => setEditForm({ ...editForm, student_phone: e.target.value })} dir="ltr" className="bg-slate-800 border-slate-700 text-white" />
+              <Input value={editForm.student_phone} onChange={(e) => setEditForm({ ...editForm, student_phone: normalizePhone(e.target.value) })} placeholder={PHONE_PLACEHOLDER} dir="ltr" className="bg-slate-800 border-slate-700 text-white" />
             </div>
             <div>
               <Label className="text-slate-300 text-sm">هاتف الأب</Label>
-              <Input value={editForm.father_phone} onChange={(e) => setEditForm({ ...editForm, father_phone: e.target.value })} dir="ltr" className="bg-slate-800 border-slate-700 text-white" />
+              <Input value={editForm.father_phone} onChange={(e) => setEditForm({ ...editForm, father_phone: normalizePhone(e.target.value) })} placeholder={PHONE_PLACEHOLDER} dir="ltr" className="bg-slate-800 border-slate-700 text-white" />
             </div>
             <div>
               <Label className="text-slate-300 text-sm">هاتف الأم</Label>
-              <Input value={editForm.mother_phone} onChange={(e) => setEditForm({ ...editForm, mother_phone: e.target.value })} dir="ltr" className="bg-slate-800 border-slate-700 text-white" />
+              <Input value={editForm.mother_phone} onChange={(e) => setEditForm({ ...editForm, mother_phone: normalizePhone(e.target.value) })} placeholder={PHONE_PLACEHOLDER} dir="ltr" className="bg-slate-800 border-slate-700 text-white" />
             </div>
             <div>
               <Label className="text-slate-300 text-sm">تاريخ الميلاد</Label>

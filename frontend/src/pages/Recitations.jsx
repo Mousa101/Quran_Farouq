@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Slider } from '../components/ui/slider';
 import { BookOpen, Plus, Loader2, CheckCircle, XCircle, FileText, RotateCcw, Edit, Trash2, Star, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -570,7 +571,7 @@ console.log("this is from form data: " ,formData)
                     <div>
                       <h3 className="text-lg font-bold text-white">{getStudentName(rec.student_id)}</h3>
                       <p className="text-slate-400 text-sm">
-                        {new Date(rec.created_at).toLocaleDateString('ar-SA')}
+                        {fmtDate(rec.created_at)}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">

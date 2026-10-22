@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { toast } from 'sonner';
 import { BookOpen, Plus, Edit, Trash2, Upload, FileText, Download, Eye, Calendar, Target, BookMarked } from 'lucide-react';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -99,7 +100,7 @@ const CurriculumManagement = () => {
         toast.success('تم تحديث الخطة بنجاح');
       } else {
         await axios.post(`${API}/curriculum/${selectedCurriculum.id}/entries`, entryData);
-        toast.success('تم إضافة الخطة بنجاح');
+        toast.success('تمت إضافة الخطة بنجاح');
       }
       setEntryDialogOpen(false);
       setEntryData({ title: '', date: '', topic: '', goal: '', references: '', results: '' });
@@ -431,7 +432,7 @@ const CurriculumManagement = () => {
                                 <h4 className={`font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{entry.title}</h4>
                                 <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                                   <Calendar className="w-3 h-3 inline ml-1" />
-                                  {entry.date}
+                                  {fmtDate(entry.date)}
                                 </p>
                               </div>
                             </div>

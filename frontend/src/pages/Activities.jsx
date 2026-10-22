@@ -9,6 +9,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
 import { Calendar, Plus, Trash2, MapPin, Clock, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -234,7 +235,7 @@ const Activities = () => {
           <CardContent className="p-12 text-center">
             <Calendar className="w-16 h-16 mx-auto text-slate-600 mb-4" />
             <h3 className="text-xl font-bold text-white mb-2">لا توجد أنشطة</h3>
-            <p className="text-slate-400">لم يتم إضافة أي أنشطة بعد</p>
+            <p className="text-slate-400">لم يتمت إضافة أي أنشطة بعد</p>
           </CardContent>
         </Card>
       ) : (
@@ -263,7 +264,7 @@ const Activities = () => {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-emerald-400">
                     <Calendar className="w-4 h-4" />
-                    <span className="text-sm">{activity.date}</span>
+                    <span className="text-sm">{fmtDate(activity.date)}</span>
                   </div>
                   <div className="flex items-center gap-2 text-slate-300">
                     <Clock className="w-4 h-4" />
