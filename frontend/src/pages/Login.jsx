@@ -8,9 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { BookOpen, Mail, Lock, Loader2, Eye, EyeOff, GraduationCap, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { EMAIL_PLACEHOLDER } from '../lib/constants';
-import { registerPathFor } from '../lib/authRoutes';
 
-// لكل نوع حساب صفحة دخول مستقلة: /student/login (طالب)، /teacher/login (مشرف)، /admin/login (مدير)
+// لكل نوع حساب صفحة دخول مستقلة: /login/student (طالب)، /login/teacher (مشرف)، /login/admin (مدير)
 const ROLE_PAGES = {
   student: { icon: GraduationCap, title: 'دخول الطلاب', description: 'أدخل بياناتك للوصول إلى حسابك' },
   sheikh: { icon: BookOpen, title: 'دخول المشرفين', description: 'أدخل بيانات حساب المشرف' },
@@ -142,16 +141,7 @@ const Login = ({ role = 'student' }) => {
             </form>
 
             <div className="mt-4 md:mt-6 text-center space-y-2">
-              <p className="text-slate-400 text-sm md:text-base">
-                ليس لديك حساب؟{' '}
-                <Link
-                  to={registerPathFor(selectedRole)}
-                  className="text-emerald-400 hover:text-emerald-300 font-medium"
-                  data-testid="register-link"
-                >
-                  إنشاء حساب جديد
-                </Link>
-              </p>
+              {/* لا رابط إنشاء حساب هنا — روابط التسجيل يرسلها المدير لكل فئة */}
               <p className="text-slate-500 text-xs md:text-sm">
                 <Link
                   to="/forgot-password"

@@ -12,9 +12,9 @@ import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES, EMAIL_DOMAIN, emailLocalPart, bui
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// لكل نوع حساب رابط تسجيل مستقل: /student/register (طالب)، /teacher/register (مشرف)، /admin/register (مدير)
+// لكل نوع حساب رابط تسجيل مستقل: /register/student (طالب)، /register/teacher (مشرف)، /register/admin (مدير)
 const ROLE_PAGES = {
-  student: { label: 'طالب', icon: GraduationCap, title: 'تسجيل طالب جديد', description: 'التسجيل طالبًا في حلقات التحفيظ' },
+  student: { label: 'طالب', icon: GraduationCap, title: 'تسجيل طالب جديد', description: '' },
   sheikh: { label: 'مشرف', icon: BookOpen, title: 'تسجيل مشرف جديد', description: 'التسجيل مشرفًا في حلقات القرآن الكريم' },
   admin: { label: 'مدير', icon: Shield, title: 'تسجيل مدير جديد', description: 'التسجيل مديرًا للمركز' },
 };
@@ -319,7 +319,7 @@ const Register = ({ role = 'student' }) => {
               <rolePage.icon className="w-5 h-5 text-emerald-400" />
               {rolePage.title}
             </CardTitle>
-            <CardDescription className="text-slate-400 text-sm">{rolePage.description} — أدخل بياناتك</CardDescription>
+            <CardDescription className="text-slate-400 text-sm">{rolePage.description ? `${rolePage.description} — أدخل بياناتك` : 'أدخل بياناتك'}</CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -479,7 +479,7 @@ const Register = ({ role = 'student' }) => {
               )}
 
               {/* Mosque & Birth Date */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className={`grid gap-3 ${selectedRole === 'student' ? 'grid-cols-2' : 'grid-cols-1'}`}>
                 <div className="space-y-1">
                   <Label className="text-slate-400 text-xs flex items-center gap-1">
                     <Home className="w-3 h-3" />
@@ -527,6 +527,8 @@ const Register = ({ role = 'student' }) => {
                     />
                   )}
                 </div>
+                {/* المدرسة للطلاب فقط */}
+                {selectedRole === 'student' && (
                 <div className="space-y-1">
                     <Label className="text-slate-400 text-xs flex items-center gap-1">
                       <School className="w-3 h-3" />
@@ -540,6 +542,7 @@ const Register = ({ role = 'student' }) => {
                       className="h-8 text-xs bg-slate-800/50 border-slate-700 text-white"
                     />
                   </div>
+                )}
                 
               </div>
 

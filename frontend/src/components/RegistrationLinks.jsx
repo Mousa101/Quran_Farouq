@@ -5,12 +5,12 @@ import { useTheme } from '../context/ThemeContext';
 
 // روابط التسجيل والدخول المنفصلة: يرسل المدير لكل فئة رابطها الخاص
 const LINKS = [
-  { path: '/student/register', label: 'رابط تسجيل الطلاب', icon: GraduationCap, color: 'text-emerald-400' },
-  { path: '/teacher/register', label: 'رابط تسجيل المشرفين', icon: BookOpen, color: 'text-blue-400' },
-  { path: '/admin/register', label: 'رابط تسجيل المدراء', icon: Shield, color: 'text-purple-400' },
-  { path: '/student/login', label: 'رابط دخول الطلاب', icon: GraduationCap, color: 'text-emerald-400' },
-  { path: '/teacher/login', label: 'رابط دخول المشرفين', icon: BookOpen, color: 'text-blue-400' },
-  { path: '/admin/login', label: 'رابط دخول المدراء', icon: Shield, color: 'text-purple-400' },
+  { path: '/register/student', label: 'رابط تسجيل الطلاب', icon: GraduationCap, color: 'text-emerald-400' },
+  { path: '/register/teacher', label: 'رابط تسجيل المشرفين', icon: BookOpen, color: 'text-blue-400' },
+  { path: '/register/admin', label: 'رابط تسجيل المدراء', icon: Shield, color: 'text-purple-400' },
+  { path: '/login/student', label: 'رابط دخول الطلاب', icon: GraduationCap, color: 'text-emerald-400' },
+  { path: '/login/teacher', label: 'رابط دخول المشرفين', icon: BookOpen, color: 'text-blue-400' },
+  { path: '/login/admin', label: 'رابط دخول المدراء', icon: Shield, color: 'text-purple-400' },
 ];
 
 const RegistrationLinks = () => {

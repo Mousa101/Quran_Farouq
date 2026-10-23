@@ -60,7 +60,7 @@ import StudentRecord from './pages/StudentRecord';
 import TrackingSettings from './pages/TrackingSettings';
 import DisplaySettings from './pages/DisplaySettings';
 import { hiddenPathsFor } from './lib/navItems';
-import { loginPathFor, registerPathFor, lastLoginPath } from './lib/authRoutes';
+import { ROLE_SLUGS, loginPathFor, registerPathFor, lastLoginPath } from './lib/authRoutes';
 import './App.css';
 
 // F1: حماية الصفحات حسب الصلاحية.
@@ -163,8 +163,10 @@ function AppRoutes() {
       {/* الروابط القديمة تُحوَّل للجديدة حتى لا تتعطل الروابط المحفوظة */}
       <Route path="/login" element={<Navigate to={lastLoginPath()} replace />} />
       <Route path="/register" element={<Navigate to={registerPathFor('student')} replace />} />
-      <Route path="/register/teacher" element={<Navigate to={registerPathFor('sheikh')} replace />} />
-      <Route path="/register/admin" element={<Navigate to={registerPathFor('admin')} replace />} />
+      {['student', 'sheikh', 'admin'].map((role) => [
+        <Route key={`${role}-login-old`} path={`/${ROLE_SLUGS[role]}/login`} element={<Navigate to={loginPathFor(role)} replace />} />,
+        <Route key={`${role}-register-old`} path={`/${ROLE_SLUGS[role]}/register`} element={<Navigate to={registerPathFor(role)} replace />} />,
+      ])}
       <Route
         path="/activate"
         element={user ? <Navigate to="/dashboard" replace /> : <Activate />}
