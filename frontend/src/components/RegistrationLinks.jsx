@@ -3,11 +3,14 @@ import { Copy, Check, GraduationCap, BookOpen, Shield, Link2 } from 'lucide-reac
 import { toast } from 'sonner';
 import { useTheme } from '../context/ThemeContext';
 
-// روابط التسجيل المنفصلة: يرسل المدير لكل فئة رابطها الخاص
+// روابط التسجيل والدخول المنفصلة: يرسل المدير لكل فئة رابطها الخاص
 const LINKS = [
-  { path: '/register', label: 'رابط تسجيل الطلاب', icon: GraduationCap, color: 'text-emerald-400' },
-  { path: '/register/teacher', label: 'رابط تسجيل المشرفين', icon: BookOpen, color: 'text-blue-400' },
-  { path: '/register/admin', label: 'رابط تسجيل المدراء', icon: Shield, color: 'text-purple-400' },
+  { path: '/student/register', label: 'رابط تسجيل الطلاب', icon: GraduationCap, color: 'text-emerald-400' },
+  { path: '/teacher/register', label: 'رابط تسجيل المشرفين', icon: BookOpen, color: 'text-blue-400' },
+  { path: '/admin/register', label: 'رابط تسجيل المدراء', icon: Shield, color: 'text-purple-400' },
+  { path: '/student/login', label: 'رابط دخول الطلاب', icon: GraduationCap, color: 'text-emerald-400' },
+  { path: '/teacher/login', label: 'رابط دخول المشرفين', icon: BookOpen, color: 'text-blue-400' },
+  { path: '/admin/login', label: 'رابط دخول المدراء', icon: Shield, color: 'text-purple-400' },
 ];
 
 const RegistrationLinks = () => {
@@ -29,7 +32,7 @@ const RegistrationLinks = () => {
     <div className={`p-4 rounded-xl border ${isDark ? 'bg-slate-800/40 border-white/10' : 'bg-white border-slate-200'}`}>
       <p className={`font-bold mb-3 flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
         <Link2 className="w-5 h-5 text-emerald-400" />
-        روابط التسجيل
+        روابط التسجيل والدخول
       </p>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
         {LINKS.map(({ path, label, icon: Icon, color }) => {

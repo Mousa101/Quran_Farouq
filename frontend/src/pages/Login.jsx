@@ -5,11 +5,21 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { BookOpen, Mail, Lock, Loader2, Eye, EyeOff } from 'lucide-react';
+import { BookOpen, Mail, Lock, Loader2, Eye, EyeOff, GraduationCap, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { EMAIL_PLACEHOLDER } from '../lib/constants';
+import { registerPathFor } from '../lib/authRoutes';
 
-const Login = () => {
+// لكل نوع حساب صفحة دخول مستقلة: /student/login (طالب)، /teacher/login (مشرف)، /admin/login (مدير)
+const ROLE_PAGES = {
+  student: { icon: GraduationCap, title: 'دخول الطلاب', description: 'أدخل بياناتك للوصول إلى حسابك' },
+  sheikh: { icon: BookOpen, title: 'دخول المشرفين', description: 'أدخل بيانات حساب المشرف' },
+  admin: { icon: Shield, title: 'دخول الإدارة', description: 'أدخل بيانات حساب المدير' },
+};
+
+const Login = ({ role = 'student' }) => {
+  const selectedRole = ROLE_PAGES[role] ? role : 'student';
+  const rolePage = ROLE_PAGES[selectedRole];
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -22,7 +32,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const user = await login(email, password);
+      const user = await login(email, password, selectedRole);
       toast.success(`مرحباً ${user.name}`);
       navigate('/dashboard');
     } catch (error) {
@@ -63,9 +73,12 @@ const Login = () => {
             <div className="lg:hidden w-14 h-14 md:w-16 md:h-16 mx-auto mb-2 md:mb-4 rounded-xl bg-white flex items-center justify-center overflow-hidden p-1">
               <img src="/logo.png" alt="شعار المركز" className="w-12 h-12 md:w-14 md:h-14 object-contain" />
             </div>
-            <CardTitle className="text-xl md:text-2xl font-bold text-white font-cairo">تسجيل الدخول</CardTitle>
+            <CardTitle className="text-xl md:text-2xl font-bold text-white font-cairo flex items-center justify-center gap-2">
+              <rolePage.icon className="w-5 h-5 md:w-6 md:h-6 text-emerald-400" />
+              {rolePage.title}
+            </CardTitle>
             <CardDescription className="text-slate-400 text-sm md:text-base">
-              أدخل بياناتك للوصول إلى حسابك
+              {rolePage.description}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
@@ -132,15 +145,11 @@ const Login = () => {
               <p className="text-slate-400 text-sm md:text-base">
                 ليس لديك حساب؟{' '}
                 <Link
-                  to="/register"
+                  to={registerPathFor(selectedRole)}
                   className="text-emerald-400 hover:text-emerald-300 font-medium"
                   data-testid="register-link"
                 >
-                  تسجيل طالب
-                </Link>
-                <span className="text-slate-600 mx-2">|</span>
-                <Link to="/register/teacher" className="text-blue-400 hover:text-blue-300 font-medium">
-                  تسجيل مشرف
+                  إنشاء حساب جديد
                 </Link>
               </p>
               <p className="text-slate-500 text-xs md:text-sm">

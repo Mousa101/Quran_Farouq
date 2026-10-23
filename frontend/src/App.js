@@ -60,10 +60,11 @@ import StudentRecord from './pages/StudentRecord';
 import TrackingSettings from './pages/TrackingSettings';
 import DisplaySettings from './pages/DisplaySettings';
 import { hiddenPathsFor } from './lib/navItems';
+import { loginPathFor, registerPathFor, lastLoginPath } from './lib/authRoutes';
 import './App.css';
 
 // F1: حماية الصفحات حسب الصلاحية.
-// - إن لم يسجّل الدخول: يُوجَّه إلى /login.
+// - إن لم يسجّل الدخول: يُوجَّه إلى صفحة دخول آخر دور استخدمه (افتراضيًا /student/login).
 // - إن كان الدور غير مسموح للصفحة (allow): يُعاد توجيهه إلى /dashboard بدل ظهور خطأ.
 // - الصفحات المشتركة لا تُمرّر allow فتبقى متاحة لكل الأدوار المسجّلة.
 // - الصفحة التي أخفاها المدير لهذا الدور (إعدادات العرض) يُعاد توجيهها إلى /dashboard.
@@ -80,7 +81,7 @@ const ProtectedRoute = ({ children, allow }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={lastLoginPath()} replace />;
   }
 
   if (allow && !allow.includes(user.role)) {
@@ -105,7 +106,7 @@ const DashboardRouter = () => {
     case 'student':
       return <StudentDashboard />;
     default:
-      return <Navigate to="/login" replace />;
+      return <Navigate to={lastLoginPath()} replace />;
   }
 };
 
@@ -146,24 +147,24 @@ function AppRoutes() {
 
   return (
     <Routes>
-      {/* Public Routes */}
-      <Route
-        path="/login"
-        element={user ? <Navigate to="/dashboard" replace /> : <Login />}
-      />
-      {/* روابط تسجيل منفصلة لكل نوع حساب */}
-      <Route
-        path="/register"
-        element={user ? <Navigate to="/dashboard" replace /> : <Register role="student" />}
-      />
-      <Route
-        path="/register/teacher"
-        element={user ? <Navigate to="/dashboard" replace /> : <Register role="sheikh" />}
-      />
-      <Route
-        path="/register/admin"
-        element={user ? <Navigate to="/dashboard" replace /> : <Register role="admin" />}
-      />
+      {/* Public Routes — لكل نوع حساب رابط دخول وتسجيل مستقل (مثل منصة الاختبارات) */}
+      {['student', 'sheikh', 'admin'].map((role) => [
+        <Route
+          key={`${role}-login`}
+          path={loginPathFor(role)}
+          element={user ? <Navigate to="/dashboard" replace /> : <Login role={role} />}
+        />,
+        <Route
+          key={`${role}-register`}
+          path={registerPathFor(role)}
+          element={user ? <Navigate to="/dashboard" replace /> : <Register role={role} />}
+        />,
+      ])}
+      {/* الروابط القديمة تُحوَّل للجديدة حتى لا تتعطل الروابط المحفوظة */}
+      <Route path="/login" element={<Navigate to={lastLoginPath()} replace />} />
+      <Route path="/register" element={<Navigate to={registerPathFor('student')} replace />} />
+      <Route path="/register/teacher" element={<Navigate to={registerPathFor('sheikh')} replace />} />
+      <Route path="/register/admin" element={<Navigate to={registerPathFor('admin')} replace />} />
       <Route
         path="/activate"
         element={user ? <Navigate to="/dashboard" replace /> : <Activate />}

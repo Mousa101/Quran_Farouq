@@ -7,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { BookOpen, Mail, Lock, User, Loader2, Phone, Calendar, School, Home, CheckCircle, Key, Image, Upload, UserPlus, GraduationCap, Shield, Briefcase, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
+import { loginPathFor } from '../lib/authRoutes';
 import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES, EMAIL_DOMAIN, emailLocalPart, buildEmail, PHONE_PLACEHOLDER, normalizePhone, phoneError } from '../lib/constants';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
-// لكل نوع حساب رابط تسجيل مستقل: /register (طالب)، /register/teacher (مشرف)، /register/admin (مدير)
+// لكل نوع حساب رابط تسجيل مستقل: /student/register (طالب)، /teacher/register (مشرف)، /admin/register (مدير)
 const ROLE_PAGES = {
   student: { label: 'طالب', icon: GraduationCap, title: 'تسجيل طالب جديد', description: 'التسجيل طالبًا في حلقات التحفيظ' },
   sheikh: { label: 'مشرف', icon: BookOpen, title: 'تسجيل مشرف جديد', description: 'التسجيل مشرفًا في حلقات القرآن الكريم' },
@@ -272,7 +273,7 @@ const Register = ({ role = 'student' }) => {
             </form>
             
             <div className="mt-6 text-center">
-              <Link to="/login" className="text-slate-400 hover:text-white text-sm">
+              <Link to={loginPathFor(selectedRole)} className="text-slate-400 hover:text-white text-sm">
                 العودة لتسجيل الدخول
               </Link>
             </div>
@@ -691,7 +692,7 @@ const Register = ({ role = 'student' }) => {
             <div className="mt-4 text-center">
               <p className="text-slate-400 text-sm">
                 لديك حساب؟{' '}
-                <Link to="/login" className="text-emerald-400 hover:text-emerald-300 font-medium">
+                <Link to={loginPathFor(selectedRole)} className="text-emerald-400 hover:text-emerald-300 font-medium">
                   سجل الدخول
                 </Link>
               </p>

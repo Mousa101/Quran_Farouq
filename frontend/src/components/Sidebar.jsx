@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { LogOut, Sun, Moon, Menu, X } from 'lucide-react';
 import { navItemsFor } from '../lib/navItems';
+import { loginPathFor } from '../lib/authRoutes';
 import { Button } from './ui/button';
 
 const Sidebar = () => {
@@ -42,8 +43,9 @@ const Sidebar = () => {
   }, [isMobileMenuOpen]);
 
   const handleLogout = () => {
+    const role = user?.role;
     logout();
-    navigate('/login');
+    navigate(loginPathFor(role));
   };
 
   const navItems = navItemsFor(user?.role, uiSettings);

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { ROLE_SLUGS, rememberLoginRole } from '../lib/authRoutes';
 
 const AuthContext = createContext(null);
 
@@ -56,10 +57,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, password) => {
-    const response = await axios.post(`${API}/auth/login`, { email, password });
+  // role: الدور الذي تخصّه صفحة الدخول — الخادم يرفض حسابات الأدوار الأخرى
+  const login = async (email, password, role = 'student') => {
+    const response = await axios.post(`${API}/auth/${ROLE_SLUGS[role] || 'student'}/login`, { email, password });
     const { token: newToken, user: userData } = response.data;
 
+    rememberLoginRole(userData.role);
     storeToken(newToken);
     axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
     setToken(newToken);
@@ -94,6 +97,7 @@ export const AuthProvider = ({ children }) => {
     });
     const { token: newToken, user: userData } = response.data;
 
+    rememberLoginRole(userData.role);
     storeToken(newToken);
     axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
     setToken(newToken);

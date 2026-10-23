@@ -289,15 +289,41 @@ async def register_with_code(user_data: UserCreateWithCode):
         )
     }
 
+LOGIN_ROLE_LABELS = {"admin": "مدير", "sheikh": "مشرف", "student": "طالب"}
+
+# لكل نوع حساب رابط دخول مستقل: /auth/admin/login، /auth/teacher/login، /auth/student/login
+# كل رابط يرفض حسابات الأدوار الأخرى (يُفحص الدور بعد التحقق من كلمة المرور حتى لا يُكشف وجود الحساب).
+@api_router.post("/auth/admin/login")
+async def admin_login(credentials: UserLogin):
+    return await _login(credentials, "admin")
+
+@api_router.post("/auth/teacher/login")
+async def teacher_login(credentials: UserLogin):
+    return await _login(credentials, "sheikh")
+
+@api_router.post("/auth/student/login")
+async def student_login(credentials: UserLogin):
+    return await _login(credentials, "student")
+
+# الرابط العام القديم — يبقى للتوافق مع الاختبارات والنسخ القديمة من الواجهة
 @api_router.post("/auth/login")
 async def login(credentials: UserLogin):
+    return await _login(credentials)
+
+async def _login(credentials: UserLogin, role: Optional[str] = None):
     user = await db.users.find_one({"email": credentials.email}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
-    
+
     if not verify_password(credentials.password, user.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="بيانات الدخول غير صحيحة")
-    
+
+    if role and user.get("role") != role:
+        raise HTTPException(
+            status_code=403,
+            detail=f"هذا ليس حساب {LOGIN_ROLE_LABELS[role]} — استخدم رابط الدخول الخاص بحسابك"
+        )
+
     # Check if student account is activated
     if user.get("role") == "student" and not user.get("is_activated", True):
         raise HTTPException(

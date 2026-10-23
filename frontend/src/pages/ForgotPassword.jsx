@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { KeyRound, ArrowRight, Phone, Mail, MessageCircle } from 'lucide-react';
+import { lastLoginPath } from '../lib/authRoutes';
 
 const ForgotPassword = () => {
   return (
@@ -78,7 +79,7 @@ const ForgotPassword = () => {
           </div>
           
           {/* زر العودة */}
-          <Link to="/login">
+          <Link to={lastLoginPath()}>
             <Button className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl">
               <ArrowRight className="w-5 h-5 ml-2" />
               العودة لتسجيل الدخول

@@ -8,6 +8,7 @@ import { BookOpen, Mail, Key, CheckCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { EMAIL_PLACEHOLDER } from '../lib/constants';
+import { lastLoginPath, registerPathFor } from '../lib/authRoutes';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -106,10 +107,10 @@ const Activate = () => {
           </form>
           
           <div className="mt-6 text-center space-y-2">
-            <Link to="/login" className="text-slate-400 hover:text-white text-sm block">
+            <Link to={lastLoginPath()} className="text-slate-400 hover:text-white text-sm block">
               العودة لتسجيل الدخول
             </Link>
-            <Link to="/register" className="text-emerald-400 hover:text-emerald-300 text-sm block">
+            <Link to={registerPathFor('student')} className="text-emerald-400 hover:text-emerald-300 text-sm block">
               ليس لديك حساب؟ سجل الآن
             </Link>
           </div>
