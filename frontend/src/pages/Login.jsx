@@ -144,7 +144,6 @@ const Login = ({ role = 'student' }) => {
             <div className="mt-4 md:mt-6 text-center space-y-2">
               {/* رابط الدخول هو ما يُرسَل لكل فئة: صاحب الحساب يدخل، ومن ليس له حساب ينشئ حسابًا من نوع الصفحة نفسها */}
               <p className="text-slate-400 text-sm md:text-base">
-                ليس لديك حساب؟{' '}
                 <Link
                   to={registerPathFor(selectedRole)}
                   className="text-emerald-400 hover:text-emerald-300 font-medium"
