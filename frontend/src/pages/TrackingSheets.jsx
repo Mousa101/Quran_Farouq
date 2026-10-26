@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import StudentLink from '../components/StudentLink';
 import { formatDate as fmtDate } from '../lib/utils';
 import MosqueIcon from '../components/icons/MosqueIcon';
+import { SITTING_DAYS_MAX, SITTING_POINTS_PER_DAY, clampPrayers, clampSittingDays, sittingPoints } from '../lib/trackingWeek';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -240,15 +241,15 @@ const TrackingSheets = () => {
   };
 
   const calculatePoints = () => {
-    const prayers = Math.min(formData.prayers_count, 35);
-    const quran = Math.min(formData.quran_sitting_days, 35);
+    const prayers = clampPrayers(formData.prayers_count);
+    const quran = sittingPoints(formData.quran_sitting_days);
     const custom = customItems.reduce((s, it) => s + Math.min(Math.max(parseInt(customValues[it.id]) || 0, 0), it.max_points), 0);
     return prayers + quran + custom;
   };
 
   const calculateEditPoints = () => {
-    const prayers = Math.min(editFormData.prayers_count, 35);
-    const quran = Math.min(editFormData.quran_sitting_days, 35);
+    const prayers = clampPrayers(editFormData.prayers_count);
+    const quran = sittingPoints(editFormData.quran_sitting_days);
     return prayers + quran; // 70
   };
 
@@ -393,16 +394,17 @@ const TrackingSheets = () => {
                         <div>
                           <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                             <BookOpen className="w-4 h-4 text-blue-400" />
-                            الجلوس مع القرآن (من 35)
+                            الجلوس مع القرآن (بالأيام)
                           </Label>
                           <Input
                             type="text"
                             inputMode="numeric"
                             placeholder="اكتب العدد"
                             value={formData.quran_sitting_days === 0 ? '' : formData.quran_sitting_days}
-                            onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, quran_sitting_days: d === '' ? 0 : parseInt(d, 10) }); }}
+                            onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, quran_sitting_days: d === '' ? 0 : clampSittingDays(d) }); }}
                             className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                           />
+                          <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>من {SITTING_DAYS_MAX} أيام · كل يوم = {SITTING_POINTS_PER_DAY} نقاط</p>
                         </div>
                       </div>
 
@@ -793,16 +795,17 @@ const TrackingSheets = () => {
                 <div>
                   <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                     <BookOpen className="w-4 h-4 text-blue-400" />
-                    الجلوس مع القرآن (من 35)
+                    الجلوس مع القرآن (بالأيام)
                   </Label>
                   <Input
                     type="text"
                     inputMode="numeric"
                     placeholder="اكتب العدد"
                     value={editFormData.quran_sitting_days === 0 ? '' : editFormData.quran_sitting_days}
-                    onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setEditFormData({ ...editFormData, quran_sitting_days: d === '' ? 0 : parseInt(d, 10) }); }}
+                    onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setEditFormData({ ...editFormData, quran_sitting_days: d === '' ? 0 : clampSittingDays(d) }); }}
                     className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                   />
+                  <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>من {SITTING_DAYS_MAX} أيام · كل يوم = {SITTING_POINTS_PER_DAY} نقاط</p>
                 </div>
               </div>
             </div>

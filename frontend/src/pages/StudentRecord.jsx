@@ -203,7 +203,7 @@ const StudentRecord = () => {
         const trackingData = semesterTracking.slice(0, 10).map(t => [
           formatDate(t.week_start),
           `${t.data?.prayers_count || 0}/35`,
-          `${t.data?.quran_sitting_days || 0}/35`,
+          `${t.data?.quran_sitting_days || 0}/7`,
           `${t.points_earned || 0}`
         ]);
 
@@ -485,7 +485,7 @@ const StudentRecord = () => {
                           </div>
                           <div className="text-center p-2 rounded-lg bg-slate-700/30">
                             <p className="text-slate-400">الجلوس مع القرآن</p>
-                            <p className="text-white font-bold">{sheet.data.quran_sitting_days || 0}/35</p>
+                            <p className="text-white font-bold">{sheet.data.quran_sitting_days || 0}/7 أيام</p>
                           </div>
                         </div>
                       )}

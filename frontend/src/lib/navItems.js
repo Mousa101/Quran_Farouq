@@ -33,7 +33,7 @@ export const NAV_ITEMS = {
     { to: '/chat-monitor', icon: MessageSquare, label: 'إدارة المحادثات' },
     { to: '/notifications', icon: Bell, label: 'الإشعارات' },
     { to: '/competitions', icon: Trophy, label: 'مرشّحو المسابقات' },
-    { to: '/annual-competition', icon: FolderOpen, label: 'ملف المسابقة السنوية' },
+    { to: '/technical-supervision', icon: FolderOpen, label: 'ملف الإشراف الفني' },
   ],
   sheikh: [
     { to: '/dashboard', icon: LayoutDashboard, label: 'الرئيسية' },

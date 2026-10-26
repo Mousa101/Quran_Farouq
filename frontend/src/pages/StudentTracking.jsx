@@ -13,22 +13,13 @@ import {
   Sunrise, Users, GraduationCap, Calendar, CheckCircle, Sparkles, MessageCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatDate as fmtDate } from '../lib/utils';
 import MosqueIcon from '../components/icons/MosqueIcon';
+import {
+  getCurrentWeekStart, weekRangeLabel, TRACKING_BASE_MAX, SITTING_DAYS_MAX, SITTING_POINTS_PER_DAY,
+  clampPrayers, clampSittingDays, sittingPoints,
+} from '../lib/trackingWeek';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
-
-// دالة للحصول على بداية الأسبوع الحالي (السبت)
-const getCurrentWeekStart = () => {
-  const today = new Date();
-  // في JavaScript: 0=الأحد، 6=السبت
-  // نحتاج السبت كبداية الأسبوع
-  const dayOfWeek = today.getDay();
-  const daysToSubtract = dayOfWeek === 6 ? 0 : dayOfWeek + 1;
-  const saturday = new Date(today);
-  saturday.setDate(today.getDate() - daysToSubtract);
-  return saturday.toISOString().split('T')[0];
-};
 
 const StudentTracking = () => {
   const { user } = useAuth();
@@ -100,7 +91,7 @@ const StudentTracking = () => {
     // التأكد من أن التاريخ هو بداية الأسبوع الحالي
     const currentWeek = getCurrentWeekStart();
     if (formData.week_start !== currentWeek) {
-      toast.error(`يمكنك فقط تعبئة ورقة الأسبوع الحالي (${fmtDate(currentWeek)})`);
+      toast.error(`يمكنك فقط تعبئة ورقة الأسبوع الحالي (${weekRangeLabel(currentWeek)})`);
       return;
     }
 
@@ -127,9 +118,9 @@ const StudentTracking = () => {
   const customMax = () => customItems.reduce((sum, it) => sum + it.max_points, 0);
 
   const calculatePoints = () => {
-    const prayers = Math.min(formData.prayers_count, 35);
-    const quran = Math.min(formData.quran_sitting_days, 35);
-    return prayers + quran + customTotal(); // 70 (صلوات 35 + جلوس 35) + بنود المشرف
+    const prayers = clampPrayers(formData.prayers_count);
+    const quran = sittingPoints(formData.quran_sitting_days);
+    return prayers + quran + customTotal(); // 70 (صلوات 35 + جلوس 7 أيام × 5) + بنود المشرف
   };
 
   const viewSheet = (sheet) => {
@@ -159,7 +150,7 @@ const StudentTracking = () => {
             <div>
               <h1 className={`text-xl md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>ورق المتابعة</h1>
               <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                سجّل أنشطتك وعباداتك الأسبوعية (الأسبوع من السبت للسبت)
+                سجّل أنشطتك وعباداتك الأسبوعية — الأسبوع الحالي: {weekRangeLabel(currentWeekStart)}
               </p>
             </div>
           </div>
@@ -180,7 +171,7 @@ const StudentTracking = () => {
               <form onSubmit={handleSubmit} className="space-y-4 mt-4">
                 <div className={`p-3 rounded-lg ${isDark ? 'bg-purple-500/10 border border-purple-500/30' : 'bg-purple-50 border border-purple-200'}`}>
                   <p className={`text-sm ${isDark ? 'text-purple-300' : 'text-purple-700'}`}>
-                    📅 أسبوع: <strong>{currentWeekStart}</strong>
+                    📅 الأسبوع: <strong>{weekRangeLabel(currentWeekStart)}</strong>
                   </p>
                   {currentWeekSheet && (
                     <p className="text-xs text-amber-400 mt-1">* يوجد سجل سابق - سيتم تحديثه</p>
@@ -189,7 +180,7 @@ const StudentTracking = () => {
 
                 {/* Points Entry Fields */}
                 <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
-                  <h3 className={`font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>بيانات الأسبوع (المجموع {70 + customMax()} نقطة)</h3>
+                  <h3 className={`font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>بيانات الأسبوع (المجموع {TRACKING_BASE_MAX + customMax()} نقطة)</h3>
 
                   <div className="grid grid-cols-2 gap-4">
                     {/* الصلوات */}
@@ -203,7 +194,7 @@ const StudentTracking = () => {
                         inputMode="numeric"
                         placeholder="اكتب العدد"
                         value={formData.prayers_count === 0 ? '' : formData.prayers_count}
-                        onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, prayers_count: d === '' ? 0 : parseInt(d, 10) }); }}
+                        onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, prayers_count: d === '' ? 0 : clampPrayers(d) }); }}
                         className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                       />
                       <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>5 صلوات × 7 أيام</p>
@@ -213,16 +204,17 @@ const StudentTracking = () => {
                     <div>
                       <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                         <BookOpen className="w-4 h-4 text-blue-400" />
-                        الجلوس مع القرآن (من 35)
+                        الجلوس مع القرآن (بالأيام)
                       </Label>
                       <Input
                         type="text"
                         inputMode="numeric"
-                        placeholder="اكتب العدد"
+                        placeholder="كم يومًا جلست؟"
                         value={formData.quran_sitting_days === 0 ? '' : formData.quran_sitting_days}
-                        onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, quran_sitting_days: d === '' ? 0 : parseInt(d, 10) }); }}
+                        onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, quran_sitting_days: d === '' ? 0 : clampSittingDays(d) }); }}
                         className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
                       />
+                      <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>من {SITTING_DAYS_MAX} أيام · كل يوم = {SITTING_POINTS_PER_DAY} نقاط</p>
                     </div>
 
                     {/* بنود المشرف المخصصة */}
@@ -259,8 +251,8 @@ const StudentTracking = () => {
                 <div className={`p-4 rounded-xl text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
                   <p className={isDark ? 'text-slate-300' : 'text-slate-600'}>النقاط المتوقعة</p>
                   <p className="text-3xl font-bold text-emerald-400">{calculatePoints()} نقطة</p>
-                  <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>الحد الأقصى: {70 + customMax()} نقطة</p>
-                  {calculatePoints() >= 0.9 * (70 + customMax()) && (
+                  <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>الحد الأقصى: {TRACKING_BASE_MAX + customMax()} نقطة</p>
+                  {calculatePoints() >= 0.9 * (TRACKING_BASE_MAX + customMax()) && (
                     <p className="text-amber-400 text-sm mt-2">🏅 ستحصل على شارة العابد!</p>
                   )}
                 </div>
@@ -278,7 +270,7 @@ const StudentTracking = () => {
       {/* Points Guide — ديناميكي حسب بنود المشرف (#3) */}
       <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
         <CardHeader>
-          <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>دليل النقاط (المجموع {70 + customMax()} نقطة)</CardTitle>
+          <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>دليل النقاط (المجموع {TRACKING_BASE_MAX + customMax()} نقطة)</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
@@ -291,6 +283,7 @@ const StudentTracking = () => {
               <div className="text-lg">📖</div>
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الجلوس مع القرآن</p>
               <p className="text-sm font-bold text-blue-400">35</p>
+              <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>7 أيام × 5</p>
             </div>
             {customItems.map((it) => (
               <div key={it.id} className={`p-2 rounded-lg text-center ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
@@ -301,7 +294,7 @@ const StudentTracking = () => {
             ))}
           </div>
           <div className={`mt-3 p-2 rounded-lg text-center ${isDark ? 'bg-emerald-500/10 border border-emerald-500/30' : 'bg-emerald-50 border border-emerald-200'}`}>
-            <p className="text-lg font-bold text-emerald-400">المجموع الأسبوعي: {70 + customMax()} نقطة</p>
+            <p className="text-lg font-bold text-emerald-400">المجموع الأسبوعي: {TRACKING_BASE_MAX + customMax()} نقطة</p>
           </div>
         </CardContent>
       </Card>
@@ -319,7 +312,7 @@ const StudentTracking = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className={isDark ? 'text-slate-300' : 'text-slate-600'}>
-                  تمت تعبئة ورقة أسبوع {fmtDate(currentWeekSheet.week_start)}
+                  تمت تعبئة ورقة الأسبوع {weekRangeLabel(currentWeekSheet.week_start)}
                 </p>
                 <p className="text-emerald-400 font-bold text-xl mt-1">
                   {currentWeekSheet.points_earned || 0} نقطة
@@ -358,9 +351,9 @@ const StudentTracking = () => {
                       <FileText className="w-6 h-6 text-purple-400" />
                     </div>
                     <div>
-                      <h3 className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>أسبوع {fmtDate(sheet.week_start)}</h3>
+                      <h3 className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{weekRangeLabel(sheet.week_start)}</h3>
                       <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                        صلوات: {sheet.data?.prayers_count || 0}/35
+                        صلوات: {sheet.data?.prayers_count || 0}/35 · جلوس: {sheet.data?.quran_sitting_days || 0}/{SITTING_DAYS_MAX} أيام
                       </p>
                     </div>
                   </div>
@@ -390,7 +383,7 @@ const StudentTracking = () => {
             <div className="space-y-4">
               <div className={`p-3 rounded-lg ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
                 <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>الأسبوع</p>
-                <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{fmtDate(selectedSheet.week_start)}</p>
+                <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{weekRangeLabel(selectedSheet.week_start)}</p>
               </div>
               
               <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
@@ -402,7 +395,7 @@ const StudentTracking = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>الجلوس مع القرآن:</span>
-                    <span className="text-blue-400 font-bold">{selectedSheet.data?.quran_sitting_days || 0}/35</span>
+                    <span className="text-blue-400 font-bold">{selectedSheet.data?.quran_sitting_days || 0}/{SITTING_DAYS_MAX} أيام</span>
                   </div>
                 </div>
               </div>

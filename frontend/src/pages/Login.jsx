@@ -12,9 +12,9 @@ import { registerPathFor } from '../lib/authRoutes';
 
 // لكل نوع حساب صفحة دخول مستقلة: /login/student (طالب)، /login/teacher (مشرف)، /login/admin (مدير)
 const ROLE_PAGES = {
-  student: { icon: GraduationCap, title: 'دخول الطلاب', description: 'أدخل بياناتك للوصول إلى حسابك' },
-  sheikh: { icon: BookOpen, title: 'دخول المشرفين', description: 'أدخل بيانات حساب المشرف' },
-  admin: { icon: Shield, title: 'دخول الإدارة', description: 'أدخل بيانات حساب المدير' },
+  student: { icon: GraduationCap, title: 'دخول الطلاب', description: 'أدخل بياناتك للوصول إلى حسابك', registerLabel: 'أنشئ حساب طالب' },
+  sheikh: { icon: BookOpen, title: 'دخول المشرفين', description: 'أدخل بيانات حساب المشرف', registerLabel: 'أنشئ حساب مشرف' },
+  admin: { icon: Shield, title: 'دخول الإدارة', description: 'أدخل بيانات حساب المدير', registerLabel: 'أنشئ حساب مدير' },
 };
 
 const Login = ({ role = 'student' }) => {
@@ -142,19 +142,17 @@ const Login = ({ role = 'student' }) => {
             </form>
 
             <div className="mt-4 md:mt-6 text-center space-y-2">
-              {/* رابط إنشاء الحساب يظهر في صفحة دخول الطلاب فقط — المشرفون والمدراء يصلهم رابط التسجيل من المدير */}
-              {selectedRole === 'student' && (
-                <p className="text-slate-400 text-sm md:text-base">
-                  إذا أردت إنشاء حساب طالب{' '}
-                  <Link
-                    to={registerPathFor('student')}
-                    className="text-emerald-400 hover:text-emerald-300 font-medium"
-                    data-testid="register-link"
-                  >
-                    سجّل من هنا
-                  </Link>
-                </p>
-              )}
+              {/* رابط الدخول هو ما يُرسَل لكل فئة: صاحب الحساب يدخل، ومن ليس له حساب ينشئ حسابًا من نوع الصفحة نفسها */}
+              <p className="text-slate-400 text-sm md:text-base">
+                ليس لديك حساب؟{' '}
+                <Link
+                  to={registerPathFor(selectedRole)}
+                  className="text-emerald-400 hover:text-emerald-300 font-medium"
+                  data-testid="register-link"
+                >
+                  {rolePage.registerLabel}
+                </Link>
+              </p>
               <p className="text-slate-500 text-xs md:text-sm">
                 <Link
                   to="/forgot-password"

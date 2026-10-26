@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import { Card, CardContent } from '../components/ui/card';
@@ -211,9 +212,16 @@ const AnnualCompetition = () => {
                 </Button>
               </>
             ) : (
-              <Button onClick={() => setYearDialog(true)} className="bg-emerald-500 hover:bg-emerald-600" data-testid="add-year-btn">
-                <Plus className="w-4 h-4 ml-1" />إضافة سنة
-              </Button>
+              <>
+                <Link to="/technical-supervision">
+                  <Button variant="outline" className={isDark ? 'border-slate-700' : ''}>
+                    <ArrowRight className="w-4 h-4 ml-1" />ملف الإشراف الفني
+                  </Button>
+                </Link>
+                <Button onClick={() => setYearDialog(true)} className="bg-emerald-500 hover:bg-emerald-600" data-testid="add-year-btn">
+                  <Plus className="w-4 h-4 ml-1" />إضافة سنة
+                </Button>
+              </>
             )}
           </div>
         </div>

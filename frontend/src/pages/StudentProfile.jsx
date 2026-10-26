@@ -489,7 +489,7 @@ const StudentProfile = () => {
               </div>
               <div className="p-3 rounded-lg bg-blue-500/10 text-center">
                 <p className="text-slate-400 text-xs">📖 الجلوس مع القرآن</p>
-                <p className="text-blue-400 font-bold text-lg">{last_tracking_sheet.quran_sitting_days}</p>
+                <p className="text-blue-400 font-bold text-lg">{last_tracking_sheet.quran_sitting_days}<span className="text-xs text-slate-500">/7 أيام</span></p>
               </div>
               <div className="p-3 rounded-lg bg-amber-500/10 text-center">
                 <p className="text-slate-400 text-xs">النقاط</p>

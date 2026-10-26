@@ -1208,6 +1208,7 @@ ATTENDANCE_POINTS = 10          # نقاط كل يوم حضور
 RECITATION_PASS_POINTS = 20     # نقاط كل تسميع ناجح (اجتاز الحد الأدنى)
 TRACKING_PRAYERS_MAX = 35       # الحد الأقصى لنقاط الصلوات في ورقة المتابعة
 TRACKING_SITTING_MAX = 35       # الحد الأقصى لنقاط الجلوس مع القرآن
+SITTING_DAYS_MAX = 7            # الجلوس مع القرآن يُسجَّل بالأيام (0-7)، وكل يوم = TRACKING_SITTING_MAX / 7 نقطة
 TRACKING_BASE_MAX = TRACKING_PRAYERS_MAX + TRACKING_SITTING_MAX  # 70 - الأساس الأسبوعي لورقة المتابعة
 WEEKLY_TRACKING_MAX = TRACKING_BASE_MAX  # الإجمالي الأسبوعي الأساسي لورقة المتابعة (قبل بنود المشرف المخصصة)
 
@@ -1240,6 +1241,16 @@ def apply_points_config(cfg: dict):
         TRACKING_SITTING_MAX = int(cfg["tracking_sitting_max"])
     TRACKING_BASE_MAX = TRACKING_PRAYERS_MAX + TRACKING_SITTING_MAX
     WEEKLY_TRACKING_MAX = TRACKING_BASE_MAX
+
+
+def sitting_days(value) -> int:
+    """عدد أيام الجلوس مع القرآن (0-7)."""
+    return min(max(int(value or 0), 0), SITTING_DAYS_MAX)
+
+
+def sitting_points(days) -> int:
+    """نقاط الجلوس مع القرآن من عدد الأيام: 7 أيام = TRACKING_SITTING_MAX."""
+    return round(sitting_days(days) * TRACKING_SITTING_MAX / SITTING_DAYS_MAX)
 
 
 @app.on_event("startup")
@@ -1303,6 +1314,7 @@ DB_INDEXES = {
                       [("student_id", 1), ("sheikh_id", 1)],
                       [("kind", 1), ("sheikh_id", 1), ("created_at", 1)]],
     "annual_competition": [[("year", 1)], [("student_id", 1)], [("id", 1)]],
+    "supervision_records": [[("kind", 1), ("level", 1)], [("id", 1)], [("student_id", 1)]],
     "annual_competition_years": [[("year", 1)]],
     "fees": [[("student_id", 1)], [("year", 1), ("month", 1)],
              [("student_id", 1), ("year", 1), ("month", 1)]],
@@ -1320,6 +1332,7 @@ async def _ensure_indexes():
                 logger.warning(f"index {collection}{keys} failed: {e}")
     logger.info("Database indexes ensured.")
     await _backfill_group_sheikh_ids()
+    await _migrate_sitting_to_days()
     await _cleanup_irrelevant_student_notifications()
 
 
@@ -1330,6 +1343,18 @@ async def _backfill_group_sheikh_ids():
             await db.groups.update_one({"id": g["id"]}, {"$set": {"sheikh_ids": group_sheikh_ids(g)}})
     except Exception as e:
         logger.error(f"backfill group sheikh_ids failed: {e}")
+
+
+async def _migrate_sitting_to_days():
+    """الجلوس مع القرآن كان يُسجَّل بالنقاط (0-35) وصار بالأيام (0-7).
+    القيم القديمة الأكبر من 7 تُحوَّل إلى أيام (÷5). نقاط الأوراق المحفوظة لا تتغيّر. آمن للتكرار."""
+    try:
+        async for s in db.tracking_sheets.find({"data.quran_sitting_days": {"$gt": SITTING_DAYS_MAX}},
+                                               {"_id": 0, "id": 1, "data.quran_sitting_days": 1}):
+            days = sitting_days(round(int(s["data"]["quran_sitting_days"]) / 5))
+            await db.tracking_sheets.update_one({"id": s["id"]}, {"$set": {"data.quran_sitting_days": days}})
+    except Exception as e:
+        logger.error(f"migrate sitting to days failed: {e}")
 
 
 # عناوين إشعارات إدارية لا تخصّ الطالب — تُحذف من صناديق الطلاب
@@ -2282,7 +2307,8 @@ async def juz_classification_report(group_id: Optional[str] = None, current_user
 
 # ============== جدول إحصائيات الطلاب (فلاتر + ترتيب + تصدير) ==============
 STUDENT_STATS_NUMERIC = {"total_memorization", "new_memorization", "review", "attendance", "tracking",
-                         "tracking_prayers", "tracking_sitting", "age", "average"}
+                         "tracking_prayers", "tracking_sitting", "age", "average",
+                         "admin_tested_juz", "annual_score"}
 
 
 def parse_average(val):
@@ -2350,7 +2376,7 @@ def _sheet_prayers_sitting(sheet: dict) -> tuple:
     """عدد الصلوات وعدد أيام الجلوس مع القرآن من ورقة متابعة (مع الحدّ الأقصى)."""
     d = sheet.get("data") or {}
     prayers = min(int(d.get("prayers_count") or 0), TRACKING_PRAYERS_MAX)
-    sitting = min(int(d.get("quran_sitting_days") or 0), TRACKING_SITTING_MAX)
+    sitting = sitting_days(d.get("quran_sitting_days"))
     return prayers, sitting
 
 
@@ -2381,9 +2407,17 @@ async def _build_student_stats(current_user, group_id=None, student_id=None,
         "school_average": 1, "strong_juz": 1, "weak_juz": 1,
         "previous_memorization_juz": 1, "previous_memorization_pages": 1,
         "annual_competition": 1, "annual_competition_juz": 1,
-        "young_hafiz": 1, "young_hafiz_juz": 1,
+        "young_hafiz": 1, "young_hafiz_juz": 1, "administrative_test_juz": 1,
     }).to_list(5000)
     sids = [s["id"] for s in students]
+
+    # علامة الطالب في المسابقة السنوية (أحدث سنة شارك فيها) من كشوف ملف المسابقة السنوية
+    annual_by = {}
+    async for a in db.annual_competition.find({"student_id": {"$in": sids}},
+                                              {"_id": 0, "student_id": 1, "year": 1, "score": 1}):
+        prev_a = annual_by.get(a["student_id"])
+        if a.get("score") is not None and (not prev_a or (a.get("year") or 0) > (prev_a.get("year") or 0)):
+            annual_by[a["student_id"]] = a
 
     recs = await db.recitations.find(
         {"student_id": {"$in": sids}, "did_not_recite": {"$ne": True}},
@@ -2462,6 +2496,10 @@ async def _build_student_stats(current_user, group_id=None, student_id=None,
             "annual_competition_juz": s.get("annual_competition_juz") or [],
             "young_hafiz": bool(s.get("young_hafiz")),
             "young_hafiz_juz": s.get("young_hafiz_juz") or [],
+            # الأجزاء المختبَرة إداريًا (المفصل الإداري) من التقييم الأولي
+            "admin_tested_juz": len(s.get("administrative_test_juz") or []),
+            "annual_score": (annual_by.get(s["id"]) or {}).get("score"),
+            "annual_year": (annual_by.get(s["id"]) or {}).get("year"),
             "age": age,
             "grade": s.get("school_grade") or "",
             "average": parse_average(s.get("school_average")),  # المعدّل الموحّد (رقم)
@@ -2527,15 +2565,15 @@ async def export_student_stats_excel(group_id: Optional[str] = None, student_id:
     cell_f = wb.add_format({'border': 1, 'align': 'center'})
     sh = wb.add_worksheet('إحصائيات الطلاب')
     sh.right_to_left()
-    sh.merge_range('A1:P1', f'جدول إحصائيات الطلاب — ورق المتابعة حسب: {period_label}', title_f)
+    sh.merge_range('A1:R1', f'جدول إحصائيات الطلاب — ورق المتابعة حسب: {period_label}', title_f)
     headers = ['#', 'الطالب', 'المجموعة', 'الحفظ الكلي (ص)', 'الحفظ الجديد (ص)', 'المراجعة (ص)',
                'أيام الحضور', 'أوراق المتابعة', 'الصلوات', 'الجلوس مع القرآن', 'آخر ورقة',
                'المسابقة السنوية', 'الحافظ الصغير',
-               'العمر', 'الصف', 'المعدل %']
+               'العمر', 'الصف', 'المعدل %', 'المختبَرة إداريًا (جزء)', 'علامة المسابقة السنوية']
     for c, h in enumerate(headers):
         sh.write(2, c, h, head_f)
     sh.set_column('A:A', 5); sh.set_column('B:B', 22); sh.set_column('C:C', 16)
-    sh.set_column('D:J', 14); sh.set_column('K:K', 14); sh.set_column('L:M', 18); sh.set_column('N:P', 12)
+    sh.set_column('D:J', 14); sh.set_column('K:K', 14); sh.set_column('L:M', 18); sh.set_column('N:P', 12); sh.set_column('Q:R', 18)
     for i, r in enumerate(rows, 1):
         row = i + 2
         last = r.get("last_sheet") or {}
@@ -2555,6 +2593,8 @@ async def export_student_stats_excel(group_id: Optional[str] = None, student_id:
         sh.write(row, 13, r["age"] if r["age"] is not None else "", cell_f)
         sh.write(row, 14, r["grade"], cell_f)
         sh.write(row, 15, f"{r['average']}%" if r.get("average") is not None else "", cell_f)
+        sh.write(row, 16, r.get("admin_tested_juz", 0), cell_f)
+        sh.write(row, 17, r["annual_score"] if r.get("annual_score") is not None else "", cell_f)
     wb.close()
     return _xlsx_response(output, f"student_stats_{datetime.now().strftime('%Y%m%d')}.xlsx")
 
@@ -2637,12 +2677,12 @@ def calculate_tracking_points(data: dict, custom_items: list = None) -> dict:
     """
     حساب نقاط ورقة المتابعة - الأساس 70 نقطة:
     - الصلوات: 35 نقطة
-    - الجلوس مع القرآن: 35 نقطة
+    - الجلوس مع القرآن: 35 نقطة (عدد الأيام 0-7 × 5)
     بالإضافة إلى بنود مخصصة يضيفها المشرف (كل بند بحده الأقصى من النقاط).
     custom_items: [{"id", "name", "max_points"}], والقيم في data["custom_values"] = {item_id: value}
     """
     prayers = min(data.get("prayers_count", 0), TRACKING_PRAYERS_MAX)
-    sitting = min(data.get("quran_sitting_days", 0), TRACKING_SITTING_MAX)
+    sitting = sitting_points(data.get("quran_sitting_days", 0))
 
     custom_total = 0
     custom_points = {}
@@ -2672,9 +2712,9 @@ def calculate_tracking_points(data: dict, custom_items: list = None) -> dict:
     }
 
 def get_current_week_start():
-    """الحصول على بداية الأسبوع الحالي (السبت)"""
+    """الحصول على بداية الأسبوع الحالي (السبت) بتوقيت الأردن (UTC+3)"""
     from datetime import timedelta
-    today = datetime.now(timezone.utc).date()
+    today = (datetime.now(timezone.utc) + timedelta(hours=3)).date()
     # السبت = 5 في Python (Monday = 0)
     days_since_saturday = (today.weekday() + 2) % 7
     saturday = today - timedelta(days=days_since_saturday)
@@ -2805,7 +2845,7 @@ async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_
     sheet_data = TrackingSheetData(
         prayers_count=min(data.prayers_count, 35),
         adhkar_after_prayer=min(data.adhkar_after_prayer, 7),
-        quran_sitting_days=min(data.quran_sitting_days, 35),
+        quran_sitting_days=sitting_days(data.quran_sitting_days),
         duha_prayers=min(data.duha_prayers, 7),
         family_recitation=min(data.family_recitation, 7),
         study_hours=min(data.study_hours, 7),
@@ -2901,7 +2941,7 @@ async def create_tracking_sheet(sheet_data: TrackingSheetCreate, current_user: d
     # Create sheet data with new fields
     sheet_data_obj = TrackingSheetData(
         prayers_count=analysis_result.get("prayers_count", 0),
-        quran_sitting_days=analysis_result.get("quran_sitting_days", 0),
+        quran_sitting_days=sitting_days(analysis_result.get("quran_sitting_days", 0)),
         duha_prayers=analysis_result.get("duha_prayers", 0),
         family_recitation=analysis_result.get("family_recitation", 0),
         study_hours=analysis_result.get("study_hours", 0),
@@ -2962,7 +3002,7 @@ class StudentTrackingCreate(BaseModel):
     week_start: str  # تاريخ بداية الأسبوع (السبت)
     prayers_count: int = 0  # الصلوات (0-35)
     adhkar_after_prayer: int = 0  # أذكار بعد الصلاة (0-7) [ملغى]
-    quran_sitting_days: int = 0  # الجلوس مع القرآن (0-35)
+    quran_sitting_days: int = 0  # أيام الجلوس مع القرآن (0-7)
     duha_prayers: int = 0  # صلاة الضحى (0-7)
     family_recitation: int = 0  # التسميع للأهل (0-7)
     study_hours: int = 0  # ساعات الدراسة (0-7)
@@ -3173,7 +3213,7 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
     #        حتى لا يمسح تسجيل الطالب تسجيل المشرف والعكس.
     merged_data = dict((existing or {}).get("data") or {})
     merged_data["prayers_count"] = min(data.prayers_count, 35)
-    merged_data["quran_sitting_days"] = min(data.quran_sitting_days, 35)
+    merged_data["quran_sitting_days"] = sitting_days(data.quran_sitting_days)
     if data.notes is not None:
         merged_data["notes"] = data.notes
 
@@ -3348,7 +3388,7 @@ async def update_tracking_sheet(sheet_id: str, data: TrackingSheetUpdate, curren
     if data.adhkar_after_prayer is not None:
         sheet_data["adhkar_after_prayer"] = min(data.adhkar_after_prayer, 7)
     if data.quran_sitting_days is not None:
-        sheet_data["quran_sitting_days"] = min(data.quran_sitting_days, 35)
+        sheet_data["quran_sitting_days"] = sitting_days(data.quran_sitting_days)
     if data.duha_prayers is not None:
         sheet_data["duha_prayers"] = min(data.duha_prayers, 7)
     if data.family_recitation is not None:
@@ -3400,10 +3440,9 @@ async def update_tracking_sheet(sheet_id: str, data: TrackingSheetUpdate, curren
 async def get_tracking_stats(student_id: str, current_user: dict = Depends(get_current_user)):
     """الحصول على إحصائيات ورقة المتابعة - الأسبوع الحالي والمجموع الفصلي"""
     
-    # Get current week start (Sunday)
     today = datetime.now(timezone.utc)
-    days_since_sunday = today.weekday() + 1 if today.weekday() != 6 else 0
-    current_week_start = (today - timedelta(days=days_since_sunday)).strftime('%Y-%m-%d')
+    # الأسبوع يبدأ السبت — نفس بداية الأسبوع التي تُحفظ بها الأوراق
+    current_week_start = get_current_week_start()
     
     # Get current semester start (assume semester is 4 months)
     # For simplicity, use the beginning of the current semester period
@@ -3479,7 +3518,7 @@ async def get_tracking_stats(student_id: str, current_user: dict = Depends(get_c
         "semester_start": semester_start,
         "weekly": weekly_data,
         "semester": semester_data,
-        "max_weekly_points": 100,  # الحد الأقصى للنقاط الأسبوعية
+        "max_weekly_points": TRACKING_BASE_MAX,  # الأساس الأسبوعي (70) — بنود المشرف تُضاف فوقه
         "categories": {
             "prayers": {"max_weekly": 35, "label": "الصلوات"},
             "quran_sitting": {"max_weekly": 7, "label": "الجلوس مع القرآن"},
@@ -4644,8 +4683,8 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
     
     # حساب بيانات ورقة المتابعة - الأسبوعية والفصلية
     today = datetime.now(timezone.utc)
-    days_since_sunday = today.weekday() + 1 if today.weekday() != 6 else 0
-    current_week_start = (today - timedelta(days=days_since_sunday)).strftime('%Y-%m-%d')
+    # الأسبوع يبدأ السبت — نفس بداية الأسبوع التي تُحفظ بها الأوراق
+    current_week_start = get_current_week_start()
     
     # حساب بداية الفصل
     month = today.month
@@ -11025,6 +11064,170 @@ async def student_annual_competition(student_id: str, current_user: dict = Depen
         raise HTTPException(status_code=403, detail="غير مصرح لك")
     return await db.annual_competition.find({"student_id": student_id}, {"_id": 0}).sort("year", -1).to_list(100)
 
+
+
+# ============== ملف الإشراف الفني: الحافظ الصغير + التلاوة والتجويد ==============
+# المسابقة السنوية لها ملفها الخاص (annual_competition). هنا سجلّان بنفس الشكل:
+# كل سجل لشخص (طالب في المركز أو من خارجه) مع ما حصل عليه، وتاريخه، ومكانه.
+
+SUPERVISION_KINDS = {"young_hafiz": "الحافظ الصغير", "tajweed": "التلاوة والتجويد"}
+TAJWEED_LEVELS = ["تلاوة عامة", "تمهيدية", "متوسطة", "متقدمة", "إجازة", "اتقان", "سند غيبي", "روايات أخرى"]
+YOUNG_HAFIZ_MIN_JUZ = 3                 # حفظ 3 أجزاء على الأقل
+YOUNG_HAFIZ_MAX_GRADE = "الصف الخامس"   # الصف الخامس فما دون
+
+
+class SupervisionRecord(BaseModel):
+    kind: str                               # young_hafiz | tajweed
+    full_name: str                          # الاسم الرباعي
+    level: Optional[str] = None             # التجويد: المستوى · الحافظ الصغير: المستوى/الفئة
+    obtained_date: Optional[str] = None     # تاريخ الحصول عليها (YYYY-MM-DD)
+    place: Optional[str] = None             # مكان الحصول عليها: مدرسة، دورة، مركز...
+    birth_date: Optional[str] = None
+    school_grade: Optional[str] = None
+    phone: Optional[str] = None
+    juz_count: Optional[float] = None       # الحافظ الصغير: عدد الأجزاء المحفوظة
+    student_id: Optional[str] = None        # يُربط تلقائيًا بحساب الطالب إن تطابق الاسم
+    notes: Optional[str] = None
+
+
+def _young_hafiz_grade_ok(grade: Optional[str]) -> bool:
+    try:
+        return SCHOOL_GRADES_ORDER.index((grade or "").strip()) <= SCHOOL_GRADES_ORDER.index(YOUNG_HAFIZ_MAX_GRADE)
+    except ValueError:
+        return False
+
+
+async def _supervision_doc(data: SupervisionRecord) -> dict:
+    if data.kind not in SUPERVISION_KINDS:
+        raise HTTPException(status_code=400, detail="نوع السجل غير معروف")
+    name = " ".join((data.full_name or "").split())
+    if not name:
+        raise HTTPException(status_code=400, detail="الاسم مطلوب")
+    if data.kind == "tajweed" and data.level and data.level not in TAJWEED_LEVELS:
+        raise HTTPException(status_code=400, detail="مستوى التجويد غير معروف")
+    student_id = data.student_id or (await _students_by_norm_name()).get(_norm_ar_name(name))
+    return {
+        "kind": data.kind,
+        "full_name": name,
+        "level": (data.level or "").strip() or None,
+        "obtained_date": data.obtained_date or None,
+        "place": (data.place or "").strip() or None,
+        "birth_date": data.birth_date or None,
+        "school_grade": data.school_grade or None,
+        "phone": (data.phone or "").strip() or None,
+        "juz_count": data.juz_count,
+        "student_id": student_id,
+        "notes": (data.notes or "").strip() or None,
+    }
+
+
+@api_router.get("/supervision/summary")
+async def supervision_summary(current_user: dict = Depends(get_current_user)):
+    """أعداد ملفات الإشراف الفني (لبطاقات الصفحة الرئيسية للملف)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
+    by_level = {lvl: 0 for lvl in TAJWEED_LEVELS}
+    counts = {"young_hafiz": 0, "tajweed": 0}
+    async for r in db.supervision_records.find({}, {"_id": 0, "kind": 1, "level": 1}):
+        counts[r["kind"]] = counts.get(r["kind"], 0) + 1
+        if r["kind"] == "tajweed" and r.get("level") in by_level:
+            by_level[r["level"]] += 1
+    return {
+        "young_hafiz": counts["young_hafiz"],
+        "tajweed": counts["tajweed"],
+        "tajweed_levels": [{"level": k, "count": v} for k, v in by_level.items()],
+        "annual_competition": {
+            "total": await db.annual_competition.count_documents({}),
+            "years": len(await db.annual_competition.distinct("year")),
+        },
+        "young_hafiz_rule": {"min_juz": YOUNG_HAFIZ_MIN_JUZ, "max_grade": YOUNG_HAFIZ_MAX_GRADE},
+    }
+
+
+@api_router.get("/supervision/records")
+async def supervision_records(kind: str, level: Optional[str] = None,
+                              current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
+    if kind not in SUPERVISION_KINDS:
+        raise HTTPException(status_code=400, detail="نوع السجل غير معروف")
+    q = {"kind": kind}
+    if level:
+        q["level"] = level
+    rows = await db.supervision_records.find(q, {"_id": 0}).sort([("obtained_date", -1), ("full_name", 1)]).to_list(5000)
+    groups = {g["id"]: g["name"] for g in await db.groups.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(3000)}
+    sids = [r["student_id"] for r in rows if r.get("student_id")]
+    students = {s["id"]: s for s in await db.users.find({"id": {"$in": sids}}, {"_id": 0, "id": 1, "group_id": 1}).to_list(5000)}
+    for r in rows:
+        st = students.get(r.get("student_id"))
+        r["linked"] = bool(st)
+        r["group_name"] = groups.get(st.get("group_id")) if st else None
+    return rows
+
+
+@api_router.post("/supervision/records")
+async def supervision_record_add(data: SupervisionRecord, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الإضافة")
+    doc = await _supervision_doc(data)
+    doc["id"] = str(uuid.uuid4())
+    doc["created_at"] = datetime.now(timezone.utc).isoformat()
+    doc["created_by"] = current_user["user_id"]
+    await db.supervision_records.insert_one(dict(doc))
+    await log_admin_action(current_user, "create", "supervision_record", doc["id"], doc["full_name"],
+                           f"إضافة سجل {SUPERVISION_KINDS[doc['kind']]}")
+    return doc
+
+
+@api_router.put("/supervision/records/{record_id}")
+async def supervision_record_update(record_id: str, data: SupervisionRecord, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه التعديل")
+    if not await db.supervision_records.find_one({"id": record_id}):
+        raise HTTPException(status_code=404, detail="السجل غير موجود")
+    doc = await _supervision_doc(data)
+    await db.supervision_records.update_one({"id": record_id}, {"$set": doc})
+    return {"message": "تم تعديل السجل"}
+
+
+@api_router.delete("/supervision/records/{record_id}")
+async def supervision_record_delete(record_id: str, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الحذف")
+    rec = await db.supervision_records.find_one({"id": record_id}, {"_id": 0, "full_name": 1, "kind": 1})
+    if not rec:
+        raise HTTPException(status_code=404, detail="السجل غير موجود")
+    await db.supervision_records.delete_one({"id": record_id})
+    await log_admin_action(current_user, "delete", "supervision_record", record_id, rec["full_name"],
+                           f"حذف سجل {SUPERVISION_KINDS.get(rec['kind'], '')}")
+    return {"message": "تم حذف السجل"}
+
+
+@api_router.get("/supervision/young-hafiz/eligible")
+async def young_hafiz_eligible(current_user: dict = Depends(get_current_user)):
+    """طلاب المركز المؤهَّلون للحافظ الصغير: حفظ 3 أجزاء فأكثر + الصف الخامس فما دون."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
+    students = await db.users.find({"role": "student"}, {
+        "_id": 0, "id": 1, "name": 1, "group_id": 1, "school_grade": 1, "birth_date": 1, "phone": 1,
+        "previous_memorization_juz": 1, "previous_memorization_pages": 1, "strong_juz": 1, "weak_juz": 1,
+    }).to_list(10000)
+    students = [s for s in students if _young_hafiz_grade_ok(s.get("school_grade"))]
+    sids = [s["id"] for s in students]
+    new_pages_by = {}
+    async for r in db.recitations.find({"student_id": {"$in": sids}, "did_not_recite": {"$ne": True}},
+                                       {"_id": 0, "student_id": 1, "new_pages": 1, "pages_count": 1, "recitation_type": 1}):
+        new_pages_by[r["student_id"]] = new_pages_by.get(r["student_id"], 0) + _new_pages_of(r)
+    recorded = set(await db.supervision_records.distinct("student_id", {"kind": "young_hafiz"}))
+    groups = {g["id"]: g["name"] for g in await db.groups.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(3000)}
+    rows = []
+    for s in students:
+        pages = (pages_for_juz_list(student_memorized_prev_juz(s)) + (s.get("previous_memorization_pages") or 0)
+                 + new_pages_by.get(s["id"], 0))
+        juz = round(pages / PAGES_PER_JUZ, 1)
+        if juz < YOUNG_HAFIZ_MIN_JUZ:
+            continue
+        rows.append({
+            "student_id": s["id"], "name": s.get("name") or "", "group_name": groups.get(s.get("group_id"), ""),
+            "school_grade": s.get("school_grade"), "birth_date": s.get("birth_date"), "phone": s.get("phone"),
+            "memorized_juz": juz, "recorded": s["id"] in recorded,
+        })
+    rows.sort(key=lambda r: (-r["memorized_juz"], r["name"]))
+    return {"min_juz": YOUNG_HAFIZ_MIN_JUZ, "max_grade": YOUNG_HAFIZ_MAX_GRADE, "rows": rows}
 
 # TEMPORARY — full database backup for migrating off the old host. Remove after migration.
 @api_router.get("/admin/full-backup")

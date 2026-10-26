@@ -40,6 +40,8 @@ import AdminAnalytics from './pages/AdminAnalytics';
 import StrugglingStudents from './pages/StrugglingStudents';
 import CompetitionsAnalysis from './pages/CompetitionsAnalysis';
 import AnnualCompetition from './pages/AnnualCompetition';
+import TechnicalSupervision from './pages/TechnicalSupervision';
+import SupervisionFile from './pages/SupervisionFile';
 import AuditLog from './pages/AuditLog';
 import ChatMonitor from './pages/ChatMonitor';
 import StatisticsHub from './pages/StatisticsHub';
@@ -406,6 +408,39 @@ function AppRoutes() {
           <ProtectedRoute allow={['admin']}>
             <Layout>
               <CompetitionsAnalysis />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/technical-supervision"
+        element={
+          <ProtectedRoute allow={['admin']}>
+            <Layout>
+              <TechnicalSupervision />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/technical-supervision/young-hafiz"
+        element={
+          <ProtectedRoute allow={['admin']}>
+            <Layout>
+              <SupervisionFile kind="young_hafiz" />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/technical-supervision/tajweed"
+        element={
+          <ProtectedRoute allow={['admin']}>
+            <Layout>
+              <SupervisionFile kind="tajweed" />
             </Layout>
           </ProtectedRoute>
         }

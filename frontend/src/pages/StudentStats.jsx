@@ -23,6 +23,8 @@ const SORT_FIELDS = [
   { key: 'age', label: 'العمر' },
   { key: 'grade', label: 'الصف' },
   { key: 'average', label: 'المعدل' },
+  { key: 'admin_tested_juz', label: 'المختبَرة إداريًا (المفصل الإداري)' },
+  { key: 'annual_score', label: 'علامة المسابقة السنوية' },
 ];
 
 // مدى احتساب أعمدة ورق المتابعة
@@ -233,6 +235,8 @@ const StudentStats = () => {
                     <th className={`${th} ${activeCol('tracking_sitting')}`}>📖 الجلوس مع القرآن</th>
                     <th className={th}>آخر ورقة</th>
                     <th className={th}>🏆 المسابقات</th>
+                    <th className={`${th} ${activeCol('admin_tested_juz')}`}>المختبَرة إداريًا</th>
+                    <th className={`${th} ${activeCol('annual_score')}`}>علامة المسابقة السنوية</th>
                     <th className={`${th} ${activeCol('age')}`}>العمر</th>
                     <th className={`${th} ${activeCol('grade')}`}>الصف</th>
                     <th className={`${th} ${activeCol('average')}`}>المعدل</th>
@@ -278,6 +282,8 @@ const StudentStats = () => {
                           <span className={isDark ? 'text-slate-600' : 'text-slate-400'}>—</span>
                         )}
                       </td>
+                      <td className={`p-2 ${activeCol('admin_tested_juz')}`}>{r.admin_tested_juz ? `${r.admin_tested_juz} جزء` : '—'}</td>
+                      <td className={`p-2 ${activeCol('annual_score')}`} title={r.annual_year ? `سنة ${r.annual_year}` : undefined}>{r.annual_score ?? '—'}</td>
                       <td className={`p-2 ${activeCol('age')}`}>{r.age ?? '—'}</td>
                       <td className={`p-2 ${activeCol('grade')}`}>{r.grade || '—'}</td>
                       <td className={`p-2 ${activeCol('average')}`}>{r.average != null ? `${r.average}%` : '—'}</td>

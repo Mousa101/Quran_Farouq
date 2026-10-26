@@ -3,14 +3,11 @@ import { Copy, Check, GraduationCap, BookOpen, Shield, Link2 } from 'lucide-reac
 import { toast } from 'sonner';
 import { useTheme } from '../context/ThemeContext';
 
-// روابط التسجيل والدخول المنفصلة: يرسل المدير لكل فئة رابطها الخاص
+// روابط الدخول المنفصلة: يرسل المدير لكل فئة رابطها، وفي صفحة الدخول رابط لإنشاء حساب جديد من النوع نفسه
 const LINKS = [
-  { path: '/register/student', label: 'رابط تسجيل الطلاب', icon: GraduationCap, color: 'text-emerald-400' },
-  { path: '/register/teacher', label: 'رابط تسجيل المشرفين', icon: BookOpen, color: 'text-blue-400' },
-  { path: '/register/admin', label: 'رابط تسجيل المدراء', icon: Shield, color: 'text-purple-400' },
-  { path: '/login/student', label: 'رابط دخول الطلاب', icon: GraduationCap, color: 'text-emerald-400' },
-  { path: '/login/teacher', label: 'رابط دخول المشرفين', icon: BookOpen, color: 'text-blue-400' },
-  { path: '/login/admin', label: 'رابط دخول المدراء', icon: Shield, color: 'text-purple-400' },
+  { path: '/login/student', label: 'رابط الطلاب (دخول أو إنشاء حساب)', icon: GraduationCap, color: 'text-emerald-400' },
+  { path: '/login/teacher', label: 'رابط المشرفين (دخول أو إنشاء حساب)', icon: BookOpen, color: 'text-blue-400' },
+  { path: '/login/admin', label: 'رابط المدراء (دخول أو إنشاء حساب)', icon: Shield, color: 'text-purple-400' },
 ];
 
 const RegistrationLinks = () => {

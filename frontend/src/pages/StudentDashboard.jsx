@@ -21,6 +21,10 @@ import {
 } from 'lucide-react';
 import { formatDate as fmtDate } from '../lib/utils';
 import MosqueIcon from '../components/icons/MosqueIcon';
+import {
+  getCurrentWeekStart, weekRangeLabel, TRACKING_BASE_MAX, SITTING_DAYS_MAX, SITTING_POINTS_PER_DAY,
+  clampPrayers, clampSittingDays, sittingPoints,
+} from '../lib/trackingWeek';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -147,11 +151,8 @@ const StudentDashboard = () => {
   const handleSubmitTracking = async () => {
     setSubmittingTracking(true);
     try {
-      // الحصول على تاريخ بداية الأسبوع الحالي (الأحد)
-      const today = new Date();
-      const sunday = new Date(today);
-      sunday.setDate(today.getDate() - today.getDay());
-      const week_start = sunday.toISOString().split('T')[0];
+      // بداية الأسبوع الحالي (السبت) — نفس منطق الخادم
+      const week_start = getCurrentWeekStart();
       
       // تحويل القيم لأرقام صحيحة وتجنب إرسال undefined أو NaN
       const formDataToSend = {
@@ -194,10 +195,11 @@ const StudentDashboard = () => {
   };
 
   const calculateTrackingPoints = () => {
-    const prayers = Math.min(trackingForm.prayers_count, 35);
-    const quran = Math.min(trackingForm.quran_sitting_days, 35);
+    const prayers = clampPrayers(trackingForm.prayers_count);
+    const quran = sittingPoints(trackingForm.quran_sitting_days);
     return prayers + quran + customTrackingTotal(); // 70 + بنود المشرف
   };
+  const trackingMax = TRACKING_BASE_MAX + customTrackingMax();
 
   if (loading) {
     return (
@@ -773,13 +775,13 @@ console.log(stats)
         </Card>
       </div>
 
-      {/* ورقة المتابعة الإيمانية - الأسبوعية والفصلية */}
+      {/* ورقة المتابعة الإيمانية — الأسبوع الحالي فقط (ملخّص الشهر والفصل يُضاف لاحقًا) */}
       <Card className="glass-card border-white/10">
         <CardHeader className="pb-2 md:pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base md:text-lg font-bold text-white flex items-center gap-2">
               <MosqueIcon className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
-              ورقة المتابعة الإيمانية (100 نقطة)
+              ورقة المتابعة الإيمانية ({trackingMax} نقطة)
             </CardTitle>
             <Button
               onClick={() => setTrackingDialogOpen(true)}
@@ -798,6 +800,7 @@ console.log(stats)
               <Calendar className="w-4 h-4" />
               هذا الأسبوع
             </h4>
+            <p className="text-xs text-slate-400 -mt-2 mb-3">{weekRangeLabel(getCurrentWeekStart())}</p>
             <div className="grid grid-cols-2 gap-2">
               <div className="p-2 md:p-3 rounded-xl bg-emerald-500/10 text-center">
                 <MosqueIcon className="w-5 h-5 md:w-6 md:h-6 mx-auto text-emerald-400 mb-1" />
@@ -806,67 +809,13 @@ console.log(stats)
               </div>
               <div className="p-2 md:p-3 rounded-xl bg-blue-500/10 text-center">
                 <BookMarked className="w-5 h-5 md:w-6 md:h-6 mx-auto text-blue-400 mb-1" />
-                <p className="text-lg md:text-xl font-bold text-white">{(stats?.tracking?.weekly?.quran ?? stats?.tracking?.weekly?.quran_sitting) || 0}<span className="text-xs text-slate-500">/35</span></p>
+                <p className="text-lg md:text-xl font-bold text-white">{(stats?.tracking?.weekly?.quran ?? stats?.tracking?.weekly?.quran_sitting) || 0}<span className="text-xs text-slate-500">/{SITTING_DAYS_MAX} أيام</span></p>
                 <p className="text-blue-400 text-[10px] md:text-xs">الجلوس مع القرآن</p>
               </div>
             </div>
             <div className="mt-2 text-center">
               <span className="text-sm text-slate-400">نقاط الأسبوع: </span>
               <span className="text-lg font-bold text-emerald-400">{stats?.tracking?.weekly?.total_points || 0}</span>
-            </div>
-          </div>
-
-          {/* الفاصل */}
-          <div className="border-t border-white/10 my-4"></div>
-
-          {/* هذا الشهر */}
-          <div>
-            <h4 className="text-sm font-bold text-purple-400 mb-3 flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              هذا الشهر
-            </h4>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="p-2 md:p-3 rounded-xl bg-emerald-500/10 text-center">
-                <MosqueIcon className="w-5 h-5 md:w-6 md:h-6 mx-auto text-emerald-400 mb-1" />
-                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.split?.month?.prayers || 0}</p>
-                <p className="text-emerald-400 text-[10px] md:text-xs">الصلوات</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-blue-500/10 text-center">
-                <BookMarked className="w-5 h-5 md:w-6 md:h-6 mx-auto text-blue-400 mb-1" />
-                <p className="text-lg md:text-xl font-bold text-white">{stats?.tracking?.split?.month?.sitting || 0}</p>
-                <p className="text-blue-400 text-[10px] md:text-xs">الجلوس مع القرآن</p>
-              </div>
-            </div>
-            <p className="mt-2 text-center text-xs text-slate-400">
-              عدد الأوراق هذا الشهر: {stats?.tracking?.split?.month?.sheets || 0}
-            </p>
-          </div>
-
-          {/* الفاصل */}
-          <div className="border-t border-white/10 my-4"></div>
-
-          {/* المجموع الفصلي */}
-          <div>
-            <h4 className="text-sm font-bold text-amber-400 mb-3 flex items-center gap-2">
-              <Trophy className="w-4 h-4" />
-              المجموع الفصلي
-            </h4>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-emerald-500/20">
-                <p className="text-lg md:text-xl font-bold text-emerald-400">{stats?.tracking?.semester?.prayers || 0}</p>
-                <p className="text-slate-400 text-[10px] md:text-xs">الصلوات</p>
-              </div>
-              <div className="p-2 md:p-3 rounded-xl bg-slate-800/50 text-center border border-blue-500/20">
-                <p className="text-lg md:text-xl font-bold text-blue-400">{(stats?.tracking?.semester?.quran ?? stats?.tracking?.semester?.quran_sitting) || 0}</p>
-                <p className="text-slate-400 text-[10px] md:text-xs">الجلوس مع القرآن</p>
-              </div>
-            </div>
-            <div className="mt-3 flex justify-between items-center text-sm">
-              <span className="text-slate-400">عدد الأسابيع: {stats?.tracking?.semester?.weeks_count || 0}</span>
-              <div>
-                <span className="text-slate-400">إجمالي النقاط: </span>
-                <span className="text-xl font-bold text-amber-400">{stats?.tracking?.semester?.total_points || 0}</span>
-              </div>
             </div>
           </div>
 
@@ -881,7 +830,7 @@ console.log(stats)
               <p className="text-amber-400 text-sm">لم تُسلِّم أي ورقة متابعة حتى الآن.</p>
             ) : (
               <div className="flex items-center justify-between gap-2 flex-wrap text-sm">
-                <span className="text-white font-medium">أسبوع {fmtDate(stats.tracking.last_sheet.week_start)}</span>
+                <span className="text-white font-medium">{weekRangeLabel(stats.tracking.last_sheet.week_start)}</span>
                 <div className="flex items-center gap-3 text-xs">
                   <span className="text-emerald-400">🕌 {stats.tracking.last_sheet.prayers_count}</span>
                   <span className="text-blue-400">📖 {stats.tracking.last_sheet.quran_sitting_days}</span>
@@ -966,6 +915,9 @@ console.log(stats)
           </DialogHeader>
           
           <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
+              <p className="text-sm text-purple-300">📅 الأسبوع: <strong>{weekRangeLabel(getCurrentWeekStart())}</strong></p>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {/* الصلوات */}
               <div>
@@ -978,7 +930,7 @@ console.log(stats)
                   min="0"
                   max="35"
                   value={trackingForm.prayers_count}
-                  onChange={(e) => setTrackingForm({ ...trackingForm, prayers_count: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setTrackingForm({ ...trackingForm, prayers_count: clampPrayers(e.target.value) })}
                   className="bg-slate-800 border-white/10 text-white"
                 />
               </div>
@@ -987,16 +939,17 @@ console.log(stats)
               <div>
                 <Label className="text-slate-300 flex items-center gap-2">
                   <BookMarked className="w-4 h-4 text-blue-400" />
-                  الجلوس مع القرآن (من 35)
+                  الجلوس مع القرآن (بالأيام)
                 </Label>
                 <Input
                   type="number"
                   min="0"
-                  max="35"
+                  max={SITTING_DAYS_MAX}
                   value={trackingForm.quran_sitting_days}
-                  onChange={(e) => setTrackingForm({ ...trackingForm, quran_sitting_days: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => setTrackingForm({ ...trackingForm, quran_sitting_days: clampSittingDays(e.target.value) })}
                   className="bg-slate-800 border-white/10 text-white"
                 />
+                <p className="text-xs text-slate-500 mt-1">من {SITTING_DAYS_MAX} أيام · كل يوم = {SITTING_POINTS_PER_DAY} نقاط</p>
               </div>
 
               {/* بنود المشرف المخصصة */}
@@ -1033,8 +986,8 @@ console.log(stats)
             <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30 text-center">
               <p className="text-slate-300">النقاط المتوقعة</p>
               <p className="text-3xl font-bold text-purple-400">{calculateTrackingPoints()} نقطة</p>
-              <p className="text-xs text-slate-500">من أصل 100 نقطة</p>
-              {calculateTrackingPoints() >= 90 && (
+              <p className="text-xs text-slate-500">من أصل {trackingMax} نقطة</p>
+              {calculateTrackingPoints() >= 0.9 * trackingMax && (
                 <p className="text-amber-400 text-sm mt-2">🏅 ستحصل على شارة العابد!</p>
               )}
             </div>
