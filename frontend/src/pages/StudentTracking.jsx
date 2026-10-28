@@ -13,10 +13,10 @@ import {
   Sunrise, Users, GraduationCap, Calendar, CheckCircle, Sparkles, MessageCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
-import MosqueIcon from '../components/icons/MosqueIcon';
+import WeeklyTrackingGrid from '../components/WeeklyTrackingGrid';
 import {
-  getCurrentWeekStart, weekRangeLabel, TRACKING_BASE_MAX, SITTING_DAYS_MAX, SITTING_POINTS_PER_DAY,
-  clampPrayers, clampSittingDays, sittingPoints,
+  getCurrentWeekStart, weekRangeLabel, TRACKING_BASE_MAX, SITTING_DAYS_MAX,
+  emptyDaily, normalizeDaily, dailyTotals,
 } from '../lib/trackingWeek';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -34,6 +34,7 @@ const StudentTracking = () => {
   
   const [formData, setFormData] = useState({
     week_start: getCurrentWeekStart(),
+    daily: emptyDaily(),
     prayers_count: 0,
     adhkar_after_prayer: 0,
     quran_sitting_days: 0,
@@ -72,8 +73,7 @@ const StudentTracking = () => {
         // تحميل البيانات الموجودة
         setFormData({
           week_start: currentWeek,
-          prayers_count: existingSheet.data?.prayers_count || 0,
-          quran_sitting_days: existingSheet.data?.quran_sitting_days || 0,
+          daily: normalizeDaily(existingSheet.data?.daily),
           notes: existingSheet.data?.notes || ''
         });
         setCustomValues(existingSheet.data?.custom_values || {});
@@ -97,8 +97,11 @@ const StudentTracking = () => {
 
     setSubmitting(true);
     try {
+      const totals = dailyTotals(formData.daily);
       const res = await axios.post(`${API}/tracking-sheets/student`, {
         ...formData,
+        prayers_count: totals.prayers,
+        quran_sitting_days: totals.sittingDays,
         week_start: currentWeek,
         custom_values: customValues
       });
@@ -117,11 +120,8 @@ const StudentTracking = () => {
 
   const customMax = () => customItems.reduce((sum, it) => sum + it.max_points, 0);
 
-  const calculatePoints = () => {
-    const prayers = clampPrayers(formData.prayers_count);
-    const quran = sittingPoints(formData.quran_sitting_days);
-    return prayers + quran + customTotal(); // 70 (صلوات 35 + جلوس 7 أيام × 5) + بنود المشرف
-  };
+  // 70 (كل صلاة نقطة = 35 + جلوس ساعتين فأكثر 7 أيام × 5) + بنود المشرف
+  const calculatePoints = () => dailyTotals(formData.daily).points + customTotal();
 
   const viewSheet = (sheet) => {
     setSelectedSheet(sheet);
@@ -161,7 +161,7 @@ const StudentTracking = () => {
                 {currentWeekSheet ? 'تعديل ورقة الأسبوع' : 'تعبئة ورقة متابعة'}
               </Button>
             </DialogTrigger>
-            <DialogContent className={`max-w-2xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white'}`}>
+            <DialogContent className={`max-w-3xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white'}`}>
               <DialogHeader>
                 <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>
                   {currentWeekSheet ? 'تعديل ورقة المتابعة' : 'تعبئة ورقة المتابعة'}
@@ -182,41 +182,18 @@ const StudentTracking = () => {
                 <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
                   <h3 className={`font-bold mb-4 ${isDark ? 'text-white' : 'text-slate-900'}`}>بيانات الأسبوع (المجموع {TRACKING_BASE_MAX + customMax()} نقطة)</h3>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* الصلوات */}
-                    <div>
-                      <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                        <MosqueIcon className="w-4 h-4 text-emerald-400" />
-                        الصلوات (من 35)
-                      </Label>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="اكتب العدد"
-                        value={formData.prayers_count === 0 ? '' : formData.prayers_count}
-                        onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, prayers_count: d === '' ? 0 : clampPrayers(d) }); }}
-                        className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
-                      />
-                      <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>5 صلوات × 7 أيام</p>
-                    </div>
+                  {currentWeekSheet && !currentWeekSheet.data?.daily && (currentWeekSheet.data?.prayers_count > 0 || currentWeekSheet.data?.quran_sitting_days > 0) && (
+                    <p className="text-xs text-amber-400 mb-2">
+                      * سُجّلت هذه الورقة سابقًا بالأعداد ({currentWeekSheet.data.prayers_count} صلاة، {currentWeekSheet.data.quran_sitting_days} أيام جلوس) — عبّئ الجدول ليُحدَّث.
+                    </p>
+                  )}
+                  <WeeklyTrackingGrid
+                    daily={formData.daily}
+                    weekStart={currentWeekStart}
+                    onChange={(daily) => setFormData({ ...formData, daily })}
+                  />
 
-                    {/* الجلوس مع القرآن */}
-                    <div>
-                      <Label className={`flex items-center gap-2 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                        <BookOpen className="w-4 h-4 text-blue-400" />
-                        الجلوس مع القرآن (بالأيام)
-                      </Label>
-                      <Input
-                        type="text"
-                        inputMode="numeric"
-                        placeholder="كم يومًا جلست؟"
-                        value={formData.quran_sitting_days === 0 ? '' : formData.quran_sitting_days}
-                        onChange={(e) => { const d = e.target.value.replace(/[^0-9]/g, ''); setFormData({ ...formData, quran_sitting_days: d === '' ? 0 : clampSittingDays(d) }); }}
-                        className={isDark ? 'bg-slate-700 border-white/10 text-white' : ''}
-                      />
-                      <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>من {SITTING_DAYS_MAX} أيام · كل يوم = {SITTING_POINTS_PER_DAY} نقاط</p>
-                    </div>
-
+                  <div className="grid grid-cols-2 gap-4 mt-4">
                     {/* بنود المشرف المخصصة */}
                     {customItems.map((it) => (
                       <div key={it.id}>
@@ -278,12 +255,13 @@ const StudentTracking = () => {
               <div className="text-lg">🕌</div>
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الصلوات</p>
               <p className="text-sm font-bold text-emerald-400">35</p>
+              <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>كل صلاة = نقطة</p>
             </div>
             <div className={`p-2 rounded-lg text-center ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
               <div className="text-lg">📖</div>
               <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>الجلوس مع القرآن</p>
               <p className="text-sm font-bold text-blue-400">35</p>
-              <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>7 أيام × 5</p>
+              <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>ساعتان فأكثر يوميًا = 5</p>
             </div>
             {customItems.map((it) => (
               <div key={it.id} className={`p-2 rounded-lg text-center ${isDark ? 'bg-purple-500/10' : 'bg-purple-50'}`}>
@@ -375,7 +353,7 @@ const StudentTracking = () => {
 
       {/* View Sheet Dialog */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
-        <DialogContent className={`max-w-lg ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white'}`}>
+        <DialogContent className={`max-w-3xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white'}`}>
           <DialogHeader>
             <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>تفاصيل ورقة المتابعة</DialogTitle>
           </DialogHeader>
@@ -386,6 +364,10 @@ const StudentTracking = () => {
                 <p className={`font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{weekRangeLabel(selectedSheet.week_start)}</p>
               </div>
               
+              {selectedSheet.data?.daily && (
+                <WeeklyTrackingGrid daily={selectedSheet.data.daily} weekStart={selectedSheet.week_start} readOnly />
+              )}
+
               <div className={`p-4 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
                 <h4 className={`font-bold mb-3 ${isDark ? 'text-white' : 'text-slate-900'}`}>التفاصيل</h4>
                 <div className="grid grid-cols-2 gap-3 text-sm">

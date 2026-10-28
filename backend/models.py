@@ -295,6 +295,9 @@ class TrackingSheetData(BaseModel):
     notes: Optional[str] = None
     # بنود المشرف المخصصة: {item_id: نقاط} (محسوبة)
     custom_values: Optional[dict] = None
+    # الجدول اليومي (السبت → الجمعة): [{fajr, dhuhr, asr, maghrib, isha: bool, quran_minutes: int}] × 7
+    # prayers_count و quran_sitting_days يُشتقّان منه عند وجوده
+    daily: Optional[list] = None
     # Legacy fields (للتوافق مع البيانات القديمة)
     adhkar_count: int = 0
     sunnah_prayers_days: int = 0
@@ -322,6 +325,7 @@ class TrackingSheetManualCreate(BaseModel):
     fasting: int = 0  # الصيام (0-1)
     notes: Optional[str] = None
     custom_values: Optional[dict] = None  # بنود المشرف المخصّصة: {item_id: value}
+    daily: Optional[list] = None  # الجدول اليومي — إن أُرسل يُشتقّ منه الصلوات والجلوس
 
 class TrackingSheet(BaseModel):
     model_config = ConfigDict(extra="ignore")

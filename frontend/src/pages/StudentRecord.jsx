@@ -16,6 +16,8 @@ import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatDate as fmtDate } from '../lib/utils';
+import WeeklyTrackingGrid from '../components/WeeklyTrackingGrid';
+import { PRAYERS, dailyTotals, formatMinutes } from '../lib/trackingWeek';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -200,16 +202,23 @@ const StudentRecord = () => {
       yPos += 10;
       
       if (semesterTracking.length > 0) {
-        const trackingData = semesterTracking.slice(0, 10).map(t => [
-          formatDate(t.week_start),
-          `${t.data?.prayers_count || 0}/35`,
-          `${t.data?.quran_sitting_days || 0}/7`,
-          `${t.points_earned || 0}`
-        ]);
+        // عمود لكل صلاة + الجلوس مع القرآن (من الجدول اليومي؛ الأوراق القديمة تُظهر المجموع فقط)
+        const trackingData = semesterTracking.slice(0, 10).map(t => {
+          const daily = t.data?.daily;
+          const count = (k) => (daily ? `${daily.filter((d) => d[k]).length}/7` : '-');
+          return [
+            formatDate(t.week_start),
+            ...PRAYERS.map((p) => count(p.key)),
+            `${t.data?.prayers_count || 0}/35`,
+            `${t.data?.quran_sitting_days || 0}/7`,
+            daily ? formatMinutes(dailyTotals(daily).quranMinutes) : '-',
+            `${t.points_earned || 0}`
+          ];
+        });
 
         autoTable(doc, {
           startY: yPos,
-          head: [['Week', 'Prayers', 'Sitting', 'Points']],
+          head: [['Week', 'Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha', 'Prayers', 'Sitting days', 'Quran h:m', 'Points']],
           body: trackingData,
           theme: 'grid',
           styles: { halign: 'center', fontSize: 9 },
@@ -460,7 +469,7 @@ const StudentRecord = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-3 max-h-[36rem] overflow-y-auto">
                 {trackingSheets.length === 0 ? (
                   <p className="text-center text-slate-400 py-8">لا توجد ورق متابعة</p>
                 ) : (
@@ -477,6 +486,11 @@ const StudentRecord = () => {
                           {sheet.points_earned || 0} نقطة
                         </Badge>
                       </div>
+                      {sheet.data?.daily && (
+                        <div className="mb-2">
+                          <WeeklyTrackingGrid daily={sheet.data.daily} weekStart={sheet.week_start} readOnly />
+                        </div>
+                      )}
                       {sheet.data && (
                         <div className="grid grid-cols-2 gap-2 text-sm">
                           <div className="text-center p-2 rounded-lg bg-slate-700/30">

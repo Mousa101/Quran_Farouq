@@ -1253,6 +1253,61 @@ def sitting_points(days) -> int:
     return round(sitting_days(days) * TRACKING_SITTING_MAX / SITTING_DAYS_MAX)
 
 
+# الجدول اليومي لورقة المتابعة (مثل الورقة المطبوعة): الصلوات الخمس + الجلوس مع القرآن لكل يوم
+PRAYER_KEYS = ("fajr", "dhuhr", "asr", "maghrib", "isha")
+QURAN_SITTING_MIN_MINUTES = 120  # ساعتان فأكثر = يوم جلوس (5 نقاط)
+MAX_DAY_MINUTES = 24 * 60
+
+
+def normalize_daily(daily) -> Optional[list]:
+    """يوحّد الجدول اليومي إلى 7 أيام (السبت → الجمعة): صلوات منطقية + دقائق الجلوس (0-1440)."""
+    if daily is None:
+        return None
+    days = list(daily)[:SITTING_DAYS_MAX]
+    out = []
+    for i in range(SITTING_DAYS_MAX):
+        d = days[i] if i < len(days) and isinstance(days[i], dict) else {}
+        try:
+            minutes = int(d.get("quran_minutes") or 0)
+        except (TypeError, ValueError):
+            minutes = 0
+        row = {k: bool(d.get(k)) for k in PRAYER_KEYS}
+        row["quran_minutes"] = min(max(minutes, 0), MAX_DAY_MINUTES)
+        out.append(row)
+    return out
+
+
+def apply_daily(data: dict, daily) -> dict:
+    """يحفظ الجدول اليومي في بيانات الورقة ويشتقّ منه عدد الصلوات وأيام الجلوس (ساعتان فأكثر)."""
+    rows = normalize_daily(daily)
+    if rows is None:
+        return data
+    data["daily"] = rows
+    data["prayers_count"] = min(sum(r[k] for r in rows for k in PRAYER_KEYS), TRACKING_PRAYERS_MAX)
+    data["quran_sitting_days"] = sum(1 for r in rows if r["quran_minutes"] >= QURAN_SITTING_MIN_MINUTES)
+    return data
+
+
+def sheet_prayer_breakdown(sheet: dict) -> dict:
+    """عدد كل صلاة + دقائق الجلوس مع القرآن من الجدول اليومي (الأوراق القديمة بلا جدول تُرجع أصفارًا)."""
+    rows = ((sheet.get("data") or {}).get("daily")) or []
+    out = {k: 0 for k in PRAYER_KEYS}
+    out["quran_minutes"] = 0
+    for r in rows:
+        for k in PRAYER_KEYS:
+            out[k] += 1 if r.get(k) else 0
+        out["quran_minutes"] += int(r.get("quran_minutes") or 0)
+    return out
+
+
+def sum_prayer_breakdowns(sheets: list) -> dict:
+    total = {k: 0 for k in (*PRAYER_KEYS, "quran_minutes")}
+    for s in sheets:
+        for k, v in sheet_prayer_breakdown(s).items():
+            total[k] += v
+    return total
+
+
 @app.on_event("startup")
 async def _load_points_config():
     """تحميل قيم النقاط المخصّصة من قاعدة البيانات عند الإقلاع (N2)."""
@@ -2308,6 +2363,8 @@ async def juz_classification_report(group_id: Optional[str] = None, current_user
 # ============== جدول إحصائيات الطلاب (فلاتر + ترتيب + تصدير) ==============
 STUDENT_STATS_NUMERIC = {"total_memorization", "new_memorization", "review", "attendance", "tracking",
                          "tracking_prayers", "tracking_sitting", "age", "average",
+                         "tracking_fajr", "tracking_dhuhr", "tracking_asr", "tracking_maghrib", "tracking_isha",
+                         "tracking_quran_minutes",
                          "admin_tested_juz", "annual_score"}
 
 
@@ -2442,6 +2499,7 @@ async def _build_student_stats(current_user, group_id=None, student_id=None,
     # ورق المتابعة: العدد + تفصيل الصلوات/الجلوس ضمن المدة المطلوبة + آخر ورقة مُسلَّمة
     p_from, p_to = _tracking_period_bounds(tracking_period)
     track_by, prayers_by, sitting_by, last_sheet_by = {}, {}, {}, {}
+    daily_by = {}  # تفصيل كل صلاة + دقائق الجلوس من الجدول اليومي
     for t in tracks:
         sid = t["student_id"]
         ws = t.get("week_start") or ""
@@ -2463,6 +2521,9 @@ async def _build_student_stats(current_user, group_id=None, student_id=None,
         pr, si = _sheet_prayers_sitting(t)
         prayers_by[sid] = prayers_by.get(sid, 0) + pr
         sitting_by[sid] = sitting_by.get(sid, 0) + si
+        acc = daily_by.setdefault(sid, {k: 0 for k in (*PRAYER_KEYS, "quran_minutes")})
+        for k, v in sheet_prayer_breakdown(t).items():
+            acc[k] += v
 
     group_names = {}
     rows = []
@@ -2490,6 +2551,9 @@ async def _build_student_stats(current_user, group_id=None, student_id=None,
             # تقسيم ورق المتابعة: الصلوات + الجلوس مع القرآن ضمن المدة المختارة
             "tracking_prayers": prayers_by.get(s["id"], 0),
             "tracking_sitting": sitting_by.get(s["id"], 0),
+            # عمود لكل صلاة + ساعات الجلوس مع القرآن (من الجدول اليومي)
+            **{f"tracking_{k}": (daily_by.get(s["id"]) or {}).get(k, 0) for k in PRAYER_KEYS},
+            "tracking_quran_minutes": (daily_by.get(s["id"]) or {}).get("quran_minutes", 0),
             "last_sheet": last_sheet_by.get(s["id"]),
             # المشاركة في المسابقات (من التقييم الأولي)
             "annual_competition": bool(s.get("annual_competition")),
@@ -2565,15 +2629,16 @@ async def export_student_stats_excel(group_id: Optional[str] = None, student_id:
     cell_f = wb.add_format({'border': 1, 'align': 'center'})
     sh = wb.add_worksheet('إحصائيات الطلاب')
     sh.right_to_left()
-    sh.merge_range('A1:R1', f'جدول إحصائيات الطلاب — ورق المتابعة حسب: {period_label}', title_f)
+    sh.merge_range('A1:X1', f'جدول إحصائيات الطلاب — ورق المتابعة حسب: {period_label}', title_f)
     headers = ['#', 'الطالب', 'المجموعة', 'الحفظ الكلي (ص)', 'الحفظ الجديد (ص)', 'المراجعة (ص)',
-               'أيام الحضور', 'أوراق المتابعة', 'الصلوات', 'الجلوس مع القرآن', 'آخر ورقة',
+               'أيام الحضور', 'أوراق المتابعة', 'الصلوات', 'الجلوس مع القرآن (أيام)', 'آخر ورقة',
                'المسابقة السنوية', 'الحافظ الصغير',
-               'العمر', 'الصف', 'المعدل %', 'المختبَرة إداريًا (جزء)', 'علامة المسابقة السنوية']
+               'العمر', 'الصف', 'المعدل %', 'المختبَرة إداريًا (جزء)', 'علامة المسابقة السنوية',
+               'الفجر', 'الظهر', 'العصر', 'المغرب', 'العشاء', 'ساعات الجلوس مع القرآن']
     for c, h in enumerate(headers):
         sh.write(2, c, h, head_f)
     sh.set_column('A:A', 5); sh.set_column('B:B', 22); sh.set_column('C:C', 16)
-    sh.set_column('D:J', 14); sh.set_column('K:K', 14); sh.set_column('L:M', 18); sh.set_column('N:P', 12); sh.set_column('Q:R', 18)
+    sh.set_column('D:J', 14); sh.set_column('K:K', 14); sh.set_column('L:M', 18); sh.set_column('N:P', 12); sh.set_column('Q:R', 18); sh.set_column('S:X', 12)
     for i, r in enumerate(rows, 1):
         row = i + 2
         last = r.get("last_sheet") or {}
@@ -2595,6 +2660,9 @@ async def export_student_stats_excel(group_id: Optional[str] = None, student_id:
         sh.write(row, 15, f"{r['average']}%" if r.get("average") is not None else "", cell_f)
         sh.write(row, 16, r.get("admin_tested_juz", 0), cell_f)
         sh.write(row, 17, r["annual_score"] if r.get("annual_score") is not None else "", cell_f)
+        for c, k in enumerate(PRAYER_KEYS, 18):
+            sh.write(row, c, r.get(f"tracking_{k}", 0), cell_f)
+        sh.write(row, 23, round((r.get("tracking_quran_minutes") or 0) / 60, 1), cell_f)
     wb.close()
     return _xlsx_response(output, f"student_stats_{datetime.now().strftime('%Y%m%d')}.xlsx")
 
@@ -2827,6 +2895,12 @@ async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_
     manual_custom_items = await get_tracking_items_for_sheikh(current_user["user_id"])
     manual_custom_values = data.custom_values or {}
 
+    # الجدول اليومي (إن أُرسل) هو مصدر عدد الصلوات وأيام الجلوس
+    daily_derived = apply_daily({}, data.daily)
+    if daily_derived:
+        data.prayers_count = daily_derived["prayers_count"]
+        data.quran_sitting_days = daily_derived["quran_sitting_days"]
+
     # Calculate points - تضمين جميع الحقول بما فيها صلاة الضحى والبنود المخصّصة
     points_breakdown = calculate_tracking_points({
         "prayers_count": data.prayers_count,
@@ -2854,7 +2928,8 @@ async def create_tracking_sheet_manual(data: TrackingSheetManualCreate, current_
         night_prayer=min(data.night_prayer, 1),
         fasting=min(data.fasting, 1),
         notes=data.notes,
-        custom_values=points_breakdown.get("custom_points", {})
+        custom_values=points_breakdown.get("custom_points", {}),
+        daily=daily_derived.get("daily"),
     )
     
     # #10 — ورقة واحدة لكل (طالب + أسبوع): إن وُجدت ورقة (من الطالب أو سابقة) نُحدّثها بدل إنشاء نسخة ثانية
@@ -3012,6 +3087,7 @@ class StudentTrackingCreate(BaseModel):
     fasting: int = 0  # الصيام (0-1) = 8 نقاط
     notes: Optional[str] = None
     custom_values: Optional[dict] = None  # {item_id: value} للبنود المخصصة من المشرف
+    daily: Optional[list] = None  # الجدول اليومي (السبت → الجمعة) — يُشتقّ منه الصلوات والجلوس
 
 
 # ============== CUSTOM TRACKING ITEMS (بنود المشرف المخصصة) ==============
@@ -3214,6 +3290,9 @@ async def create_tracking_sheet_student(data: StudentTrackingCreate, current_use
     merged_data = dict((existing or {}).get("data") or {})
     merged_data["prayers_count"] = min(data.prayers_count, 35)
     merged_data["quran_sitting_days"] = sitting_days(data.quran_sitting_days)
+    if data.daily is None:
+        merged_data.pop("daily", None)  # أعداد بلا جدول — الجدول القديم لم يعد مطابقًا
+    apply_daily(merged_data, data.daily)
     if data.notes is not None:
         merged_data["notes"] = data.notes
 
@@ -3360,6 +3439,7 @@ class TrackingSheetUpdate(BaseModel):
     night_prayer: Optional[int] = None
     fasting: Optional[int] = None
     notes: Optional[str] = None
+    daily: Optional[list] = None  # الجدول اليومي — يتقدّم على prayers_count / quran_sitting_days
 
 @api_router.put("/tracking-sheets/{sheet_id}")
 async def update_tracking_sheet(sheet_id: str, data: TrackingSheetUpdate, current_user: dict = Depends(get_current_user)):
@@ -3405,7 +3485,10 @@ async def update_tracking_sheet(sheet_id: str, data: TrackingSheetUpdate, curren
         sheet_data["fasting"] = min(data.fasting, 1)
     if data.notes is not None:
         sheet_data["notes"] = data.notes
-    
+    if data.daily is None and (data.prayers_count is not None or data.quran_sitting_days is not None):
+        sheet_data.pop("daily", None)  # أعداد بلا جدول — الجدول القديم لم يعد مطابقًا
+    apply_daily(sheet_data, data.daily)
+
     # Calculate new points (with the student's custom items so they're not dropped)
     edit_student_id = sheet.get("student_id")
     edit_sheikh_id = await get_sheikh_id_for_student(edit_student_id) if edit_student_id else None
@@ -3493,7 +3576,8 @@ async def get_tracking_stats(student_id: str, current_user: dict = Depends(get_c
             "sunnah_prayers": data.get("sunnah_prayers", 0),
             "night_prayer": data.get("night_prayer", 0),
             "fasting": data.get("fasting", 0),
-            "total_points": current_week_sheet.get("points_earned", 0)
+            "total_points": current_week_sheet.get("points_earned", 0),
+            "breakdown": sheet_prayer_breakdown(current_week_sheet),
         }
     
     # Calculate semester totals
@@ -3510,7 +3594,8 @@ async def get_tracking_stats(student_id: str, current_user: dict = Depends(get_c
         "night_prayer": sum(s["data"].get("night_prayer", 0) for s in semester_sheets if s.get("data")),
         "fasting": sum(s["data"].get("fasting", 0) for s in semester_sheets if s.get("data")),
         "total_points": sum(s.get("points_earned", 0) for s in semester_sheets),
-        "weeks_count": len(semester_sheets)
+        "weeks_count": len(semester_sheets),
+        "breakdown": sum_prayer_breakdowns(semester_sheets),
     }
     
     return {
@@ -4625,7 +4710,8 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
             a, b = _sheet_prayers_sitting(t)
             pr += a
             si += b
-        tracking_split[period] = {"sheets": len(scoped), "prayers": pr, "sitting": si}
+        tracking_split[period] = {"sheets": len(scoped), "prayers": pr, "sitting": si,
+                                  "breakdown": sum_prayer_breakdowns(scoped)}
 
     last_tracking_sheet = _summarize_last_sheet(tracking)
     
@@ -4726,7 +4812,8 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
             "witr": data.get("witr_prayers_days", 0),
             "night_prayer": data.get("night_prayer", 0),
             "fasting": data.get("fasting", 0),
-            "total_points": current_week_sheet.get("points_earned", 0)
+            "total_points": current_week_sheet.get("points_earned", 0),
+            "breakdown": sheet_prayer_breakdown(current_week_sheet),
         }
     
     # البيانات الفصلية
@@ -4741,7 +4828,8 @@ async def get_student_statistics(student_id: str, current_user: dict = Depends(g
         "night_prayer": sum(s["data"].get("night_prayer", 0) for s in semester_sheets if s.get("data")),
         "fasting": sum(s["data"].get("fasting", 0) for s in semester_sheets if s.get("data")),
         "total_points": sum(s.get("points_earned", 0) for s in semester_sheets),
-        "weeks_count": len(semester_sheets)
+        "weeks_count": len(semester_sheets),
+        "breakdown": sum_prayer_breakdowns(semester_sheets),
     }
     
     return {

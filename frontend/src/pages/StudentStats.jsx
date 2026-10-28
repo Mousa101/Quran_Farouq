@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { Table2, FileDown, ArrowUpNarrowWide, ArrowDownWideNarrow } from 'lucide-react';
 import { SCHOOL_GRADES } from '../lib/constants';
 import { formatDate as fmtDate } from '../lib/utils';
+import { PRAYERS, formatMinutes } from '../lib/trackingWeek';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -18,8 +19,10 @@ const SORT_FIELDS = [
   { key: 'review', label: 'المراجعة' },
   { key: 'attendance', label: 'أيام الحضور' },
   { key: 'tracking', label: 'عدد أوراق المتابعة' },
-  { key: 'tracking_prayers', label: 'الصلوات' },
-  { key: 'tracking_sitting', label: 'الجلوس مع القرآن' },
+  { key: 'tracking_prayers', label: 'الصلوات (المجموع)' },
+  ...PRAYERS.map((p) => ({ key: `tracking_${p.key}`, label: `صلاة ${p.label}` })),
+  { key: 'tracking_sitting', label: 'الجلوس مع القرآن (أيام)' },
+  { key: 'tracking_quran_minutes', label: 'ساعات الجلوس مع القرآن' },
   { key: 'age', label: 'العمر' },
   { key: 'grade', label: 'الصف' },
   { key: 'average', label: 'المعدل' },
@@ -232,7 +235,11 @@ const StudentStats = () => {
                     <th className={`${th} ${activeCol('attendance')}`}>أيام الحضور</th>
                     <th className={`${th} ${activeCol('tracking')}`}>أوراق المتابعة</th>
                     <th className={`${th} ${activeCol('tracking_prayers')}`}>🕌 الصلوات</th>
-                    <th className={`${th} ${activeCol('tracking_sitting')}`}>📖 الجلوس مع القرآن</th>
+                    {PRAYERS.map((p) => (
+                      <th key={p.key} className={`${th} ${activeCol(`tracking_${p.key}`)}`}>{p.label}</th>
+                    ))}
+                    <th className={`${th} ${activeCol('tracking_sitting')}`}>📖 أيام الجلوس</th>
+                    <th className={`${th} ${activeCol('tracking_quran_minutes')}`}>📖 ساعات الجلوس</th>
                     <th className={th}>آخر ورقة</th>
                     <th className={th}>🏆 المسابقات</th>
                     <th className={`${th} ${activeCol('admin_tested_juz')}`}>المختبَرة إداريًا</th>
@@ -254,7 +261,11 @@ const StudentStats = () => {
                       <td className={`p-2 ${activeCol('attendance')}`}>{r.attendance} يوم</td>
                       <td className={`p-2 ${activeCol('tracking')}`}>{r.tracking}</td>
                       <td className={`p-2 ${activeCol('tracking_prayers')}`}>{r.tracking_prayers ?? 0}</td>
+                      {PRAYERS.map((p) => (
+                        <td key={p.key} className={`p-2 ${activeCol(`tracking_${p.key}`)}`}>{r[`tracking_${p.key}`] ?? 0}</td>
+                      ))}
                       <td className={`p-2 ${activeCol('tracking_sitting')}`}>{r.tracking_sitting ?? 0}</td>
+                      <td dir="ltr" className={`p-2 text-right ${activeCol('tracking_quran_minutes')}`}>{formatMinutes(r.tracking_quran_minutes)}</td>
                       <td className="p-2">
                         {r.last_sheet?.week_start ? (
                           <span className={isDark ? 'text-slate-300' : 'text-slate-700'}>{fmtDate(r.last_sheet.week_start)}</span>
@@ -293,9 +304,10 @@ const StudentStats = () => {
               </table>
               <p className={`text-xs mt-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                 الأرقام بالصفحات (الحفظ الكلي/الجديد/المراجعة).
-                {' '}أعمدة ورق المتابعة (الأوراق/الصلوات/الجلوس) محسوبة خلال{' '}
+                {' '}أعمدة ورق المتابعة (الأوراق/الصلوات/كل صلاة/الجلوس) محسوبة خلال{' '}
                 <strong>{TRACKING_PERIODS.find((p) => p.key === trackingPeriod)?.label}</strong>؛
                 يعرض عمود «آخر ورقة» أسبوع آخر ورقة مُسلَّمة بغضّ النظر عن المدة.
+                {' '}أعمدة كل صلاة وساعات الجلوس تُحسب من الجدول اليومي (الأوراق القديمة المسجّلة بالأعداد تدخل في المجموع فقط).
               </p>
             </div>
           )}

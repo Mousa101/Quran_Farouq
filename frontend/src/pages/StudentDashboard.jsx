@@ -21,9 +21,10 @@ import {
 } from 'lucide-react';
 import { formatDate as fmtDate } from '../lib/utils';
 import MosqueIcon from '../components/icons/MosqueIcon';
+import WeeklyTrackingGrid from '../components/WeeklyTrackingGrid';
 import {
-  getCurrentWeekStart, weekRangeLabel, TRACKING_BASE_MAX, SITTING_DAYS_MAX, SITTING_POINTS_PER_DAY,
-  clampPrayers, clampSittingDays, sittingPoints,
+  getCurrentWeekStart, weekRangeLabel, TRACKING_BASE_MAX, SITTING_DAYS_MAX,
+  PRAYERS, emptyDaily, normalizeDaily, dailyTotals, formatMinutes,
 } from '../lib/trackingWeek';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -41,8 +42,7 @@ const StudentDashboard = () => {
   const [trackingDialogOpen, setTrackingDialogOpen] = useState(false);
   const [submittingTracking, setSubmittingTracking] = useState(false);
   const [trackingForm, setTrackingForm] = useState({
-    prayers_count: 0,
-    quran_sitting_days: 0,
+    daily: emptyDaily(),
     notes: ''
   });
   const [customItems, setCustomItems] = useState([]);
@@ -147,6 +147,19 @@ const StudentDashboard = () => {
 
   const formatDate = (dateStr) => fmtDate(dateStr);
 
+  // فتح الورقة مع تحميل جدول الأسبوع الحالي إن كان قد عُبّئ
+  const openTrackingDialog = async () => {
+    setTrackingDialogOpen(true);
+    try {
+      const res = await axios.get(`${API}/tracking-sheets`);
+      const current = (res.data || []).find((s) => s.week_start === getCurrentWeekStart());
+      if (current) {
+        setTrackingForm({ daily: normalizeDaily(current.data?.daily), notes: current.data?.notes || '' });
+        setCustomValues(current.data?.custom_values || {});
+      }
+    } catch (e) { /* يبقى النموذج فارغًا */ }
+  };
+
   // تقديم ورقة المتابعة من حساب الطالب
   const handleSubmitTracking = async () => {
     setSubmittingTracking(true);
@@ -155,10 +168,12 @@ const StudentDashboard = () => {
       const week_start = getCurrentWeekStart();
       
       // تحويل القيم لأرقام صحيحة وتجنب إرسال undefined أو NaN
+      const totals = dailyTotals(trackingForm.daily);
       const formDataToSend = {
         week_start,
-        prayers_count: parseInt(trackingForm.prayers_count) || 0,
-        quran_sitting_days: parseInt(trackingForm.quran_sitting_days) || 0,
+        daily: trackingForm.daily,
+        prayers_count: totals.prayers,
+        quran_sitting_days: totals.sittingDays,
         custom_values: customValues,
         notes: trackingForm.notes || ''
       };
@@ -180,8 +195,7 @@ const StudentDashboard = () => {
       
       // إعادة تعيين النموذج فقط بعد النجاح
       setTrackingForm({
-        prayers_count: 0,
-        quran_sitting_days: 0,
+        daily: emptyDaily(),
         notes: ''
       });
       setCustomValues({});
@@ -194,11 +208,7 @@ const StudentDashboard = () => {
     }
   };
 
-  const calculateTrackingPoints = () => {
-    const prayers = clampPrayers(trackingForm.prayers_count);
-    const quran = sittingPoints(trackingForm.quran_sitting_days);
-    return prayers + quran + customTrackingTotal(); // 70 + بنود المشرف
-  };
+  const calculateTrackingPoints = () => dailyTotals(trackingForm.daily).points + customTrackingTotal(); // 70 + بنود المشرف
   const trackingMax = TRACKING_BASE_MAX + customTrackingMax();
 
   if (loading) {
@@ -784,7 +794,7 @@ console.log(stats)
               ورقة المتابعة الإيمانية ({trackingMax} نقطة)
             </CardTitle>
             <Button
-              onClick={() => setTrackingDialogOpen(true)}
+              onClick={openTrackingDialog}
               size="sm"
               className="bg-purple-600 hover:bg-purple-700"
             >
@@ -813,6 +823,20 @@ console.log(stats)
                 <p className="text-blue-400 text-[10px] md:text-xs">الجلوس مع القرآن</p>
               </div>
             </div>
+            {stats?.tracking?.weekly?.breakdown && (
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1 mt-2 text-center">
+                {PRAYERS.map((p) => (
+                  <div key={p.key} className="p-1 rounded-lg bg-slate-800/50">
+                    <p className="text-sm font-bold text-white">{stats.tracking.weekly.breakdown[p.key] || 0}<span className="text-[10px] text-slate-500">/7</span></p>
+                    <p className="text-[10px] text-emerald-400">{p.label}</p>
+                  </div>
+                ))}
+                <div className="p-1 rounded-lg bg-slate-800/50">
+                  <p dir="ltr" className="text-sm font-bold text-white">{formatMinutes(stats.tracking.weekly.breakdown.quran_minutes)}</p>
+                  <p className="text-[10px] text-blue-400">ساعات القرآن</p>
+                </div>
+              </div>
+            )}
             <div className="mt-2 text-center">
               <span className="text-sm text-slate-400">نقاط الأسبوع: </span>
               <span className="text-lg font-bold text-emerald-400">{stats?.tracking?.weekly?.total_points || 0}</span>
@@ -909,7 +933,7 @@ console.log(stats)
 
       {/* Dialog تعبئة ورقة المتابعة */}
       <Dialog open={trackingDialogOpen} onOpenChange={setTrackingDialogOpen}>
-        <DialogContent className="bg-slate-900 border-white/10 max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-slate-900 border-white/10 max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">تعبئة ورقة المتابعة الأسبوعية</DialogTitle>
           </DialogHeader>
@@ -918,40 +942,12 @@ console.log(stats)
             <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
               <p className="text-sm text-purple-300">📅 الأسبوع: <strong>{weekRangeLabel(getCurrentWeekStart())}</strong></p>
             </div>
+            <WeeklyTrackingGrid
+              daily={trackingForm.daily}
+              weekStart={getCurrentWeekStart()}
+              onChange={(daily) => setTrackingForm({ ...trackingForm, daily })}
+            />
             <div className="grid grid-cols-2 gap-3">
-              {/* الصلوات */}
-              <div>
-                <Label className="text-slate-300 flex items-center gap-2">
-                  <MosqueIcon className="w-4 h-4 text-emerald-400" />
-                  الصلوات (من 35)
-                </Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="35"
-                  value={trackingForm.prayers_count}
-                  onChange={(e) => setTrackingForm({ ...trackingForm, prayers_count: clampPrayers(e.target.value) })}
-                  className="bg-slate-800 border-white/10 text-white"
-                />
-              </div>
-
-              {/* الجلوس مع القرآن */}
-              <div>
-                <Label className="text-slate-300 flex items-center gap-2">
-                  <BookMarked className="w-4 h-4 text-blue-400" />
-                  الجلوس مع القرآن (بالأيام)
-                </Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max={SITTING_DAYS_MAX}
-                  value={trackingForm.quran_sitting_days}
-                  onChange={(e) => setTrackingForm({ ...trackingForm, quran_sitting_days: clampSittingDays(e.target.value) })}
-                  className="bg-slate-800 border-white/10 text-white"
-                />
-                <p className="text-xs text-slate-500 mt-1">من {SITTING_DAYS_MAX} أيام · كل يوم = {SITTING_POINTS_PER_DAY} نقاط</p>
-              </div>
-
               {/* بنود المشرف المخصصة */}
               {customItems.map((it) => (
                 <div key={it.id}>
