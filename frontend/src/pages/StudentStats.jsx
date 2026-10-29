@@ -46,6 +46,14 @@ const COMPETITION_FILTERS = [
   { key: 'none', label: 'بدون مشاركة' },
 ];
 
+// فلتر امتحانات المفصل (الاختبار الإداري بمضاعفات 5 أجزاء)
+const ADMIN_TEST_FILTERS = [
+  { key: 'all', label: 'الكل' },
+  { key: 'tested', label: 'اختُبر في المفصل' },
+  { key: 'none', label: 'لم يُختبر بعد' },
+  ...[5, 10, 15, 20, 25, 30].map((n) => ({ key: String(n), label: `${n} جزءًا` })),
+];
+
 const StudentStats = () => {
   const { isDark } = useTheme();
   const [groups, setGroups] = useState([]);
@@ -57,6 +65,7 @@ const StudentStats = () => {
   const [order, setOrder] = useState('desc');       // الفلتر الثالث
   const [trackingPeriod, setTrackingPeriod] = useState('term'); // مدى أعمدة ورق المتابعة
   const [competition, setCompetition] = useState('all'); // فلتر المسابقات
+  const [adminTest, setAdminTest] = useState('all'); // فلتر امتحانات المفصل
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -67,7 +76,7 @@ const StudentStats = () => {
   useEffect(() => {
     fetchRows();
     // eslint-disable-next-line
-  }, [groupId, sortBy, order, trackingPeriod, competition]);
+  }, [groupId, sortBy, order, trackingPeriod, competition, adminTest]);
 
   const params = (withStudent) => {
     const p = new URLSearchParams();
@@ -77,6 +86,7 @@ const StudentStats = () => {
     p.append('order', order);
     p.append('tracking_period', trackingPeriod);
     if (competition !== 'all') p.append('competition', competition);
+    if (adminTest !== 'all') p.append('admin_test', adminTest);
     return p.toString();
   };
 
@@ -179,6 +189,18 @@ const StudentStats = () => {
               className={`p-2 rounded-lg border text-sm ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}
             >
               {COMPETITION_FILTERS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+            </select>
+          </div>
+          {/* فلتر امتحانات المفصل */}
+          <div>
+            <label className={`block text-xs mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>امتحانات المفصل</label>
+            <select
+              value={adminTest}
+              onChange={(e) => setAdminTest(e.target.value)}
+              className={`p-2 rounded-lg border text-sm ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}
+              data-testid="admin-test-filter"
+            >
+              {ADMIN_TEST_FILTERS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
             </select>
           </div>
           {/* مدى أعمدة ورق المتابعة */}

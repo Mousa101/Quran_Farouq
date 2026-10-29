@@ -2439,7 +2439,7 @@ def _sheet_prayers_sitting(sheet: dict) -> tuple:
 
 async def _build_student_stats(current_user, group_id=None, student_id=None,
                                term_id=None, sort_by="name", order="asc",
-                               tracking_period="term", competition=None):
+                               tracking_period="term", competition=None, admin_test=None):
     uq = {"role": "student"}
     # فلتر المسابقة: annual | young | any | none
     if competition == "annual":
@@ -2569,6 +2569,14 @@ async def _build_student_stats(current_user, group_id=None, student_id=None,
             "average": parse_average(s.get("school_average")),  # المعدّل الموحّد (رقم)
         })
 
+    # فلتر امتحانات المفصل (الاختبار الإداري): tested | none | عدد الأجزاء المختبَرة (5، 10، ...)
+    if admin_test == "tested":
+        rows = [r for r in rows if r["admin_tested_juz"] > 0]
+    elif admin_test == "none":
+        rows = [r for r in rows if r["admin_tested_juz"] == 0]
+    elif admin_test and admin_test.isdigit():
+        rows = [r for r in rows if r["admin_tested_juz"] == int(admin_test)]
+
     sort_by = sort_by if sort_by in (STUDENT_STATS_NUMERIC | {"name", "grade"}) else "name"
     reverse = (order == "desc")
     if sort_by in STUDENT_STATS_NUMERIC:
@@ -2589,6 +2597,7 @@ async def student_stats_report(group_id: Optional[str] = None, student_id: Optio
                                term_id: Optional[str] = None, sort_by: str = "name", order: str = "asc",
                                tracking_period: str = "term",
                                competition: Optional[str] = None,
+                               admin_test: Optional[str] = None,
                                current_user: dict = Depends(get_current_user)):
     """جدول إحصائيات الطلاب: الحفظ الكلي/الجديد/المراجعة، الحضور، ورق المتابعة (صلوات + جلوس)، العمر، الصف.
     tracking_period: week | month | term — يحدّد مدى احتساب أعمدة المتابعة.
@@ -2599,9 +2608,10 @@ async def student_stats_report(group_id: Optional[str] = None, student_id: Optio
     if competition not in ("annual", "young", "any", "none"):
         competition = None
     rows = await _build_student_stats(current_user, group_id, student_id, term_id, sort_by, order,
-                                      tracking_period, competition)
+                                      tracking_period, competition, admin_test)
     return {"count": len(rows), "sort_by": sort_by, "order": order,
-            "tracking_period": tracking_period, "competition": competition, "rows": rows}
+            "tracking_period": tracking_period, "competition": competition,
+            "admin_test": admin_test, "rows": rows}
 
 
 TRACKING_PERIOD_LABELS = {"week": "الأسبوع الحالي", "month": "الشهر الحالي", "term": "الفصل"}
@@ -2612,6 +2622,7 @@ async def export_student_stats_excel(group_id: Optional[str] = None, student_id:
                                      term_id: Optional[str] = None, sort_by: str = "name", order: str = "asc",
                                      tracking_period: str = "term",
                                      competition: Optional[str] = None,
+                                     admin_test: Optional[str] = None,
                                      current_user: dict = Depends(get_current_user)):
     """تصدير جدول إحصائيات الطلاب إلى Excel (بنفس الفلاتر والترتيب)."""
     ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
@@ -2620,7 +2631,7 @@ async def export_student_stats_excel(group_id: Optional[str] = None, student_id:
     if competition not in ("annual", "young", "any", "none"):
         competition = None
     rows = await _build_student_stats(current_user, group_id, student_id, term_id, sort_by, order,
-                                      tracking_period, competition)
+                                      tracking_period, competition, admin_test)
     period_label = TRACKING_PERIOD_LABELS[tracking_period]
     output = io.BytesIO()
     wb = xlsxwriter.Workbook(output, {'in_memory': True})
