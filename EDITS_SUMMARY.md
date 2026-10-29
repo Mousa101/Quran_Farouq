@@ -697,3 +697,11 @@
    - **الجوال:** بطاقة لكل يوم بأزرار صلوات كبيرة وحقول وقت بخط 16px (تمنع تكبير iOS)؛ الشاشات الأكبر تعرض الجدول.
 2. **الخادم:** `data.daily` = 7 × `{fajr, dhuhr, asr, maghrib, isha, quran_minutes}`. `apply_daily()` يشتقّ منه `prayers_count` و`quran_sitting_days` (`QURAN_SITTING_MIN_MINUTES = 120`) فيبقى حساب النقاط والإحصائيات القديمة كما هو. يُقبل في `POST /tracking-sheets/student`، `POST /tracking-sheets/manual`، `PUT /tracking-sheets/{id}`. الأوراق القديمة (أعداد بلا جدول) تعمل كما كانت.
 3. **الإحصائيات والتقارير:** أعمدة وترتيب جديدة لكل صلاة (`tracking_fajr` … `tracking_isha`) وساعات الجلوس (`tracking_quran_minutes`) في جدول إحصائيات الطلاب وتصدير Excel وPDF سجل الطالب؛ و`breakdown` في `/statistics/student/{id}` و`/tracking-sheets/stats/{id}` (أسبوعي/فصلي/split). الأوراق القديمة تدخل في المجموع فقط، لا في أعمدة الصلوات المنفردة.
+
+---
+
+## دفعة 2026-10-29 — فلتر امتحانات المفصل
+
+الحالة: ✅ مُنفَّذة ومُختبَرة محليًا.
+
+1. **فلتر امتحانات المفصل** في جدول إحصائيات الطلاب (صفحة المدير): قائمة «امتحانات المفصل» = الكل / اختُبر في المفصل / لم يُختبر بعد / 5، 10 … 30 جزءًا (من `administrative_test_juz` في التقييم الأولي). المعامل `admin_test` في `GET /reports/student-stats` و`GET /export/student-stats` (فيطبَّق على ملف Excel أيضًا).
