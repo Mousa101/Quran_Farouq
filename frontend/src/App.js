@@ -61,6 +61,8 @@ import StudentHomework from './pages/StudentHomework';
 import StudentRecord from './pages/StudentRecord';
 import TrackingSettings from './pages/TrackingSettings';
 import DisplaySettings from './pages/DisplaySettings';
+import TasksMeetings from './pages/TasksMeetings';
+import MyTasks from './pages/MyTasks';
 import { hiddenPathsFor } from './lib/navItems';
 import { ROLE_SLUGS, loginPathFor, registerPathFor, lastLoginPath } from './lib/authRoutes';
 import './App.css';
@@ -324,7 +326,29 @@ function AppRoutes() {
         }
       />
 
+      <Route
+        path="/my-tasks"
+        element={
+          <ProtectedRoute allow={['sheikh']}>
+            <Layout>
+              <MyTasks />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
       {/* صفحات المدير فقط */}
+      <Route
+        path="/tasks"
+        element={
+          <ProtectedRoute allow={['admin']}>
+            <Layout>
+              <TasksMeetings />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/pending-students"
         element={

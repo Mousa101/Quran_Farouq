@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AnnouncementBanner from '../components/AnnouncementBanner';
+import TasksSummaryCard from '../components/TasksSummaryCard';
 import { defaultAvatar, onAvatarError } from '../lib/avatar';
 import { formatDate as fmtDate } from '../lib/utils';
 
@@ -75,6 +76,7 @@ const SheikhDashboard = () => {
     <div className="space-y-4 md:space-y-6 animate-fadeIn" data-testid="sheikh-dashboard">
       {/* N1: شريط إعلانات المدير */}
       <AnnouncementBanner />
+      <TasksSummaryCard role="sheikh" />
       {/* Welcome & Profile Header */}
       <div className="glass-card p-4 md:p-6 border border-white/10">
         <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">

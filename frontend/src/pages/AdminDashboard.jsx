@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import StudentLink from '../components/StudentLink';
 import OnlineUsers from '../components/OnlineUsers';
+import TasksSummaryCard from '../components/TasksSummaryCard';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -448,6 +449,8 @@ const AdminDashboard = () => {
           </div>
         </div>
       </div>
+
+      <TasksSummaryCard role="admin" />
 
       <OnlineUsers />
 

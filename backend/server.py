@@ -1353,6 +1353,8 @@ DB_INDEXES = {
     "exam_submissions": [[("exam_id", 1)], [("student_id", 1)]],
     "activities": [[("id", 1)]],
     "announcements": [[("id", 1)]],
+    "meetings": [[("id", 1)], [("date", -1)]],
+    "admin_tasks": [[("id", 1)], [("assignee_id", 1), ("status", 1)], [("meeting_id", 1)], [("due_date", 1)]],
     "audit_logs": [[("action", 1)], [("created_at", -1)]],
     "warnings": [[("student_id", 1)], [("student_id", 1), ("created_at", -1)]],
     "admin_bonus_grants": [[("student_id", 1)], [("student_id", 1), ("created_at", -1)]],
@@ -11692,6 +11694,372 @@ async def young_hafiz_eligible(current_user: dict = Depends(get_current_user)):
         })
     rows.sort(key=lambda r: (-r["memorized_juz"], r["name"]))
     return {"min_juz": YOUNG_HAFIZ_MIN_JUZ, "max_grade": YOUNG_HAFIZ_MAX_GRADE, "rows": rows}
+
+# ============== المهام ومتابعة مخرجات الاجتماعات ==============
+# meetings: اجتماعات المدير (محضر + حضور). admin_tasks: مهام المدير، ولكل مهمة مسؤول
+# (المدير نفسه أو مشرف)، والمهمة المرتبطة باجتماع عبر meeting_id هي أحد مخرجاته.
+# المشرف يرى المهام المسندة إليه فقط ويغيّر حالتها، والمدير يدير كل شيء.
+TASK_STATUSES = ("todo", "in_progress", "done")
+TASK_PRIORITIES = ("low", "normal", "high")
+MEETING_TYPES = ("sheikhs", "management", "parents", "other")
+MEETING_STATUSES = ("scheduled", "held", "cancelled")
+JORDAN_TZ = timezone(timedelta(hours=3))
+
+
+def _jordan_today() -> str:
+    return datetime.now(JORDAN_TZ).strftime("%Y-%m-%d")
+
+
+def _valid_date(value: Optional[str], label: str) -> Optional[str]:
+    if not value:
+        return None
+    try:
+        datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"{label} غير صالح")
+    return value
+
+
+class MeetingIn(BaseModel):
+    title: str
+    date: str
+    time: Optional[str] = None
+    type: str = "sheikhs"
+    status: str = "scheduled"
+    attendee_ids: List[str] = []
+    other_attendees: str = ""
+    agenda: str = ""
+    minutes: str = ""
+
+
+class TaskIn(BaseModel):
+    title: str
+    details: str = ""
+    priority: str = "normal"
+    due_date: Optional[str] = None
+    assignee_id: Optional[str] = None  # None = المدير نفسه
+    meeting_id: Optional[str] = None
+
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    details: Optional[str] = None
+    priority: Optional[str] = None
+    due_date: Optional[str] = None
+    assignee_id: Optional[str] = None
+    meeting_id: Optional[str] = None
+    status: Optional[str] = None
+
+
+class TaskStatusIn(BaseModel):
+    status: str
+    note: Optional[str] = None
+
+
+async def _clean_meeting(data: MeetingIn) -> dict:
+    if not data.title.strip():
+        raise HTTPException(status_code=400, detail="عنوان الاجتماع مطلوب")
+    if not _valid_date(data.date, "تاريخ الاجتماع"):
+        raise HTTPException(status_code=400, detail="تاريخ الاجتماع مطلوب")
+    ids = list(dict.fromkeys(data.attendee_ids))
+    if ids:
+        found = await db.users.count_documents({"id": {"$in": ids}, "role": {"$in": ["sheikh", "admin"]}})
+        if found != len(ids):
+            raise HTTPException(status_code=400, detail="أحد الحضور غير موجود")
+    return {
+        "title": data.title.strip(),
+        "date": data.date,
+        "time": (data.time or "").strip() or None,
+        "type": data.type if data.type in MEETING_TYPES else "other",
+        "status": data.status if data.status in MEETING_STATUSES else "scheduled",
+        "attendee_ids": ids,
+        "other_attendees": data.other_attendees.strip(),
+        "agenda": data.agenda.strip(),
+        "minutes": data.minutes.strip(),
+    }
+
+
+async def _check_assignee(assignee_id: Optional[str]) -> Optional[dict]:
+    if not assignee_id:
+        return None
+    user = await db.users.find_one({"id": assignee_id, "role": {"$in": ["sheikh", "admin"]}},
+                                   {"_id": 0, "id": 1, "name": 1, "role": 1})
+    if not user:
+        raise HTTPException(status_code=400, detail="المسؤول عن المهمة غير موجود")
+    return user
+
+
+async def _check_meeting(meeting_id: Optional[str]):
+    if meeting_id and not await db.meetings.find_one({"id": meeting_id}, {"_id": 1}):
+        raise HTTPException(status_code=400, detail="الاجتماع غير موجود")
+
+
+async def _notify_task_assigned(task: dict, assignee: Optional[dict]):
+    if assignee and assignee["role"] == "sheikh":
+        due = f" — آخر موعد {task['due_date']}" if task.get("due_date") else ""
+        await create_notification_internal(assignee["id"], "📝 مهمة جديدة من الإدارة",
+                                           f"{task['title']}{due}", "info", "system")
+
+
+async def _enrich_tasks(tasks: list) -> list:
+    """إضافة اسم المسؤول وعنوان الاجتماع وعلامة التأخر لكل مهمة."""
+    user_ids = list({t["assignee_id"] for t in tasks if t.get("assignee_id")})
+    meeting_ids = list({t["meeting_id"] for t in tasks if t.get("meeting_id")})
+    names = {u["id"]: u.get("name") for u in await db.users.find(
+        {"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(None)}
+    meetings = {m["id"]: m for m in await db.meetings.find(
+        {"id": {"$in": meeting_ids}}, {"_id": 0, "id": 1, "title": 1, "date": 1}).to_list(None)}
+    today = _jordan_today()
+    for t in tasks:
+        t["assignee_name"] = names.get(t.get("assignee_id"))
+        m = meetings.get(t.get("meeting_id"))
+        t["meeting_title"] = m["title"] if m else None
+        t["meeting_date"] = m["date"] if m else None
+        t["is_overdue"] = bool(t["status"] != "done" and t.get("due_date") and t["due_date"] < today)
+    return tasks
+
+
+def _sort_tasks(tasks: list) -> list:
+    """المفتوحة أولًا، ثم الأقرب موعدًا، ثم الأعلى أولوية."""
+    prio = {"high": 0, "normal": 1, "low": 2}
+    return sorted(tasks, key=lambda t: (t["status"] == "done", t.get("due_date") or "9999-99-99",
+                                        prio.get(t.get("priority"), 1), t.get("created_at", "")))
+
+
+@api_router.get("/meetings")
+async def list_meetings(current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
+    meetings = await db.meetings.find({}, {"_id": 0}).sort([("date", -1), ("created_at", -1)]).to_list(1000)
+    progress = {}
+    async for row in db.admin_tasks.aggregate([
+        {"$match": {"meeting_id": {"$ne": None}}},
+        {"$group": {"_id": "$meeting_id", "total": {"$sum": 1},
+                    "done": {"$sum": {"$cond": [{"$eq": ["$status", "done"]}, 1, 0]}}}},
+    ]):
+        progress[row["_id"]] = row
+    for m in meetings:
+        p = progress.get(m["id"], {})
+        m["tasks_total"] = p.get("total", 0)
+        m["tasks_done"] = p.get("done", 0)
+    return meetings
+
+
+@api_router.get("/meetings/{meeting_id}")
+async def get_meeting(meeting_id: str, current_user: dict = Depends(get_current_user)):
+    """الاجتماع مع مخرجاته، والمخرجات غير المنجزة من الاجتماعات السابقة (للمتابعة)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
+    meeting = await db.meetings.find_one({"id": meeting_id}, {"_id": 0})
+    if not meeting:
+        raise HTTPException(status_code=404, detail="الاجتماع غير موجود")
+    tasks = await db.admin_tasks.find({"meeting_id": meeting_id}, {"_id": 0}).to_list(1000)
+    earlier_ids = [m["id"] for m in await db.meetings.find(
+        {"date": {"$lt": meeting["date"]}}, {"_id": 0, "id": 1}).to_list(1000)]
+    carried = await db.admin_tasks.find(
+        {"meeting_id": {"$in": earlier_ids}, "status": {"$ne": "done"}}, {"_id": 0}).to_list(1000)
+    meeting["attendees"] = await db.users.find({"id": {"$in": meeting.get("attendee_ids", [])}},
+                                               {"_id": 0, "id": 1, "name": 1}).to_list(None)
+    meeting["tasks"] = _sort_tasks(await _enrich_tasks(tasks))
+    meeting["carried_over"] = _sort_tasks(await _enrich_tasks(carried))
+    return meeting
+
+
+@api_router.post("/meetings")
+async def create_meeting(data: MeetingIn, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إضافة اجتماع")
+    now = datetime.now(timezone.utc).isoformat()
+    meeting = {"id": str(uuid.uuid4()), **(await _clean_meeting(data)),
+               "created_by": current_user["user_id"], "created_at": now, "updated_at": now}
+    await db.meetings.insert_one(meeting)
+    meeting.pop("_id", None)
+    return meeting
+
+
+@api_router.put("/meetings/{meeting_id}")
+async def update_meeting(meeting_id: str, data: MeetingIn, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل الاجتماع")
+    fields = await _clean_meeting(data)
+    fields["updated_at"] = datetime.now(timezone.utc).isoformat()
+    result = await db.meetings.update_one({"id": meeting_id}, {"$set": fields})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="الاجتماع غير موجود")
+    return await db.meetings.find_one({"id": meeting_id}, {"_id": 0})
+
+
+@api_router.delete("/meetings/{meeting_id}")
+async def delete_meeting(meeting_id: str, delete_tasks: bool = False,
+                         current_user: dict = Depends(get_current_user)):
+    """حذف الاجتماع. مخرجاته تبقى مهامًا مستقلة إلا إذا طُلب حذفها (delete_tasks=true)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف الاجتماع")
+    meeting = await db.meetings.find_one({"id": meeting_id}, {"_id": 0, "title": 1})
+    if not meeting:
+        raise HTTPException(status_code=404, detail="الاجتماع غير موجود")
+    removed = 0
+    if delete_tasks:
+        removed = (await db.admin_tasks.delete_many({"meeting_id": meeting_id})).deleted_count
+    else:
+        await db.admin_tasks.update_many({"meeting_id": meeting_id}, {"$set": {"meeting_id": None}})
+    await db.meetings.delete_one({"id": meeting_id})
+    await log_admin_action(current_user, "delete_meeting", "meeting", meeting_id, meeting["title"],
+                           f"حُذفت {removed} مهمة مرتبطة" if delete_tasks else "أُبقيت المهام المرتبطة")
+    return {"message": "تم حذف الاجتماع", "tasks_deleted": removed}
+
+
+@api_router.get("/tasks")
+async def list_tasks(status: Optional[str] = None, meeting_id: Optional[str] = None,
+                     assignee: Optional[str] = None, overdue: bool = False,
+                     current_user: dict = Depends(get_current_user)):
+    """المدير: كل المهام (assignee = me | sheikhs | <user id>). المشرف: المسندة إليه فقط.
+    status = todo | in_progress | done | open (غير المنجزة)."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    query: Dict[str, Any] = {}
+    if current_user["role"] == "sheikh":
+        query["assignee_id"] = current_user["user_id"]
+    elif assignee == "me":
+        query["assignee_id"] = {"$in": [None, current_user["user_id"]]}
+    elif assignee == "sheikhs":
+        sheikh_ids = [u["id"] for u in await db.users.find({"role": "sheikh"}, {"_id": 0, "id": 1}).to_list(None)]
+        query["assignee_id"] = {"$in": sheikh_ids}
+    elif assignee:
+        query["assignee_id"] = assignee
+    if status in TASK_STATUSES:
+        query["status"] = status
+    elif status == "open":
+        query["status"] = {"$ne": "done"}
+    if meeting_id:
+        query["meeting_id"] = meeting_id
+    if overdue:
+        query["status"] = {"$ne": "done"}
+        query["due_date"] = {"$lt": _jordan_today(), "$ne": None}
+    tasks = await db.admin_tasks.find(query, {"_id": 0}).to_list(5000)
+    return _sort_tasks(await _enrich_tasks(tasks))
+
+
+@api_router.get("/tasks/summary")
+async def tasks_summary(current_user: dict = Depends(get_current_user)):
+    """أرقام بطاقة اللوحة: المفتوحة والمتأخرة ومستحقة اليوم، والاجتماع القادم للمدير."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    today = _jordan_today()
+    base: Dict[str, Any] = {"status": {"$ne": "done"}}
+    if current_user["role"] == "sheikh":
+        base["assignee_id"] = current_user["user_id"]
+    summary = {
+        "open": await db.admin_tasks.count_documents(base),
+        "overdue": await db.admin_tasks.count_documents({**base, "due_date": {"$lt": today, "$ne": None}}),
+        "due_today": await db.admin_tasks.count_documents({**base, "due_date": today}),
+    }
+    if current_user["role"] == "admin":
+        summary["next_meeting"] = await db.meetings.find_one(
+            {"date": {"$gte": today}, "status": "scheduled"},
+            {"_id": 0, "id": 1, "title": 1, "date": 1, "time": 1}, sort=[("date", 1)])
+    return summary
+
+
+@api_router.post("/tasks")
+async def create_task(data: TaskIn, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إضافة مهمة")
+    if not data.title.strip():
+        raise HTTPException(status_code=400, detail="عنوان المهمة مطلوب")
+    assignee = await _check_assignee(data.assignee_id)
+    await _check_meeting(data.meeting_id)
+    now = datetime.now(timezone.utc).isoformat()
+    task = {
+        "id": str(uuid.uuid4()),
+        "title": data.title.strip(),
+        "details": data.details.strip(),
+        "priority": data.priority if data.priority in TASK_PRIORITIES else "normal",
+        "due_date": _valid_date(data.due_date, "تاريخ الاستحقاق"),
+        "assignee_id": data.assignee_id or None,
+        "meeting_id": data.meeting_id or None,
+        "status": "todo",
+        "note": None,
+        "done_at": None,
+        "created_by": current_user["user_id"],
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.admin_tasks.insert_one(task)
+    task.pop("_id", None)
+    await _notify_task_assigned(task, assignee)
+    return (await _enrich_tasks([task]))[0]
+
+
+@api_router.put("/tasks/{task_id}")
+async def update_task(task_id: str, data: TaskUpdate, current_user: dict = Depends(get_current_user)):
+    """تعديل جزئي: تُطبَّق الحقول المرسلة فقط (assignee_id/meeting_id = null لإلغاء الربط)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل المهمة")
+    task = await db.admin_tasks.find_one({"id": task_id}, {"_id": 0})
+    if not task:
+        raise HTTPException(status_code=404, detail="المهمة غير موجودة")
+    sent = data.model_dump(exclude_unset=True)
+    now = datetime.now(timezone.utc).isoformat()
+    fields: Dict[str, Any] = {"updated_at": now}
+    if "title" in sent:
+        if not (data.title or "").strip():
+            raise HTTPException(status_code=400, detail="عنوان المهمة مطلوب")
+        fields["title"] = data.title.strip()
+    if "details" in sent:
+        fields["details"] = (data.details or "").strip()
+    if data.priority in TASK_PRIORITIES:
+        fields["priority"] = data.priority
+    if "due_date" in sent:
+        fields["due_date"] = _valid_date(data.due_date, "تاريخ الاستحقاق")
+    assignee = None
+    if "assignee_id" in sent:
+        assignee = await _check_assignee(data.assignee_id)
+        fields["assignee_id"] = data.assignee_id or None
+    if "meeting_id" in sent:
+        await _check_meeting(data.meeting_id)
+        fields["meeting_id"] = data.meeting_id or None
+    if data.status in TASK_STATUSES and data.status != task["status"]:
+        fields["status"] = data.status
+        fields["done_at"] = now if data.status == "done" else None
+    await db.admin_tasks.update_one({"id": task_id}, {"$set": fields})
+    updated = await db.admin_tasks.find_one({"id": task_id}, {"_id": 0})
+    if assignee and assignee["id"] != task.get("assignee_id"):
+        await _notify_task_assigned(updated, assignee)
+    return (await _enrich_tasks([updated]))[0]
+
+
+@api_router.patch("/tasks/{task_id}/status")
+async def set_task_status(task_id: str, data: TaskStatusIn, current_user: dict = Depends(get_current_user)):
+    """تغيير حالة المهمة: المدير لأي مهمة، والمشرف للمهام المسندة إليه (مع ملاحظة اختيارية)."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    if data.status not in TASK_STATUSES:
+        raise HTTPException(status_code=400, detail="حالة غير صالحة")
+    task = await db.admin_tasks.find_one({"id": task_id}, {"_id": 0})
+    if not task:
+        raise HTTPException(status_code=404, detail="المهمة غير موجودة")
+    is_sheikh = current_user["role"] == "sheikh"
+    if is_sheikh and task.get("assignee_id") != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="هذه المهمة ليست مسندة إليك")
+    now = datetime.now(timezone.utc).isoformat()
+    fields: Dict[str, Any] = {"status": data.status, "updated_at": now}
+    if data.status != task["status"]:
+        fields["done_at"] = now if data.status == "done" else None
+    if data.note is not None:
+        fields["note"] = data.note.strip() or None
+    await db.admin_tasks.update_one({"id": task_id}, {"$set": fields})
+    if is_sheikh and data.status == "done" and task["status"] != "done":
+        note = f" — ملاحظة: {fields['note']}" if fields.get("note") else ""
+        admins = await db.users.find({"role": "admin"}, {"_id": 0, "id": 1}).to_list(None)
+        for a in admins:
+            await create_notification_internal(
+                a["id"], "✅ مهمة مُنجزة", f"{current_user.get('name') or 'مشرف'} أنجز: {task['title']}{note}",
+                "success", "system")
+    updated = await db.admin_tasks.find_one({"id": task_id}, {"_id": 0})
+    return (await _enrich_tasks([updated]))[0]
+
+
+@api_router.delete("/tasks/{task_id}")
+async def delete_task(task_id: str, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف المهمة")
+    task = await db.admin_tasks.find_one({"id": task_id}, {"_id": 0, "title": 1})
+    if not task:
+        raise HTTPException(status_code=404, detail="المهمة غير موجودة")
+    await db.admin_tasks.delete_one({"id": task_id})
+    await log_admin_action(current_user, "delete_task", "task", task_id, task["title"])
+    return {"message": "تم حذف المهمة"}
+
 
 # TEMPORARY — full database backup for migrating off the old host. Remove after migration.
 @api_router.get("/admin/full-backup")

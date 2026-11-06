@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, Trophy, Calendar, Bell, BookOpen, UserCheck, FileText, UsersRound, Star,
   GraduationCap, ClipboardList, UserCog, UserPlus, BookMarked, CalendarDays, TrendingUp, DollarSign,
   BookText, Award, Settings, BarChart3, AlertTriangle, Shield, Table2, Megaphone, MessageSquare,
-  BookUser, SlidersHorizontal, FolderOpen,
+  BookUser, SlidersHorizontal, FolderOpen, ClipboardCheck,
 } from 'lucide-react';
 
 // روابط القائمة الجانبية لكل دور. المدير يتحكم في إظهار روابط المشرف والطالب
@@ -10,6 +10,7 @@ import {
 export const NAV_ITEMS = {
   admin: [
     { to: '/dashboard', icon: LayoutDashboard, label: 'الرئيسية' },
+    { to: '/tasks', icon: ClipboardCheck, label: 'المهام والاجتماعات' },
     { to: '/sheikh-management', icon: BookUser, label: 'إدارة المشرفين' },
     { to: '/student-management', icon: GraduationCap, label: 'إدارة الطلاب' },
     { to: '/group-management', icon: UsersRound, label: 'إدارة المجموعات' },
@@ -37,6 +38,7 @@ export const NAV_ITEMS = {
   ],
   sheikh: [
     { to: '/dashboard', icon: LayoutDashboard, label: 'الرئيسية' },
+    { to: '/my-tasks', icon: ClipboardCheck, label: 'مهامي' },
     { to: '/groups', icon: UsersRound, label: 'مجموعاتي' },
     { to: '/initial-assessment', icon: ClipboardList, label: 'تقييم الطلاب الجدد' },
     { to: '/attendance', icon: UserCheck, label: 'الحضور' },
