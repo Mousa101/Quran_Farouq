@@ -226,6 +226,12 @@ const MyProgress = () => {
                 <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>مراجعة</p>
               </div>
             </div>
+            <div className={`mt-4 p-3 rounded-lg text-center ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`} data-testid="my-average">
+              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>المعدل الدراسي</p>
+              <p className="text-2xl font-bold text-emerald-400">
+                {stats?.student?.school_average ? `${String(stats.student.school_average).replace(/%/g, '')}%` : '-'}
+              </p>
+            </div>
             {stats?.recitation?.average_rating > 0 && (
               <div className={`mt-4 p-3 rounded-lg text-center ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
                 <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>متوسط التقييم</p>

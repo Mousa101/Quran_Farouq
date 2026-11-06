@@ -4356,6 +4356,14 @@ async def get_audit_logs(action: Optional[str] = None, limit: int = 200,
     return {"count": len(logs), "logs": logs}
 
 
+@api_router.delete("/admin/audit-logs")
+async def clear_audit_logs(current_user: dict = Depends(get_current_user)):
+    """تصفير سجل العمليات بالكامل (للمدير فقط)."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تصفير سجل العمليات")
+    res = await db.audit_logs.delete_many({})
+    return {"message": f"تم تصفير سجل العمليات ({res.deleted_count} عملية)", "deleted": res.deleted_count}
+
+
 # ============== N1 - الإعلانات (المدير -> المشرفون) ==============
 class AnnouncementCreate(BaseModel):
     title: str
@@ -5474,16 +5482,20 @@ async def sheikh_message_students(data: SheikhMessageRequest, current_user: dict
 
 
 # ============== المحادثات ==============
-# نوعان من المحادثات:
-#  1) محادثة الطالب: غرفة ثلاثية — الطالب + مشرفه + المدير. الثلاثة يقرأون ويكتبون.
-#  2) محادثة مدير↔مشرف: ثنائية مباشرة.
+# ثلاثة أنواع من المحادثات:
+#  1) محادثة الطالب مع مشرفه: الطالب + مشرفه، والمدير يطّلع ويكتب فيها.
+#  2) محادثة الطالب مع الإدارة (`student_admin`): خاصة بالطالب والمدير، ولا يراها المشرف.
+#  3) محادثة مدير↔مشرف: ثنائية مباشرة.
 # الرسائل كلها في `chat_messages`؛ الرسائل القديمة (طالب↔مشرف) تبقى شغّالة
 # لأن `student_id` موجود فيها والغرفة الثلاثية مبنية على نفس المفتاح.
+NON_ROOM_CHAT_KINDS = ["admin_sheikh", "student_admin"]
+
 
 class ChatSendRequest(BaseModel):
     text: str
     student_id: Optional[str] = None  # لمحادثة الطالب (الطالب يستخدم نفسه تلقائيًا)
     sheikh_id: Optional[str] = None   # لمحادثة المدير↔المشرف المباشرة
+    channel: Optional[str] = None     # محادثة الطالب: "admin" مع الإدارة، وغير ذلك مع المشرف
 
 
 async def _student_room(current_user: dict, student_id_param: Optional[str]):
@@ -5507,6 +5519,18 @@ async def _student_room(current_user: dict, student_id_param: Optional[str]):
 
 def _read_flag(role: str) -> str:
     return {"student": "read_by_student", "sheikh": "read_by_sheikh", "admin": "read_by_admin"}[role]
+
+
+def _student_chat_query(student_id: str, channel: Optional[str]) -> dict:
+    """رسائل محادثة الطالب: مع الإدارة، أو مع المشرف (بما فيها الرسائل القديمة بلا kind)."""
+    if channel == "admin":
+        return {"student_id": student_id, "kind": "student_admin"}
+    return {"student_id": student_id, "kind": {"$nin": NON_ROOM_CHAT_KINDS}}
+
+
+def _ensure_chat_channel_access(role: str, channel: Optional[str]):
+    if channel == "admin" and role == "sheikh":
+        raise HTTPException(status_code=403, detail="هذه المحادثة خاصة بالطالب والإدارة")
 
 
 @api_router.post("/chat/send")
@@ -5549,10 +5573,34 @@ async def chat_send(data: ChatSendRequest, current_user: dict = Depends(get_curr
         msg.pop("_id", None)
         return {"message": "تم الإرسال", "chat": msg}
 
-    # ── غرفة الطالب الثلاثية ──
+    # ── محادثة الطالب ──
+    _ensure_chat_channel_access(role, data.channel)
     sid, shid = await _student_room(current_user, data.student_id)
     if not sid:
         raise HTTPException(status_code=400, detail="لا يمكن تحديد المحادثة")
+
+    if data.channel == "admin":
+        msg = {
+            "id": str(uuid.uuid4()),
+            "kind": "student_admin",
+            "student_id": sid,
+            "sheikh_id": None,
+            "sender_role": role,
+            "sender_id": current_user["user_id"],
+            "sender_name": sender_name,
+            "text": text,
+            "created_at": now,
+            "read_by_student": role == "student",
+            "read_by_admin": role == "admin",
+        }
+        await db.chat_messages.insert_one(dict(msg))
+        if role == "student":
+            for adm in await db.users.find({"role": "admin"}, {"_id": 0, "id": 1}).to_list(100):
+                await create_notification_internal(adm["id"], f"رسالة من الطالب {sender_name}", text[:80], "info", "chat")
+        else:
+            await create_notification_internal(sid, "رسالة من الإدارة", text[:80], "info", "chat")
+        msg.pop("_id", None)
+        return {"message": "تم الإرسال", "chat": msg}
 
     msg = {
         "id": str(uuid.uuid4()),
@@ -5593,9 +5641,9 @@ async def chat_send(data: ChatSendRequest, current_user: dict = Depends(get_curr
 
 @api_router.get("/chat/messages")
 async def chat_messages(student_id: Optional[str] = None, sheikh_id: Optional[str] = None,
-                        current_user: dict = Depends(get_current_user)):
+                        channel: Optional[str] = None, current_user: dict = Depends(get_current_user)):
     """رسائل محادثة. مع `sheikh_id` وبدون `student_id` = محادثة مدير↔مشرف؛
-    غير ذلك = غرفة الطالب الثلاثية."""
+    غير ذلك = محادثة الطالب (`channel=admin` مع الإدارة، وإلا مع المشرف)."""
     ensure_role(current_user, ["student", "sheikh", "admin"], "غير مصرح لك")
     role = current_user["role"]
 
@@ -5609,27 +5657,52 @@ async def chat_messages(student_id: Optional[str] = None, sheikh_id: Optional[st
         )
         return {"messages": msgs, "student_id": None, "sheikh_id": target, "kind": "admin_sheikh"}
 
-    # غرفة الطالب
+    # محادثة الطالب
+    _ensure_chat_channel_access(role, channel)
     sid, shid = await _student_room(current_user, student_id)
     if not sid:
         return {"messages": [], "student_id": None, "sheikh_id": None, "kind": "student_room"}
 
-    # كل رسائل الطالب (بما فيها القديمة اللي بلا kind)
-    q = {"student_id": sid, "kind": {"$ne": "admin_sheikh"}}
+    q = _student_chat_query(sid, channel)
     msgs = await db.chat_messages.find(q, {"_id": 0}).sort("created_at", 1).to_list(2000)
     await db.chat_messages.update_many(
         {**q, _read_flag(role): {"$ne": True}}, {"$set": {_read_flag(role): True}}
     )
-    return {"messages": msgs, "student_id": sid, "sheikh_id": shid, "kind": "student_room"}
+    return {"messages": msgs, "student_id": sid, "sheikh_id": shid,
+            "kind": "student_admin" if channel == "admin" else "student_room"}
 
 
 @api_router.get("/chat/conversations")
 async def chat_conversations(current_user: dict = Depends(get_current_user)):
-    """قائمة المحادثات. المشرف: طلابه + محادثته مع الإدارة.
-    المدير: كل غرف الطلاب + محادثة مع كل مشرف."""
-    ensure_role(current_user, ["sheikh", "admin"], "غير مصرح لك")
+    """قائمة المحادثات. الطالب: مشرفه + الإدارة. المشرف: طلابه + محادثته مع الإدارة.
+    المدير: محادثات الطلاب معه ومع مشرفيهم + محادثة مع كل مشرف."""
+    ensure_role(current_user, ["student", "sheikh", "admin"], "غير مصرح لك")
     role = current_user["role"]
     flag = _read_flag(role)
+
+    if role == "student":
+        sid = current_user["user_id"]
+        shid = await get_sheikh_id_for_student(sid)
+        sheikh = await db.users.find_one({"id": shid}, {"_id": 0, "name": 1}) if shid else None
+        channels = [("student_admin", "admin")]
+        if sheikh:
+            channels.insert(0, ("student_room", None))
+        convos = []
+        for convo_type, channel in channels:
+            msgs = await db.chat_messages.find(
+                _student_chat_query(sid, channel),
+                {"_id": 0, "text": 1, "created_at": 1, "sender_role": 1, flag: 1},
+            ).sort("created_at", 1).to_list(2000)
+            last = msgs[-1] if msgs else {}
+            convos.append({
+                "type": convo_type,
+                "student_id": sid,
+                "sheikh_name": (sheikh or {}).get("name"),
+                "last_text": last.get("text", ""),
+                "last_at": last.get("created_at"),
+                "unread": sum(1 for m in msgs if m.get("sender_role") != role and not m.get(flag)),
+            })
+        return {"conversations": convos}
 
     if role == "sheikh":
         gids = await _sheikh_group_ids(current_user["user_id"])
@@ -5642,34 +5715,40 @@ async def chat_conversations(current_user: dict = Depends(get_current_user)):
         ).to_list(10000)
     sids = [s["id"] for s in students]
 
-    # كل رسائل غرف الطلاب دفعة واحدة (بدون N+1)
+    # كل رسائل محادثات الطلاب دفعة واحدة (بدون N+1)
     msgs = await db.chat_messages.find(
         {"student_id": {"$in": sids}, "kind": {"$ne": "admin_sheikh"}},
-        {"_id": 0, "student_id": 1, "text": 1, "created_at": 1, "sender_role": 1, flag: 1},
+        {"_id": 0, "student_id": 1, "kind": 1, "text": 1, "created_at": 1, "sender_role": 1, flag: 1},
     ).to_list(200000)
 
     last_by, unread_by = {}, {}
     for m in msgs:
-        sid = m["student_id"]
-        if m.get("created_at", "") > (last_by.get(sid, {}).get("created_at") or ""):
-            last_by[sid] = m
+        convo_type = "student_admin" if m.get("kind") == "student_admin" else "student_room"
+        if convo_type == "student_admin" and role != "admin":
+            continue  # محادثة الطالب مع الإدارة لا تظهر للمشرف
+        key = (convo_type, m["student_id"])
+        if m.get("created_at", "") > (last_by.get(key, {}).get("created_at") or ""):
+            last_by[key] = m
         # غير المقروء = رسائل الآخرين اللي ما قرأها هذا الدور
         if m.get("sender_role") != role and not m.get(flag):
-            unread_by[sid] = unread_by.get(sid, 0) + 1
+            unread_by[key] = unread_by.get(key, 0) + 1
 
     convos = []
     for s in students:
-        last = last_by.get(s["id"])
-        if role == "admin" and not last:
-            continue  # المدير يرى الغرف اللي فيها رسائل فقط
-        convos.append({
-            "type": "student_room",
-            "student_id": s["id"],
-            "student_name": s["name"],
-            "last_text": (last or {}).get("text", ""),
-            "last_at": (last or {}).get("created_at"),
-            "unread": unread_by.get(s["id"], 0),
-        })
+        for convo_type in ("student_room", "student_admin"):
+            key = (convo_type, s["id"])
+            last = last_by.get(key)
+            # المدير يرى المحادثات اللي فيها رسائل فقط، والمشرف يرى كل طلابه
+            if not last and (role == "admin" or convo_type == "student_admin"):
+                continue
+            convos.append({
+                "type": convo_type,
+                "student_id": s["id"],
+                "student_name": s["name"],
+                "last_text": (last or {}).get("text", ""),
+                "last_at": (last or {}).get("created_at"),
+                "unread": unread_by.get(key, 0),
+            })
 
     # محادثات مدير↔مشرف
     if role == "admin":
@@ -5725,7 +5804,7 @@ async def chat_unread_count(current_user: dict = Depends(get_current_user)):
         ).to_list(10000)]
         n = await db.chat_messages.count_documents({
             "$or": [
-                {"student_id": {"$in": sids}, "kind": {"$ne": "admin_sheikh"}},
+                {"student_id": {"$in": sids}, "kind": {"$nin": NON_ROOM_CHAT_KINDS}},
                 {"kind": "admin_sheikh", "sheikh_id": uid},
             ],
             "sender_role": {"$ne": "sheikh"}, flag: {"$ne": True},
@@ -5752,11 +5831,11 @@ async def chat_delete_message(message_id: str, current_user: dict = Depends(get_
 
 @api_router.delete("/chat/conversation")
 async def chat_delete_conversation(student_id: Optional[str] = None, sheikh_id: Optional[str] = None,
-                                   current_user: dict = Depends(get_current_user)):
-    """المدير يحذف محادثة كاملة: غرفة طالب (`student_id`) أو محادثة الإدارة مع مشرف (`sheikh_id`)."""
+                                   channel: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """المدير يحذف محادثة كاملة: محادثة طالب (`student_id` ومعها `channel`) أو محادثة الإدارة مع مشرف (`sheikh_id`)."""
     ensure_role(current_user, "admin", "فقط المدير يمكنه حذف المحادثات")
     if student_id:
-        q = {"student_id": student_id, "kind": {"$ne": "admin_sheikh"}}
+        q = _student_chat_query(student_id, channel)
         target = await db.users.find_one({"id": student_id}, {"_id": 0, "name": 1})
     elif sheikh_id:
         q = {"kind": "admin_sheikh", "sheikh_id": sheikh_id}
@@ -5861,6 +5940,7 @@ class AdminCreateStudent(BaseModel):
     mosque_name: Optional[str] = None
     school_name: Optional[str] = None
     school_grade: Optional[str] = None
+    school_average: Optional[str] = None
     birth_date: Optional[str] = None
     profile_image: Optional[str] = None
     group_id: Optional[str] = None
@@ -5891,6 +5971,7 @@ async def admin_create_student(data: AdminCreateStudent, current_user: dict = De
             mosque_name=data.mosque_name,
             school_name=data.school_name,
             school_grade=data.school_grade,
+            school_average=data.school_average or None,
             birth_date=data.birth_date,
             profile_image=data.profile_image,
             student_phone=data.student_phone,
@@ -6431,6 +6512,65 @@ async def adjust_points(data: PointsAdjustRequest, current_user: dict = Depends(
     return {"message": ADJUSTMENT_DONE_TEXTS[data.type], "adjustment": adjustment, "points": result}
 
 
+class PointsResetRequest(BaseModel):
+    scope: str                       # student | group | all
+    student_id: Optional[str] = None
+    group_id: Optional[str] = None
+
+
+@api_router.post("/points/reset")
+async def reset_points(data: PointsResetRequest, current_user: dict = Depends(get_current_user)):
+    """تصفير نقاط طالب أو مجموعة أو كل الطلاب (للمدير فقط).
+    السجلات الخام لا تُمس: التصفير خصم يدوي يساوي الرصيد، وتُفك التجميدات السارية،
+    فيبقى ظاهرًا في سجل الطالب ويمكن للمدير التراجع عنه بحذفه."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تصفير النقاط")
+
+    uq = {"role": "student"}
+    if data.scope == "student" and data.student_id:
+        uq["id"] = data.student_id
+    elif data.scope == "group" and data.group_id:
+        uq["group_id"] = data.group_id
+    elif data.scope != "all":
+        raise HTTPException(status_code=400, detail="يجب تحديد الطلاب المراد تصفير نقاطهم")
+
+    students = await db.users.find(uq, {"_id": 0, "id": 1, "name": 1}).to_list(10000)
+    now = datetime.now(timezone.utc).isoformat()
+    zeroed = removed = 0
+    for s in students:
+        await db.points_adjustments.update_many(
+            {"student_id": s["id"], "type": "freeze", "active": True},
+            {"$set": {"active": False, "released_at": now, "released_by": current_user["user_id"]}},
+        )
+        total = (await recompute_student_points(s["id"]))["total_points"]
+        if total <= 0:
+            continue
+        await db.points_adjustments.insert_one({
+            "id": str(uuid.uuid4()),
+            "student_id": s["id"],
+            "student_name": s.get("name", ""),
+            "type": "deduction",
+            "points": total,
+            "reason": "تصفير النقاط",
+            "is_reset": True,
+            "created_by": current_user["user_id"],
+            "created_by_name": current_user.get("name", ""),
+            "created_by_role": current_user["role"],
+            "created_at": now,
+            "active": None,
+            "released_at": None,
+            "released_by": None,
+        })
+        await recompute_student_points(s["id"])
+        await create_notification_internal(s["id"], "⚠️ تصفير النقاط", "قامت الإدارة بتصفير نقاطك", "warning")
+        zeroed += 1
+        removed += total
+
+    target = students[0].get("name") if data.scope == "student" and students else None
+    await log_admin_action(current_user, "points_reset", "student" if target else "students", data.student_id or data.group_id,
+                           target, f"تصفير نقاط {zeroed} طالب (مجموع {removed} نقطة)")
+    return {"message": f"تم تصفير نقاط {zeroed} طالب", "students": zeroed, "points": removed}
+
+
 @api_router.post("/points/freeze/{adjustment_id}/release")
 async def release_freeze(adjustment_id: str, current_user: dict = Depends(get_current_user)):
     """فكّ تجميد سارٍ — النقاط بترجع للرصيد المتاح."""
@@ -6463,6 +6603,8 @@ async def delete_adjustment(adjustment_id: str, current_user: dict = Depends(get
     if not adj:
         raise HTTPException(status_code=404, detail="التعديل غير موجود")
     await assert_can_manage_student_points(current_user, adj["student_id"])
+    if adj.get("is_reset"):
+        ensure_role(current_user, "admin", "فقط المدير يمكنه التراجع عن تصفير النقاط")
 
     await db.points_adjustments.delete_one({"id": adjustment_id})
     result = await recompute_student_points(adj["student_id"])
@@ -6547,6 +6689,7 @@ async def points_ledger(student_id: str, source: Optional[str] = None,
             "description": desc,
             "by": by,
             "adjustment_id": a["id"],
+            "is_reset": bool(a.get("is_reset")),
             "active": a.get("active"),
             "released_at": a.get("released_at"),
             # التجميد ما بيغيّر الرصيد الكلي — بس بيحجز منه
@@ -10860,6 +11003,9 @@ class AnnualCompetitionRow(BaseModel):
     passed: Optional[bool] = None        # إن لم تُحدَّد تُحسب من العلامة وعلامة النجاح
     student_id: Optional[str] = None
     notes: Optional[str] = None
+    phone: Optional[str] = None
+    residence: Optional[str] = None      # السكن
+    national_id: Optional[str] = None    # الرقم الوطني أو المرجعي
 
 
 class AnnualCompetitionImport(BaseModel):
@@ -10899,6 +11045,9 @@ async def _annual_row_doc(row: AnnualCompetitionRow, pass_mark: float, students_
         "score": row.score,
         "passed": passed,
         "notes": (row.notes or "").strip() or None,
+        "phone": (row.phone or "").strip() or None,
+        "residence": (row.residence or "").strip() or None,
+        "national_id": (row.national_id or "").strip() or None,
     }
 
 
@@ -11009,67 +11158,148 @@ async def annual_competition_delete(row_id: str, current_user: dict = Depends(ge
     return {"message": "تم حذف السجل"}
 
 
-# أسماء الأعمدة المقبولة في ملف الاستيراد (Excel)
-ANNUAL_IMPORT_HEADERS = {
-    "student_name": ("الاسم", "اسم الطالب", "الطالب", "name"),
-    "level": ("المستوى", "المستوي", "الفئة", "level"),
+# أسماء الأعمدة المقبولة في ملفات الاستيراد (Excel) — ترتيب المفاتيح هو ترتيب الأعمدة المعتمد
+_PARTICIPANT_NAME_HEADERS = ("اسم المشارك", "المشارك", "الاسم", "اسم الطالب", "الطالب", "name")
+_LEVEL_HEADERS = ("المستوى", "المستوي", "الفئة", "level")
+PARTICIPANT_IMPORT_HEADERS = {
+    "student_name": _PARTICIPANT_NAME_HEADERS,
+    "level": _LEVEL_HEADERS,
     "score": ("العلامة", "العلامه", "الدرجة", "الدرجه", "score", "mark"),
+    "phone": ("رقم التلفون", "رقم التليفون", "رقم الهاتف", "رقم الموبايل", "رقم الجوال", "التلفون", "الهاتف", "الموبايل", "الجوال", "phone"),
+    "residence": ("السكن", "مكان السكن", "العنوان", "residence"),
+    "national_id": ("الرقم الوطني أو المرجعي", "الرقم الوطني او الرقم المرجعي", "الرقم الوطني", "الرقم المرجعي", "رقم وطني", "national id"),
     "result": ("النتيجة", "النتيجه", "الحالة", "result"),
     "notes": ("ملاحظات", "ملاحظة", "notes"),
 }
+TAJWEED_IMPORT_HEADERS = {
+    "student_name": _PARTICIPANT_NAME_HEADERS,
+    "level": _LEVEL_HEADERS,
+    "teacher": ("مدرس الدورة", "المدرس", "معلم الدورة", "المعلم", "teacher"),
+    "theory": ("نظري", "النظري", "الحالة نظري", "حالة نظري"),
+    "practical": ("عملي", "العملي", "الحالة عملي", "حالة عملي"),
+    "memorization": ("حفظ", "الحفظ", "الحالة حفظ", "حالة حفظ"),
+    "overall": ("الحالة العامة", "الحاله العامه", "النتيجة العامة", "النتيجة", "overall"),
+    "notes": ("ملاحظات", "ملاحظة", "notes"),
+}
+# الأعمدة الستة/السبعة الأساسية بالترتيب، للملفات التي بلا صف عناوين
+PARTICIPANT_IMPORT_ORDER = ["student_name", "level", "score", "phone", "residence", "national_id"]
+TAJWEED_IMPORT_ORDER = ["student_name", "level", "teacher", "theory", "practical", "memorization", "overall"]
 
 
-def _parse_annual_xlsx(content: bytes) -> List[dict]:
-    """يقرأ أول ورقة: يبحث عن صف العناوين في أول 10 صفوف ثم يقرأ البيانات تحته."""
+def _header_label(val) -> str:
+    label = str(val or "").translate(str.maketrans("():-_/", "      "))
+    return _norm_ar_name(label).lower()
+
+
+def _match_headers(row, headers: dict) -> dict:
+    wanted = {key: {_header_label(n) for n in names} for key, names in headers.items()}
+    found = {}
+    for c, val in enumerate(row):
+        label = _header_label(val)
+        if not label:
+            continue
+        for key, names in wanted.items():
+            if key not in found and label in names:
+                found[key] = c
+                break
+    return found
+
+
+def _parse_xlsx_table(content: bytes, headers: dict, order: List[str]) -> List[dict]:
+    """يقرأ أول ورقة ويرجّع قيم الخلايا الخام لكل صف فيه اسم.
+    يبحث عن صف العناوين في أول 15 صفًا (وقد يكون العنوان على صفين عند دمج خلايا «الحالة»)،
+    وإن لم يجده يعتمد الترتيب الثابت للأعمدة ابتداءً من الصف الأول."""
     import openpyxl
     try:
         wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
     except Exception:
         raise HTTPException(status_code=400, detail="تعذّرت قراءة الملف — يجب أن يكون ملف Excel بصيغة xlsx")
-    ws = wb.worksheets[0]
-    all_rows = list(ws.iter_rows(values_only=True))
-    header_idx, cols = None, {}
-    for i, row in enumerate(all_rows[:10]):
-        found = {}
-        for c, val in enumerate(row):
-            label = _norm_ar_name(str(val or "")).lower()
-            for key, names in ANNUAL_IMPORT_HEADERS.items():
-                if key not in found and label in {_norm_ar_name(n).lower() for n in names}:
-                    found[key] = c
-        if "student_name" in found:
-            header_idx, cols = i, found
-            break
-    if header_idx is None:
-        raise HTTPException(status_code=400, detail="لم يُعثر على عمود «الاسم» في أول عشرة صفوف من الملف")
+    all_rows = list(wb.worksheets[0].iter_rows(values_only=True))
 
-    def cell(row, key):
-        c = cols.get(key)
-        return row[c] if c is not None and c < len(row) else None
+    start, cols = 0, None
+    for i, row in enumerate(all_rows[:15]):
+        found = _match_headers(row, headers)
+        if "student_name" in found and len(found) >= 2:
+            start, cols = i + 1, found
+            if i + 1 < len(all_rows):
+                sub = {k: v for k, v in _match_headers(all_rows[i + 1], headers).items() if k not in found}
+                if sub:
+                    cols.update(sub)
+                    start = i + 2
+            break
+    if cols is None:
+        cols = {key: c for c, key in enumerate(order)}
 
     out = []
-    for row in all_rows[header_idx + 1:]:
-        name = str(cell(row, "student_name") or "").strip()
-        if not name:
+    for row in all_rows[start:]:
+        cells = {k: (row[c] if c < len(row) else None) for k, c in cols.items()}
+        name = cells.get("student_name")
+        if name is None or not str(name).strip() or isinstance(name, (int, float)):
             continue
-        score = cell(row, "score")
-        try:
-            score = float(str(score).replace("%", "").strip()) if score not in (None, "") else None
-        except ValueError:
-            score = None
-        result = _norm_ar_name(str(cell(row, "result") or ""))
-        passed = True if result in ("ناجح", "ناجحه", "نجح", "pass", "passed") else \
-            False if result in ("راسب", "راسبه", "رسب", "fail", "failed") else None
-        level = cell(row, "level")
-        notes = cell(row, "notes")
-        out.append({"student_name": name, "level": str(level).strip() if level not in (None, "") else None,
-                    "score": score, "passed": passed, "notes": str(notes).strip() if notes not in (None, "") else None})
+        out.append(cells)
     return out
+
+
+def _cell_text(val) -> Optional[str]:
+    """نص الخلية؛ الأرقام تُكتب بلا كسور (Excel يخزّن الأرقام الطويلة كـ float)."""
+    if val is None:
+        return None
+    if isinstance(val, float) and val.is_integer():
+        val = int(val)
+    return str(val).strip() or None
+
+
+def _cell_phone(val) -> Optional[str]:
+    text = _cell_text(val)
+    # Excel يحذف الصفر الأول من الأرقام: 791234567 → 0791234567
+    if text and text.isdigit() and len(text) == 9 and text.startswith("7"):
+        return "0" + text
+    return text
+
+
+def _cell_result(val) -> Optional[bool]:
+    text = _norm_ar_name(str(val or "")).lower()
+    if text in ("ناجح", "ناجحه", "نجح", "pass", "passed"):
+        return True
+    if text in ("راسب", "راسبه", "رسب", "fail", "failed"):
+        return False
+    return None
+
+
+def _cell_score(cells: dict):
+    """(العلامة، نص بديل): خلية غير رقمية مثل «غائب» تُحفظ في الملاحظات بدل أن تضيع."""
+    raw = cells.get("score")
+    if raw in (None, ""):
+        return None, None
+    try:
+        return float(str(raw).replace("%", "").strip()), None
+    except ValueError:
+        return None, _cell_text(raw)
+
+
+def _participant_fields(cells: dict) -> dict:
+    score, score_text = _cell_score(cells)
+    return {
+        "level": _cell_text(cells.get("level")),
+        "score": score,
+        "notes": _cell_text(cells.get("notes")) or score_text,
+        "phone": _cell_phone(cells.get("phone")),
+        "residence": _cell_text(cells.get("residence")),
+        "national_id": _cell_text(cells.get("national_id")),
+    }
+
+
+def _parse_annual_xlsx(content: bytes) -> List[dict]:
+    return [
+        {"student_name": str(c["student_name"]).strip(), "passed": _cell_result(c.get("result")), **_participant_fields(c)}
+        for c in _parse_xlsx_table(content, PARTICIPANT_IMPORT_HEADERS, PARTICIPANT_IMPORT_ORDER)
+    ]
 
 
 @api_router.post("/annual-competition/import")
 async def annual_competition_import(year: int, pass_mark: Optional[float] = None, replace: bool = False,
                                     file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
-    """استيراد كشف سنة من ملف Excel (أعمدة: الاسم، المستوى، العلامة، النتيجة، ملاحظات).
+    """استيراد كشف سنة من ملف Excel (أعمدة: اسم المشارك، المستوى، العلامة، رقم التلفون، السكن، الرقم الوطني أو المرجعي).
     replace=true يحذف كشف السنة القديم أولًا؛ وإلا يُحدَّث الطالب الموجود بالاسم نفسه ويُضاف الجديد."""
     ensure_role(current_user, "admin", "فقط المدير يمكنه الاستيراد")
     if not (2000 <= year <= 2100):
@@ -11086,6 +11316,8 @@ async def annual_competition_import(year: int, pass_mark: Optional[float] = None
             {"year": year}, {"$setOnInsert": {"year": year, "pass_mark": ANNUAL_DEFAULT_PASS_MARK}}, upsert=True)
     mark = await _annual_pass_mark(year)
     by_name = await _students_by_norm_name()
+    # تُبنى كل السجلات قبل الحذف: خطأ في صف لا يُفقد الكشف القديم
+    docs = [await _annual_row_doc(AnnualCompetitionRow(year=year, **p), mark, by_name) for p in parsed]
 
     if replace:
         await db.annual_competition.delete_many({"year": year})
@@ -11094,12 +11326,13 @@ async def annual_competition_import(year: int, pass_mark: Optional[float] = None
 
     added = updated = linked = 0
     now = datetime.now(timezone.utc).isoformat()
-    for p in parsed:
-        doc = await _annual_row_doc(AnnualCompetitionRow(year=year, **p), mark, by_name)
+    for doc in docs:
         linked += 1 if doc["student_id"] else 0
         key = _norm_ar_name(doc["student_name"])
         if key in existing:
-            await db.annual_competition.update_one({"id": existing[key]}, {"$set": doc})
+            # الخلايا الفارغة في الملف لا تمسح ما سُجّل سابقًا
+            await db.annual_competition.update_one({"id": existing[key]},
+                                                   {"$set": {k: v for k, v in doc.items() if v is not None}})
             updated += 1
         else:
             doc["id"] = str(uuid.uuid4())
@@ -11114,21 +11347,33 @@ async def annual_competition_import(year: int, pass_mark: Optional[float] = None
             "added": added, "updated": updated, "linked": linked, "total": len(parsed)}
 
 
+PARTICIPANT_TEMPLATE_COLUMNS = ['اسم المشارك', 'المستوى', 'العلامة', 'رقم التلفون', 'السكن', 'الرقم الوطني أو المرجعي']
+PARTICIPANT_TEMPLATE_SAMPLE = ['محمد أحمد علي', 'المستوى الخامس (حفظ 15 جزء)', 85, '0791234567', 'عمان', '2001234567']
+TAJWEED_TEMPLATE_COLUMNS = ['اسم المشارك', 'المستوى', 'مدرس الدورة', 'نظري', 'عملي', 'حفظ', 'الحالة العامة']
+TAJWEED_TEMPLATE_SAMPLE = ['محمد أحمد علي', 'تمهيدية', 'أحمد خالد', 'ناجح', 'ناجح', 'راسب', 'راسب']
+
+
+def _import_template(columns: List[str], sample: list, filename: str):
+    output = io.BytesIO()
+    wb = xlsxwriter.Workbook(output, {'in_memory': True})
+    head_f = wb.add_format({'bold': True, 'bg_color': '#1e3a5f', 'font_color': 'white', 'border': 1, 'align': 'center'})
+    text_f = wb.add_format({'num_format': '@'})
+    sh = wb.add_worksheet('الكشف')
+    sh.right_to_left()
+    for c, h in enumerate(columns):
+        sh.write(0, c, h, head_f)
+    for c, v in enumerate(sample):
+        sh.write(1, c, v, text_f if isinstance(v, str) else None)
+    sh.set_column(0, 1, 28); sh.set_column(2, len(columns) - 1, 16)
+    wb.close()
+    return _xlsx_response(output, filename)
+
+
 @api_router.get("/annual-competition/template")
 async def annual_competition_template(current_user: dict = Depends(get_current_user)):
     """نموذج Excel فارغ بالأعمدة المطلوبة للاستيراد."""
     ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
-    output = io.BytesIO()
-    wb = xlsxwriter.Workbook(output, {'in_memory': True})
-    head_f = wb.add_format({'bold': True, 'bg_color': '#1e3a5f', 'font_color': 'white', 'border': 1, 'align': 'center'})
-    sh = wb.add_worksheet('كشف المسابقة')
-    sh.right_to_left()
-    for c, h in enumerate(['الاسم', 'المستوى', 'العلامة', 'النتيجة', 'ملاحظات']):
-        sh.write(0, c, h, head_f)
-    sh.write_row(1, 0, ['محمد أحمد علي', '5 أجزاء', 85, 'ناجح', ''])
-    sh.set_column('A:A', 26); sh.set_column('B:E', 14)
-    wb.close()
-    return _xlsx_response(output, "annual_competition_template.xlsx")
+    return _import_template(PARTICIPANT_TEMPLATE_COLUMNS, PARTICIPANT_TEMPLATE_SAMPLE, "annual_competition_template.xlsx")
 
 
 @api_router.get("/annual-competition/export")
@@ -11143,14 +11388,16 @@ async def annual_competition_export(year: int, status: Optional[str] = None,
     cell_f = wb.add_format({'border': 1, 'align': 'center'})
     sh = wb.add_worksheet(f'المسابقة {year}')
     sh.right_to_left()
-    sh.merge_range('A1:G1', f'كشف المسابقة السنوية {year} — علامة النجاح {data["pass_mark"]:g}', title_f)
-    for c, h in enumerate(['#', 'الاسم', 'المستوى', 'العلامة', 'النتيجة', 'المجموعة', 'ملاحظات']):
+    sh.merge_range('A1:J1', f'كشف المسابقة السنوية {year} — علامة النجاح {data["pass_mark"]:g}', title_f)
+    for c, h in enumerate(['#', 'الاسم', 'المستوى', 'العلامة', 'النتيجة', 'رقم التلفون', 'السكن',
+                           'الرقم الوطني أو المرجعي', 'المجموعة', 'ملاحظات']):
         sh.write(2, c, h, head_f)
     for i, r in enumerate(data["rows"], 1):
         result = "ناجح" if r.get("passed") is True else "راسب" if r.get("passed") is False else "—"
         sh.write_row(i + 2, 0, [i, r["student_name"], r.get("level") or "", r.get("score") if r.get("score") is not None else "",
-                                result, r.get("group_name") or "", r.get("notes") or ""], cell_f)
-    sh.set_column('A:A', 5); sh.set_column('B:B', 26); sh.set_column('C:G', 14)
+                                result, r.get("phone") or "", r.get("residence") or "", r.get("national_id") or "",
+                                r.get("group_name") or "", r.get("notes") or ""], cell_f)
+    sh.set_column('A:A', 5); sh.set_column('B:C', 26); sh.set_column('D:J', 14)
     wb.close()
     return _xlsx_response(output, f"annual_competition_{year}.xlsx")
 
@@ -11161,7 +11408,9 @@ async def student_annual_competition(student_id: str, current_user: dict = Depen
     ensure_role(current_user, ["admin", "sheikh", "student"], "غير مصرح لك")
     if current_user["role"] == "student" and current_user["user_id"] != student_id:
         raise HTTPException(status_code=403, detail="غير مصرح لك")
-    return await db.annual_competition.find({"student_id": student_id}, {"_id": 0}).sort("year", -1).to_list(100)
+    # بيانات التواصل والرقم الوطني للمدير فقط
+    private = {} if current_user["role"] == "admin" else {"phone": 0, "residence": 0, "national_id": 0}
+    return await db.annual_competition.find({"student_id": student_id}, {"_id": 0, **private}).sort("year", -1).to_list(100)
 
 
 
@@ -11171,6 +11420,7 @@ async def student_annual_competition(student_id: str, current_user: dict = Depen
 
 SUPERVISION_KINDS = {"young_hafiz": "الحافظ الصغير", "tajweed": "التلاوة والتجويد"}
 TAJWEED_LEVELS = ["تلاوة عامة", "تمهيدية", "متوسطة", "متقدمة", "إجازة", "اتقان", "سند غيبي", "روايات أخرى"]
+TAJWEED_UNSET_LEVEL = "بلا مستوى"       # صفوف ملف Excel التي بلا مستوى
 YOUNG_HAFIZ_MIN_JUZ = 3                 # حفظ 3 أجزاء على الأقل
 YOUNG_HAFIZ_MAX_GRADE = "الصف الخامس"   # الصف الخامس فما دون
 
@@ -11187,6 +11437,14 @@ class SupervisionRecord(BaseModel):
     juz_count: Optional[float] = None       # الحافظ الصغير: عدد الأجزاء المحفوظة
     student_id: Optional[str] = None        # يُربط تلقائيًا بحساب الطالب إن تطابق الاسم
     notes: Optional[str] = None
+    score: Optional[float] = None           # الحافظ الصغير: العلامة
+    residence: Optional[str] = None         # الحافظ الصغير: السكن
+    national_id: Optional[str] = None       # الحافظ الصغير: الرقم الوطني أو المرجعي
+    teacher: Optional[str] = None           # التجويد: مدرس الدورة
+    theory_passed: Optional[bool] = None    # التجويد: نظري (ناجح/راسب)
+    practical_passed: Optional[bool] = None # التجويد: عملي
+    memorization_passed: Optional[bool] = None  # التجويد: حفظ
+    overall_passed: Optional[bool] = None   # التجويد: الحالة العامة
 
 
 def _young_hafiz_grade_ok(grade: Optional[str]) -> bool:
@@ -11196,15 +11454,16 @@ def _young_hafiz_grade_ok(grade: Optional[str]) -> bool:
         return False
 
 
-async def _supervision_doc(data: SupervisionRecord) -> dict:
+async def _supervision_doc(data: SupervisionRecord, students_by_name: Optional[dict] = None) -> dict:
     if data.kind not in SUPERVISION_KINDS:
         raise HTTPException(status_code=400, detail="نوع السجل غير معروف")
     name = " ".join((data.full_name or "").split())
     if not name:
         raise HTTPException(status_code=400, detail="الاسم مطلوب")
-    if data.kind == "tajweed" and data.level and data.level not in TAJWEED_LEVELS:
-        raise HTTPException(status_code=400, detail="مستوى التجويد غير معروف")
-    student_id = data.student_id or (await _students_by_norm_name()).get(_norm_ar_name(name))
+    if data.score is not None and not (0 <= data.score <= 100):
+        raise HTTPException(status_code=400, detail=f"العلامة يجب أن تكون بين 0 و100 ({name})")
+    student_id = data.student_id or (students_by_name if students_by_name is not None
+                                     else await _students_by_norm_name()).get(_norm_ar_name(name))
     return {
         "kind": data.kind,
         "full_name": name,
@@ -11217,7 +11476,112 @@ async def _supervision_doc(data: SupervisionRecord) -> dict:
         "juz_count": data.juz_count,
         "student_id": student_id,
         "notes": (data.notes or "").strip() or None,
+        "score": data.score,
+        "residence": (data.residence or "").strip() or None,
+        "national_id": (data.national_id or "").strip() or None,
+        "teacher": (data.teacher or "").strip() or None,
+        "theory_passed": data.theory_passed,
+        "practical_passed": data.practical_passed,
+        "memorization_passed": data.memorization_passed,
+        "overall_passed": data.overall_passed,
     }
+
+
+def _tajweed_level(level: Optional[str]) -> str:
+    """يوحّد مستوى ملف Excel مع مستويات الملف («المستوى التمهيدي» ← «تمهيدية»)؛ وغيرها يبقى كما كُتب."""
+    text = _norm_ar_name(level or "")
+    if not text:
+        return TAJWEED_UNSET_LEVEL
+    for known in TAJWEED_LEVELS:
+        root = _norm_ar_name(known)
+        if root in text or root.removesuffix("ه") in text:
+            return known
+    return " ".join(level.split())
+
+
+def _parse_supervision_xlsx(content: bytes, kind: str, default_level: Optional[str]) -> List[dict]:
+    if kind == "young_hafiz":
+        rows = []
+        for c in _parse_xlsx_table(content, PARTICIPANT_IMPORT_HEADERS, PARTICIPANT_IMPORT_ORDER):
+            fields = _participant_fields(c)
+            rows.append({"kind": kind, "full_name": str(c["student_name"]).strip(), **fields,
+                         "level": fields["level"] or default_level})
+        return rows
+    return [
+        {
+            "kind": kind,
+            "full_name": str(c["student_name"]).strip(),
+            "level": default_level or _tajweed_level(_cell_text(c.get("level"))),
+            "teacher": _cell_text(c.get("teacher")),
+            "theory_passed": _cell_result(c.get("theory")),
+            "practical_passed": _cell_result(c.get("practical")),
+            "memorization_passed": _cell_result(c.get("memorization")),
+            "overall_passed": _cell_result(c.get("overall")),
+            "notes": _cell_text(c.get("notes")),
+        }
+        for c in _parse_xlsx_table(content, TAJWEED_IMPORT_HEADERS, TAJWEED_IMPORT_ORDER)
+    ]
+
+
+@api_router.post("/supervision/import")
+async def supervision_import(kind: str, level: Optional[str] = None, replace: bool = False,
+                             file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    """استيراد سجلات الحافظ الصغير أو التلاوة والتجويد من ملف Excel.
+    `level` مستوى التجويد المفتوح: كل صفوف الملف تُسجَّل عليه، و`replace` يقتصر عليه.
+    الشخص الموجود بالاسم نفسه (وبالمستوى نفسه في التجويد) يُحدَّث، والجديد يُضاف."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الاستيراد")
+    if kind not in SUPERVISION_KINDS:
+        raise HTTPException(status_code=400, detail="نوع السجل غير معروف")
+    parsed = _parse_supervision_xlsx(await file.read(), kind, level)
+    if not parsed:
+        raise HTTPException(status_code=400, detail="الملف لا يحتوي على أسماء")
+
+    by_name = await _students_by_norm_name()
+    docs = [await _supervision_doc(SupervisionRecord(**p), by_name) for p in parsed]
+
+    q = {"kind": kind}
+    if level:
+        q["level"] = level
+    if replace:
+        await db.supervision_records.delete_many(q)
+
+    def record_key(r):
+        return (_norm_ar_name(r["full_name"]), r.get("level") if kind == "tajweed" else None)
+
+    existing = {record_key(r): r["id"] for r in await db.supervision_records.find(
+        q, {"_id": 0, "id": 1, "full_name": 1, "level": 1}).to_list(5000)}
+
+    added = updated = linked = 0
+    now = datetime.now(timezone.utc).isoformat()
+    for doc in docs:
+        linked += 1 if doc["student_id"] else 0
+        key = record_key(doc)
+        if key in existing:
+            # الخلايا الفارغة في الملف لا تمسح ما سُجّل سابقًا
+            await db.supervision_records.update_one({"id": existing[key]},
+                                                    {"$set": {k: v for k, v in doc.items() if v is not None}})
+            updated += 1
+        else:
+            doc["id"] = str(uuid.uuid4())
+            doc["created_at"] = now
+            doc["created_by"] = current_user["user_id"]
+            await db.supervision_records.insert_one(dict(doc))
+            existing[key] = doc["id"]
+            added += 1
+
+    await log_admin_action(current_user, "supervision_import", "supervision_record", kind, SUPERVISION_KINDS[kind],
+                           f"استيراد {SUPERVISION_KINDS[kind]}: {added} جديد، {updated} مُحدَّث، {linked} مرتبط بحساب طالب")
+    return {"message": f"تم الاستيراد: {added} جديد، {updated} مُحدَّث، {linked} مرتبط بحساب طالب",
+            "added": added, "updated": updated, "linked": linked, "total": len(parsed)}
+
+
+@api_router.get("/supervision/template")
+async def supervision_template(kind: str, current_user: dict = Depends(get_current_user)):
+    """نموذج Excel فارغ بأعمدة الاستيراد."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
+    if kind == "tajweed":
+        return _import_template(TAJWEED_TEMPLATE_COLUMNS, TAJWEED_TEMPLATE_SAMPLE, "tajweed_template.xlsx")
+    return _import_template(PARTICIPANT_TEMPLATE_COLUMNS, PARTICIPANT_TEMPLATE_SAMPLE, "young_hafiz_template.xlsx")
 
 
 @api_router.get("/supervision/summary")
@@ -11228,8 +11592,9 @@ async def supervision_summary(current_user: dict = Depends(get_current_user)):
     counts = {"young_hafiz": 0, "tajweed": 0}
     async for r in db.supervision_records.find({}, {"_id": 0, "kind": 1, "level": 1}):
         counts[r["kind"]] = counts.get(r["kind"], 0) + 1
-        if r["kind"] == "tajweed" and r.get("level") in by_level:
-            by_level[r["level"]] += 1
+        if r["kind"] == "tajweed" and r.get("level"):
+            # مستويات الملفات المستوردة التي خارج القائمة تظهر ببطاقات خاصة بها
+            by_level[r["level"]] = by_level.get(r["level"], 0) + 1
     return {
         "young_hafiz": counts["young_hafiz"],
         "tajweed": counts["tajweed"],

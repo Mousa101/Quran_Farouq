@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
@@ -9,7 +9,7 @@ import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { toast } from 'sonner';
-import { Plus, Trash2, Edit, Search, ArrowRight, Star, BookOpen, Link2, Loader2, UserPlus, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, Edit, Search, ArrowRight, Star, BookOpen, Link2, Loader2, UserPlus, CheckCircle, Upload, Download, FileSpreadsheet } from 'lucide-react';
 import StudentLink from '../components/StudentLink';
 import { SCHOOL_GRADES } from '../lib/constants';
 import { formatDate } from '../lib/utils';
@@ -25,8 +25,20 @@ const KINDS = {
 
 const emptyRecord = (kind, level = '') => ({
   kind, full_name: '', level, obtained_date: '', place: '', birth_date: '', school_grade: '',
-  phone: '', juz_count: '', student_id: null, notes: '',
+  phone: '', juz_count: '', student_id: null, notes: '', score: '', residence: '', national_id: '',
+  teacher: '', theory_passed: null, practical_passed: null, memorization_passed: null, overall_passed: null,
 });
+
+// حالات ورقة التجويد: كل عمود ناجح/راسب
+const TAJWEED_STATUS_FIELDS = [
+  { key: 'theory_passed', label: 'نظري' },
+  { key: 'practical_passed', label: 'عملي' },
+  { key: 'memorization_passed', label: 'حفظ' },
+  { key: 'overall_passed', label: 'الحالة العامة' },
+];
+
+const statusValue = (v) => (v === true ? 'passed' : v === false ? 'failed' : '');
+const statusFromValue = (v) => (v === 'passed' ? true : v === 'failed' ? false : null);
 
 // سجلات الإشراف الفني لنوع واحد: الحافظ الصغير (مع قائمة المؤهَّلين) أو التلاوة والتجويد (حسب المستوى)
 const SupervisionFile = ({ kind }) => {
@@ -36,11 +48,16 @@ const SupervisionFile = ({ kind }) => {
   const [tab, setTab] = useState('records');          // الحافظ الصغير: records | eligible
   const [rows, setRows] = useState([]);
   const [levelCounts, setLevelCounts] = useState({});
+  const [levels, setLevels] = useState(TAJWEED_LEVELS);
   const [eligible, setEligible] = useState({ rows: [], min_juz: 3, max_grade: 'الصف الخامس' });
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [dialog, setDialog] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importReplace, setImportReplace] = useState(false);
+  const fileRef = useRef(null);
 
   const card = isDark ? 'glass-card border border-white/10' : 'bg-white border border-slate-200 shadow-sm';
   const title = isDark ? 'text-white' : 'text-slate-900';
@@ -55,6 +72,7 @@ const SupervisionFile = ({ kind }) => {
       if (isTajweed) {
         const sum = await axios.get(`${API}/supervision/summary`);
         setLevelCounts(Object.fromEntries(sum.data.tajweed_levels.map((l) => [l.level, l.count])));
+        setLevels(sum.data.tajweed_levels.map((l) => l.level));
       }
       if (showList) {
         const res = await axios.get(`${API}/supervision/records`, { params: { kind, level: level || undefined } });
@@ -76,7 +94,11 @@ const SupervisionFile = ({ kind }) => {
   const save = async () => {
     const d = dialog;
     if (!d.full_name.trim()) { toast.error('الاسم مطلوب'); return; }
-    const body = { ...d, juz_count: d.juz_count === '' ? null : Number(d.juz_count) };
+    const body = {
+      ...d,
+      juz_count: d.juz_count === '' ? null : Number(d.juz_count),
+      score: d.score === '' ? null : Number(d.score),
+    };
     delete body.id;
     setBusy(true);
     try {
@@ -105,7 +127,48 @@ const SupervisionFile = ({ kind }) => {
   const editRow = (r) => setDialog({
     ...emptyRecord(kind), ...Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v ?? ''])),
     student_id: r.student_id || null,
+    ...Object.fromEntries(TAJWEED_STATUS_FIELDS.map(({ key }) => [key, r[key] ?? null])),
   });
+
+  const downloadTemplate = async () => {
+    try {
+      const res = await axios.get(`${API}/supervision/template`, { params: { kind }, responseType: 'blob' });
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(new Blob([res.data]));
+      link.download = `${kind}_template.xlsx`;
+      link.click();
+    } catch (e) {
+      toast.error('تعذّر تنزيل الملف');
+    }
+  };
+
+  const runImport = async () => {
+    if (!importFile) { toast.error('اختر ملف Excel أولًا'); return; }
+    const form = new FormData();
+    form.append('file', importFile);
+    setBusy(true);
+    try {
+      const res = await axios.post(`${API}/supervision/import`, form, {
+        params: { kind, level: level || undefined, replace: importReplace },
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success(res.data.message);
+      setImportOpen(false);
+      setImportFile(null);
+      setImportReplace(false);
+      await load();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'تعذّر الاستيراد');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const statusBadge = (v) => {
+    if (v === true) return <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">ناجح</Badge>;
+    if (v === false) return <Badge className="bg-red-500/20 text-red-400 border-red-500/30">راسب</Badge>;
+    return <span className={muted}>—</span>;
+  };
 
   const addFromEligible = (s) => {
     setDialog({
@@ -153,6 +216,9 @@ const SupervisionFile = ({ kind }) => {
                 <Button variant="outline" className={outline}><ArrowRight className="w-4 h-4 ml-1" />ملف الإشراف الفني</Button>
               </Link>
             )}
+            <Button variant="outline" onClick={() => setImportOpen(true)} className={outline} data-testid="supervision-import-btn">
+              <Upload className="w-4 h-4 ml-1" />استيراد من Excel
+            </Button>
             {showList && (
               <Button onClick={() => setDialog(emptyRecord(kind, level || ''))} className="bg-emerald-500 hover:bg-emerald-600" data-testid="add-record-btn">
                 <Plus className="w-4 h-4 ml-1" />إضافة سجل
@@ -165,7 +231,7 @@ const SupervisionFile = ({ kind }) => {
       {/* التجويد: بطاقات المستويات */}
       {isTajweed && !level && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {TAJWEED_LEVELS.map((lvl) => (
+          {levels.map((lvl) => (
             <button key={lvl} type="button" onClick={() => setLevel(lvl)}
               className={`p-5 rounded-xl text-right transition-all hover:border-emerald-500/50 ${card}`}
               data-testid={`level-card-${lvl}`}>
@@ -248,8 +314,14 @@ const SupervisionFile = ({ kind }) => {
                   <tr className={`${muted} border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
                     <th className="p-2 text-right">#</th>
                     <th className="p-2 text-right">الاسم الرباعي</th>
-                    {!isTajweed && <th className="p-2 text-center">الأجزاء</th>}
                     {!isTajweed && <th className="p-2 text-right">المستوى</th>}
+                    {!isTajweed && <th className="p-2 text-center">العلامة</th>}
+                    {!isTajweed && <th className="p-2 text-right">رقم التلفون</th>}
+                    {!isTajweed && <th className="p-2 text-right">السكن</th>}
+                    {!isTajweed && <th className="p-2 text-right">الرقم الوطني أو المرجعي</th>}
+                    {!isTajweed && <th className="p-2 text-center">الأجزاء</th>}
+                    {isTajweed && <th className="p-2 text-right">مدرس الدورة</th>}
+                    {isTajweed && TAJWEED_STATUS_FIELDS.map((s) => <th key={s.key} className="p-2 text-center">{s.label}</th>)}
                     <th className="p-2 text-right">تاريخ الحصول</th>
                     <th className="p-2 text-right">المكان</th>
                     <th className="p-2 text-right">الصف</th>
@@ -260,7 +332,7 @@ const SupervisionFile = ({ kind }) => {
                 </thead>
                 <tbody>
                   {shown.length === 0 && (
-                    <tr><td colSpan={10} className={`text-center py-8 ${muted}`}>لا توجد سجلات</td></tr>
+                    <tr><td colSpan={13} className={`text-center py-8 ${muted}`}>لا توجد سجلات</td></tr>
                   )}
                   {shown.map((r, i) => (
                     <tr key={r.id} className={`border-b ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
@@ -268,8 +340,14 @@ const SupervisionFile = ({ kind }) => {
                       <td className={`p-2 font-medium ${title}`}>
                         {r.linked ? <StudentLink studentId={r.student_id} name={r.full_name} className={title} /> : r.full_name}
                       </td>
-                      {!isTajweed && <td className={`p-2 text-center font-bold ${title}`}>{r.juz_count ?? '—'}</td>}
                       {!isTajweed && <td className={`p-2 ${title}`}>{r.level || '—'}</td>}
+                      {!isTajweed && <td className={`p-2 text-center font-bold ${title}`}>{r.score ?? '—'}</td>}
+                      {!isTajweed && <td className={`p-2 ${muted}`} dir="ltr">{r.phone || '—'}</td>}
+                      {!isTajweed && <td className={`p-2 ${muted}`}>{r.residence || '—'}</td>}
+                      {!isTajweed && <td className={`p-2 ${muted}`} dir="ltr">{r.national_id || '—'}</td>}
+                      {!isTajweed && <td className={`p-2 text-center font-bold ${title}`}>{r.juz_count ?? '—'}</td>}
+                      {isTajweed && <td className={`p-2 ${title}`}>{r.teacher || '—'}</td>}
+                      {isTajweed && TAJWEED_STATUS_FIELDS.map((s) => <td key={s.key} className="p-2 text-center">{statusBadge(r[s.key])}</td>)}
                       <td className={`p-2 ${muted}`}>{r.obtained_date ? formatDate(r.obtained_date) : '—'}</td>
                       <td className={`p-2 ${muted}`}>{r.place || '—'}</td>
                       <td className={`p-2 ${muted}`}>{r.school_grade || '—'}</td>
@@ -319,7 +397,7 @@ const SupervisionFile = ({ kind }) => {
                   <select value={dialog.level} onChange={(e) => setDialog({ ...dialog, level: e.target.value })}
                     className={`w-full h-10 px-3 rounded-md border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-300'}`}>
                     <option value="">— اختر —</option>
-                    {TAJWEED_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+                    {levels.map((l) => <option key={l} value={l}>{l}</option>)}
                   </select>
                 </div>
               ) : (
@@ -333,6 +411,38 @@ const SupervisionFile = ({ kind }) => {
                     <Label className={muted}>المستوى / الفئة</Label>
                     <Input value={dialog.level} onChange={(e) => setDialog({ ...dialog, level: e.target.value })} className={field} placeholder="مثال: 3 أجزاء" />
                   </div>
+                  <div>
+                    <Label className={muted}>العلامة (من 100)</Label>
+                    <Input type="number" min="0" max="100" value={dialog.score} dir="ltr"
+                      onChange={(e) => setDialog({ ...dialog, score: e.target.value })} className={field} />
+                  </div>
+                  <div>
+                    <Label className={muted}>السكن</Label>
+                    <Input value={dialog.residence} onChange={(e) => setDialog({ ...dialog, residence: e.target.value })} className={field} />
+                  </div>
+                  <div className="col-span-2">
+                    <Label className={muted}>الرقم الوطني أو المرجعي</Label>
+                    <Input value={dialog.national_id} dir="ltr" onChange={(e) => setDialog({ ...dialog, national_id: e.target.value })} className={field} />
+                  </div>
+                </>
+              )}
+              {isTajweed && (
+                <>
+                  <div className="col-span-2">
+                    <Label className={muted}>مدرس الدورة</Label>
+                    <Input value={dialog.teacher} onChange={(e) => setDialog({ ...dialog, teacher: e.target.value })} className={field} />
+                  </div>
+                  {TAJWEED_STATUS_FIELDS.map((s) => (
+                    <div key={s.key}>
+                      <Label className={muted}>{s.label}</Label>
+                      <select value={statusValue(dialog[s.key])} onChange={(e) => setDialog({ ...dialog, [s.key]: statusFromValue(e.target.value) })}
+                        className={`w-full h-10 px-3 rounded-md border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'border-slate-300'}`}>
+                        <option value="">—</option>
+                        <option value="passed">ناجح</option>
+                        <option value="failed">راسب</option>
+                      </select>
+                    </div>
+                  ))}
                 </>
               )}
               <div>
@@ -369,6 +479,42 @@ const SupervisionFile = ({ kind }) => {
             <Button variant="outline" onClick={() => setDialog(null)} className={outline}>إلغاء</Button>
             <Button onClick={save} disabled={busy} className="bg-emerald-500 hover:bg-emerald-600">
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'حفظ'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* استيراد من Excel */}
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className={`max-w-lg ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}>
+          <DialogHeader>
+            <DialogTitle className={`flex items-center gap-2 ${title}`}>
+              <FileSpreadsheet className="w-5 h-5 text-emerald-400" />استيراد {meta.label.replace('ملف ', '')}{level ? ` — ${level}` : ''}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-2 text-sm">
+            <p className={muted}>
+              {isTajweed
+                ? <>ملف Excel (xlsx) بالأعمدة بالترتيب: <b>اسم المشارك</b>، المستوى، مدرس الدورة، نظري، عملي، حفظ، الحالة العامة. تُكتب الحالات: ناجح أو راسب.</>
+                : <>ملف Excel (xlsx) بالأعمدة بالترتيب: <b>اسم المشارك</b>، المستوى، العلامة، رقم التلفون، السكن، الرقم الوطني أو المرجعي.</>}
+              {level && ' كل صفوف الملف ستُسجَّل على هذا المستوى.'}
+            </p>
+            <Button variant="outline" size="sm" onClick={downloadTemplate} className={outline}>
+              <Download className="w-4 h-4 ml-1" />تنزيل نموذج فارغ
+            </Button>
+            <input ref={fileRef} type="file" accept=".xlsx" className="hidden" onChange={(e) => setImportFile(e.target.files?.[0] || null)} />
+            <Button variant="outline" onClick={() => fileRef.current?.click()} className={`w-full ${outline}`}>
+              <Upload className="w-4 h-4 ml-1" />{importFile ? importFile.name : 'اختيار الملف'}
+            </Button>
+            <label className={`flex items-center gap-2 ${muted}`}>
+              <input type="checkbox" checked={importReplace} onChange={(e) => setImportReplace(e.target.checked)} />
+              استبدال السجلات الحالية{level ? ' لهذا المستوى' : ''} بالكامل (وإلا يُحدَّث الموجود ويُضاف الجديد)
+            </label>
+          </div>
+          <DialogFooter className="gap-2 mt-4">
+            <Button variant="outline" onClick={() => setImportOpen(false)} className={outline}>إلغاء</Button>
+            <Button onClick={runImport} disabled={busy || !importFile} className="bg-emerald-500 hover:bg-emerald-600">
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'استيراد'}
             </Button>
           </DialogFooter>
         </DialogContent>

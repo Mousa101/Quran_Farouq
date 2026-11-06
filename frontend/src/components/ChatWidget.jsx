@@ -14,13 +14,18 @@ const ROLE_META = {
   admin: { label: 'الإدارة', color: 'text-purple-400', icon: Shield },
 };
 
-// محادثة الطالب = غرفة ثلاثية (طالب + مشرفه + المدير).
-// بالإضافة لمحادثات ثنائية مباشرة بين المدير وكل مشرف.
+// استعلام المحادثة: مدير↔مشرف، أو الطالب مع الإدارة، أو الطالب مع مشرفه
+const convoQuery = (c) => {
+  if (c.type === 'admin_sheikh') return `sheikh_id=${c.sheikh_id}`;
+  return `student_id=${c.student_id}${c.type === 'student_admin' ? '&channel=admin' : ''}`;
+};
+
+// الطالب يختار من القائمة: مشرفه أو الإدارة. والمشرف يختار: أحد طلابه أو الإدارة.
 const ChatWidget = () => {
   const { user } = useAuth();
   const { isDark } = useTheme();
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState('conversation'); // 'list' | 'conversation'
+  const [view, setView] = useState('list'); // 'list' | 'conversation'
   const [conversations, setConversations] = useState([]);
   const [active, setActive] = useState(null); // المحادثة المفتوحة
   const [messages, setMessages] = useState([]);
@@ -56,7 +61,7 @@ const ChatWidget = () => {
   useEffect(() => {
     if (!open) return;
     const t = setInterval(() => {
-      if (isStudent || view === 'conversation') loadMessages(active, true);
+      if (view === 'conversation') loadMessages(active, true);
       else loadConversations(true);
     }, 3000);
     return () => clearInterval(t);
@@ -64,8 +69,9 @@ const ChatWidget = () => {
 
   const openWidget = async () => {
     setOpen(true);
-    if (isStudent) { setView('conversation'); setActive(null); loadMessages(); }
-    else { setView('list'); loadConversations(); }
+    setView('list');
+    setActive(null);
+    loadConversations();
   };
 
   const loadConversations = async (silent = false) => {
@@ -77,10 +83,7 @@ const ChatWidget = () => {
   const loadMessages = async (convo, silent = false) => {
     if (!silent) setLoading(true);
     try {
-      let q = '';
-      if (convo?.type === 'admin_sheikh') q = `?sheikh_id=${convo.sheikh_id}`;
-      else if (convo?.student_id) q = `?student_id=${convo.student_id}`;
-      const r = await axios.get(`${API}/chat/messages${q}`);
+      const r = await axios.get(`${API}/chat/messages?${convoQuery(convo)}`);
       setMessages(r.data.messages || []);
       fetchUnread();
     } catch (e) { if (!silent) setMessages([]); } finally { if (!silent) setLoading(false); }
@@ -98,8 +101,7 @@ const ChatWidget = () => {
   const deleteConversation = async () => {
     if (!active || !window.confirm('حذف المحادثة كاملة؟ لا يمكن التراجع عن هذا الإجراء.')) return;
     try {
-      const q = active.type === 'admin_sheikh' ? `sheikh_id=${active.sheikh_id}` : `student_id=${active.student_id}`;
-      const r = await axios.delete(`${API}/chat/conversation?${q}`);
+      const r = await axios.delete(`${API}/chat/conversation?${convoQuery(active)}`);
       toast.success(r.data.message);
       setMessages([]);
       setView('list'); setActive(null); loadConversations();
@@ -114,7 +116,10 @@ const ChatWidget = () => {
     try {
       const body = { text: text.trim() };
       if (active?.type === 'admin_sheikh') body.sheikh_id = active.sheikh_id;
-      else if (active?.student_id) body.student_id = active.student_id;
+      else if (active?.student_id) {
+        body.student_id = active.student_id;
+        if (active.type === 'student_admin') body.channel = 'admin';
+      }
       const r = await axios.post(`${API}/chat/send`, body);
       setMessages((m) => [...m, r.data.chat]);
       setText('');
@@ -124,9 +129,9 @@ const ChatWidget = () => {
   if (!enabled) return null;
 
   const title = () => {
-    if (isStudent) return 'محادثة مع المشرف والإدارة';
-    if (view === 'list') return 'المحادثات';
+    if (view === 'list') return isStudent ? 'مع من تريد التحدث؟' : 'المحادثات';
     if (active?.type === 'admin_sheikh') return role === 'admin' ? `الإدارة ↔ ${active.sheikh_name}` : 'محادثة مع الإدارة';
+    if (isStudent) return active?.type === 'student_admin' ? 'محادثة مع الإدارة' : `محادثة مع المشرف ${active?.sheikh_name || ''}`;
     return active?.student_name || 'محادثة';
   };
 
@@ -158,10 +163,13 @@ const ChatWidget = () => {
   };
 
   const convoRow = (c) => {
-    const isDirect = c.type === 'admin_sheikh';
-    const Icon = isDirect ? (role === 'admin' ? BookUser : Shield) : Users;
-    const name = isDirect ? c.sheikh_name : c.student_name;
-    const key = isDirect ? `sh-${c.sheikh_id}` : `st-${c.student_id}`;
+    const isDirect = c.type === 'admin_sheikh' || c.type === 'student_admin';
+    const toAdmin = role !== 'admin' && isDirect;
+    const toSheikh = isStudent && c.type === 'student_room';
+    const Icon = toAdmin ? Shield : (toSheikh || c.type === 'admin_sheikh') ? BookUser : Users;
+    let name = c.type === 'admin_sheikh' ? c.sheikh_name : c.student_name;
+    if (isStudent) name = toSheikh ? `المشرف: ${c.sheikh_name}` : 'الإدارة';
+    const key = c.type === 'admin_sheikh' ? `sh-${c.sheikh_id}` : `${c.type}-${c.student_id}`;
     return (
       <button
         key={key}
@@ -185,7 +193,8 @@ const ChatWidget = () => {
   };
 
   const directConvos = conversations.filter((c) => c.type === 'admin_sheikh');
-  const roomConvos = conversations.filter((c) => c.type !== 'admin_sheikh');
+  const studentAdminConvos = conversations.filter((c) => c.type === 'student_admin');
+  const roomConvos = conversations.filter((c) => c.type === 'student_room');
 
   return (
     <>
@@ -206,7 +215,7 @@ const ChatWidget = () => {
         <div className={`fixed bottom-24 left-5 z-40 w-[92vw] max-w-sm h-[70vh] max-h-[560px] rounded-2xl shadow-2xl border flex flex-col overflow-hidden ${isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-slate-200'}`}>
           {/* رأس */}
           <div className={`px-4 py-3 flex items-center gap-2 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-            {!isStudent && view === 'conversation' && (
+            {view === 'conversation' && (
               <button onClick={() => { setView('list'); setActive(null); loadConversations(); }} className="text-slate-400 hover:text-emerald-400">
                 <ArrowRight className="w-5 h-5" />
               </button>
@@ -223,11 +232,11 @@ const ChatWidget = () => {
           {/* المحتوى */}
           {loading ? (
             <div className="flex-1 flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-emerald-400" /></div>
-          ) : !isStudent && view === 'list' ? (
+          ) : view === 'list' ? (
             <div className="flex-1 overflow-y-auto p-2">
               {conversations.length === 0 ? (
                 <p className="text-center text-slate-400 text-sm mt-8">لا توجد محادثات</p>
-              ) : (
+              ) : isStudent ? conversations.map(convoRow) : (
                 <>
                   {directConvos.length > 0 && (
                     <>
@@ -237,10 +246,16 @@ const ChatWidget = () => {
                       {directConvos.map(convoRow)}
                     </>
                   )}
+                  {studentAdminConvos.length > 0 && (
+                    <>
+                      <p className="text-[11px] text-slate-500 px-2 py-1 mt-2">محادثات الطلاب مع الإدارة</p>
+                      {studentAdminConvos.map(convoRow)}
+                    </>
+                  )}
                   {roomConvos.length > 0 && (
                     <>
                       <p className="text-[11px] text-slate-500 px-2 py-1 mt-2">
-                        محادثات الطلاب (طالب + مشرف + إدارة)
+                        {role === 'admin' ? 'محادثات الطلاب مع المشرفين' : 'الطلاب'}
                       </p>
                       {roomConvos.map(convoRow)}
                     </>
@@ -250,10 +265,12 @@ const ChatWidget = () => {
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto p-3">
-              {/* تنويه أن الغرفة ثلاثية */}
-              {(isStudent || active?.type !== 'admin_sheikh') && (
+              {/* من يطّلع على هذه المحادثة */}
+              {active?.type !== 'admin_sheikh' && (
                 <p className={`text-[10px] text-center mb-2 px-2 py-1 rounded ${isDark ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                  محادثة يشترك فيها الطالب ومشرفه والإدارة
+                  {active?.type === 'student_admin'
+                    ? 'محادثة خاصة بين الطالب والإدارة، ولا يراها المشرف'
+                    : 'محادثة بين الطالب ومشرفه، وتطّلع عليها الإدارة'}
                 </p>
               )}
               {messages.length === 0 ? (
@@ -264,7 +281,7 @@ const ChatWidget = () => {
           )}
 
           {/* حقل الإرسال */}
-          {(isStudent || view === 'conversation') && (
+          {view === 'conversation' && (
             <div className={`p-2 border-t flex items-center gap-2 ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
               <input
                 value={text}

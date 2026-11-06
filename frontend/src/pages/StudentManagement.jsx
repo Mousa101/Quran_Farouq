@@ -13,10 +13,11 @@ import { Textarea } from '../components/ui/textarea';
 import { MOSQUES, MOSQUE_OTHER, SCHOOL_GRADES, EMAIL_DOMAIN, emailLocalPart, buildEmail } from '../lib/constants';
 import {
   Users, Plus, Trash2, Edit, Search, AlertTriangle,
-  UserPlus, Eye, RefreshCcw, Loader2, Key, Award
+  UserPlus, Eye, RefreshCcw, Loader2, Key, Award, Send
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { avatarSrc, onAvatarError } from '../lib/avatar';
+import BulkNotifyDialog from '../components/BulkNotifyDialog';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -27,6 +28,8 @@ const StudentManagement = () => {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [groupFilter, setGroupFilter] = useState('all'); // all | none | معرّف المجموعة
+  const [notifyDialogOpen, setNotifyDialogOpen] = useState(false);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [warningDialogOpen, setWarningDialogOpen] = useState(false);
   const [changeGroupDialogOpen, setChangeGroupDialogOpen] = useState(false);
@@ -47,6 +50,7 @@ const StudentManagement = () => {
     mosque_name: '',
     school_name: '',
     school_grade: '',
+    school_average: '',
     birth_date: ''
   });
 
@@ -103,6 +107,7 @@ const StudentManagement = () => {
         mosque_name: '',
         school_name: '',
         school_grade: '',
+        school_average: '',
         birth_date: ''
       });
       fetchData();
@@ -213,7 +218,15 @@ const StudentManagement = () => {
     return group?.name || 'بدون مجموعة';
   };
 
-  const filteredStudents = students.filter(student =>
+  const inGroupFilter = (student) => {
+    if (groupFilter === 'all') return true;
+    if (groupFilter === 'none') return !student.group_id;
+    return student.group_id === groupFilter;
+  };
+
+  const groupStudents = students.filter(inGroupFilter);
+
+  const filteredStudents = groupStudents.filter(student =>
     student.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -237,6 +250,17 @@ const StudentManagement = () => {
           <h1 className="text-2xl font-bold text-white">إدارة الطلاب</h1>
           <p className="text-slate-400">إضافة وحذف ونقل الطلاب وإصدار الإنذارات</p>
         </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+        <Button
+          variant="outline"
+          className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+          onClick={() => setNotifyDialogOpen(true)}
+          data-testid="bulk-notify-btn"
+        >
+          <Send className="w-4 h-4 ml-2" />
+          إشعار جماعي
+        </Button>
 
         <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
           <DialogTrigger asChild>
@@ -353,6 +377,17 @@ const StudentManagement = () => {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label className="text-slate-300">المعدل الدراسي (%)</Label>
+                <Input
+                  inputMode="decimal"
+                  value={newStudentData.school_average}
+                  onChange={(e) => setNewStudentData({ ...newStudentData, school_average: e.target.value.replace(/[^0-9.]/g, '') })}
+                  className="bg-slate-800 border-slate-700 text-white"
+                  placeholder="مثال: 95"
+                />
+              </div>
+
               <Button
                 type="submit"
                 className="w-full bg-emerald-500 hover:bg-emerald-600"
@@ -363,18 +398,33 @@ const StudentManagement = () => {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-        <Input
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="bg-slate-800/50 border-slate-700 text-white pr-10"
-          placeholder="البحث عن طالب..."
-          data-testid="search-student"
-        />
+      {/* Search + group filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <Input
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="bg-slate-800/50 border-slate-700 text-white pr-10"
+            placeholder="البحث عن طالب..."
+            data-testid="search-student"
+          />
+        </div>
+        <Select value={groupFilter} onValueChange={setGroupFilter}>
+          <SelectTrigger className="w-full sm:w-56 bg-slate-800/50 border-slate-700 text-white" data-testid="group-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-slate-800 border-slate-700">
+            <SelectItem value="all" className="text-white">كل المجموعات</SelectItem>
+            <SelectItem value="none" className="text-white">بدون مجموعة</SelectItem>
+            {groups.map((group) => (
+              <SelectItem key={group.id} value={group.id} className="text-white">{group.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Students List */}
@@ -497,6 +547,13 @@ const StudentManagement = () => {
           )}
         </CardContent>
       </Card>
+
+      <BulkNotifyDialog
+        open={notifyDialogOpen}
+        onOpenChange={setNotifyDialogOpen}
+        students={groupStudents}
+        groupLabel={groupFilter === 'all' ? 'كل المجموعات' : groupFilter === 'none' ? 'بدون مجموعة' : getGroupName(groupFilter)}
+      />
 
       {/* Change Group Dialog */}
       <Dialog open={changeGroupDialogOpen} onOpenChange={setChangeGroupDialogOpen}>

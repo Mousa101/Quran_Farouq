@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { ScrollText, Trash2, KeyRound, AlertTriangle, RotateCcw, Shield, MessageSquareX, SlidersHorizontal } from 'lucide-react';
+import { Button } from '../components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
+import { toast } from 'sonner';
+import { ScrollText, Trash2, KeyRound, AlertTriangle, RotateCcw, Shield, MessageSquareX, SlidersHorizontal, Loader2 } from 'lucide-react';
 import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
@@ -15,6 +18,7 @@ const ACTIONS = {
   warning: { label: 'إنذار', color: 'bg-orange-500/20 text-orange-400', icon: AlertTriangle },
   chat_delete: { label: 'حذف محادثة/رسالة', color: 'bg-red-500/20 text-red-400', icon: MessageSquareX },
   ui_settings: { label: 'تعديل إعدادات العرض', color: 'bg-emerald-500/20 text-emerald-400', icon: SlidersHorizontal },
+  points_reset: { label: 'تصفير نقاط', color: 'bg-red-500/20 text-red-400', icon: RotateCcw },
 };
 
 const AuditLog = () => {
@@ -22,6 +26,8 @@ const AuditLog = () => {
   const [logs, setLogs] = useState([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   useEffect(() => { fetchLogs(); }, [filter]);
 
@@ -38,6 +44,20 @@ const AuditLog = () => {
     }
   };
 
+  const clearLogs = async () => {
+    setClearing(true);
+    try {
+      const res = await axios.delete(`${API}/admin/audit-logs`);
+      toast.success(res.data.message);
+      setConfirmOpen(false);
+      fetchLogs();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'فشل في تصفير السجل');
+    } finally {
+      setClearing(false);
+    }
+  };
+
   const fmt = (iso) => (iso ? fmtDate(iso, { withTime: true }) : '');
 
   return (
@@ -51,10 +71,16 @@ const AuditLog = () => {
               <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>أثر العمليات الحساسة غير القابلة للتراجع</p>
             </div>
           </div>
-          <select value={filter} onChange={(e) => setFilter(e.target.value)} className={`p-2 rounded-lg border text-sm ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}>
-            <option value="all">كل العمليات</option>
-            {Object.entries(ACTIONS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          </select>
+          <div className="flex items-center gap-2 flex-wrap">
+            <select value={filter} onChange={(e) => setFilter(e.target.value)} className={`p-2 rounded-lg border text-sm ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}>
+              <option value="all">كل العمليات</option>
+              {Object.entries(ACTIONS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <Button variant="outline" onClick={() => setConfirmOpen(true)} className="border-red-500/40 text-red-400 hover:bg-red-500/10" data-testid="clear-audit-btn">
+              <Trash2 className="w-4 h-4 ml-1" />
+              تصفير السجل
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -87,6 +113,23 @@ const AuditLog = () => {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className={isDark ? 'bg-slate-900 border-slate-700' : 'bg-white'}>
+          <DialogHeader>
+            <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>تصفير سجل العمليات</DialogTitle>
+            <DialogDescription className={isDark ? 'text-slate-400' : 'text-slate-600'}>
+              سيُحذف كامل السجل نهائيًا بكل أنواع عملياته، ولا يمكن التراجع عن ذلك.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 mt-4">
+            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>إلغاء</Button>
+            <Button onClick={clearLogs} disabled={clearing} className="bg-red-600 hover:bg-red-700">
+              {clearing ? <Loader2 className="w-4 h-4 animate-spin" /> : 'تصفير'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

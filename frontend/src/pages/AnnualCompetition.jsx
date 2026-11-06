@@ -25,7 +25,7 @@ const STATUS_FILTERS = [
   { id: 'pending', label: 'بلا نتيجة' },
 ];
 
-const emptyRow = { student_name: '', level: '', score: '', passed: 'auto', notes: '' };
+const emptyRow = { student_name: '', level: '', score: '', passed: 'auto', notes: '', phone: '', residence: '', national_id: '' };
 
 // ملف المسابقة السنوية: السنوات ← كشف كل سنة (الاسم، المستوى، العلامة، النتيجة) مع تصفية واستيراد وتصدير
 const AnnualCompetition = () => {
@@ -113,6 +113,9 @@ const AnnualCompetition = () => {
       score: r.score === '' ? null : Number(r.score),
       passed: r.passed === 'auto' ? null : r.passed === 'passed',
       notes: r.notes || null,
+      phone: r.phone || null,
+      residence: r.residence || null,
+      national_id: r.national_id || null,
     };
     setBusy(true);
     try {
@@ -292,6 +295,9 @@ const AnnualCompetition = () => {
                     <th className="p-2 text-right">المستوى</th>
                     <th className="p-2 text-center">العلامة</th>
                     <th className="p-2 text-center">النتيجة</th>
+                    <th className="p-2 text-right">رقم التلفون</th>
+                    <th className="p-2 text-right">السكن</th>
+                    <th className="p-2 text-right">الرقم الوطني أو المرجعي</th>
                     <th className="p-2 text-right">الربط بالتقييم</th>
                     <th className="p-2 text-right">ملاحظات</th>
                     <th className="p-2" />
@@ -299,7 +305,7 @@ const AnnualCompetition = () => {
                 </thead>
                 <tbody>
                   {rows.length === 0 && (
-                    <tr><td colSpan={8} className={`text-center py-8 ${muted}`}>لا توجد أسماء</td></tr>
+                    <tr><td colSpan={11} className={`text-center py-8 ${muted}`}>لا توجد أسماء</td></tr>
                   )}
                   {rows.map((r, i) => (
                     <tr key={r.id} className={`border-b ${isDark ? 'border-white/5' : 'border-slate-100'}`} data-testid={`participant-row-${r.id}`}>
@@ -310,6 +316,9 @@ const AnnualCompetition = () => {
                       <td className={`p-2 ${title}`}>{r.level || '—'}</td>
                       <td className={`p-2 text-center font-bold ${title}`}>{r.score ?? '—'}</td>
                       <td className="p-2 text-center">{resultBadge(r.passed)}</td>
+                      <td className={`p-2 ${muted}`} dir="ltr">{r.phone || '—'}</td>
+                      <td className={`p-2 ${muted}`}>{r.residence || '—'}</td>
+                      <td className={`p-2 ${muted}`} dir="ltr">{r.national_id || '—'}</td>
                       <td className="p-2">
                         {r.linked ? (
                           <span className="flex items-center gap-1 text-xs text-sky-400">
@@ -328,6 +337,7 @@ const AnnualCompetition = () => {
                             onClick={() => setRowDialog({
                               id: r.id, student_name: r.student_name, level: r.level || '', score: r.score ?? '',
                               passed: r.passed === true ? 'passed' : r.passed === false ? 'failed' : 'auto', notes: r.notes || '',
+                              phone: r.phone || '', residence: r.residence || '', national_id: r.national_id || '',
                             })}>
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -402,6 +412,18 @@ const AnnualCompetition = () => {
                   <option value="failed">راسب</option>
                 </select>
               </div>
+              <div>
+                <Label className={muted}>رقم التلفون</Label>
+                <Input value={rowDialog.phone} onChange={(e) => setRowDialog({ ...rowDialog, phone: e.target.value })} className={field} dir="ltr" />
+              </div>
+              <div>
+                <Label className={muted}>السكن</Label>
+                <Input value={rowDialog.residence} onChange={(e) => setRowDialog({ ...rowDialog, residence: e.target.value })} className={field} />
+              </div>
+              <div className="col-span-2">
+                <Label className={muted}>الرقم الوطني أو المرجعي</Label>
+                <Input value={rowDialog.national_id} onChange={(e) => setRowDialog({ ...rowDialog, national_id: e.target.value })} className={field} dir="ltr" />
+              </div>
               <div className="col-span-2">
                 <Label className={muted}>ملاحظات</Label>
                 <Input value={rowDialog.notes} onChange={(e) => setRowDialog({ ...rowDialog, notes: e.target.value })} className={field} />
@@ -425,7 +447,7 @@ const AnnualCompetition = () => {
           </DialogHeader>
           <div className="space-y-3 mt-2 text-sm">
             <p className={muted}>
-              ملف Excel (xlsx) فيه الأعمدة: <b>الاسم</b>، المستوى، العلامة، النتيجة (ناجح/راسب)، ملاحظات. عمود الاسم وحده إلزامي، وإذا لم تُكتب النتيجة تُحسب من العلامة.
+              ملف Excel (xlsx) بالأعمدة بالترتيب: <b>اسم المشارك</b>، المستوى، العلامة، رقم التلفون، السكن، الرقم الوطني أو المرجعي. تُحسب النتيجة من العلامة، والصف الذي بلا علامة يبقى بلا نتيجة.
             </p>
             <Button variant="outline" size="sm" onClick={() => download('/annual-competition/template', 'annual_competition_template.xlsx')} className={isDark ? 'border-slate-700' : ''}>
               <Download className="w-4 h-4 ml-1" />تنزيل نموذج فارغ

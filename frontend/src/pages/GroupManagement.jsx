@@ -174,7 +174,7 @@ const GroupManagement = () => {
     }
   };
 
-  // بعد أي عملية جماعية (نقل/تفعيل) — نحدّث المجموعات وقوائم الطلاب فوق
+  // بعد أي نقل جماعي — نحدّث المجموعات وقوائم الطلاب فوق
   const handleBulkChanged = async () => {
     await fetchData();
     if (selectedGroup) {
@@ -559,7 +559,7 @@ const GroupManagement = () => {
         </DialogContent>
       </Dialog>
 
-      {/* #4 — العمليات الجماعية بنفس صفحة إدارة المجموعات (مربوطة: أي نقل بيحدّث القوائم فوق) */}
+      {/* #4 — نقل الطلاب بنفس صفحة إدارة المجموعات (مربوط: أي نقل بيحدّث القوائم فوق) */}
       <div className="mt-8 pt-6 border-t border-white/10">
         <BulkOperations onChanged={handleBulkChanged} />
       </div>

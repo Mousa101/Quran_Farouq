@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { toast } from 'sonner';
 import {
   Star, Plus, Minus, Lock, Unlock, History, Search, Loader2, Trash2,
-  UserCheck, BookOpen, FileText, Award, ArrowRight
+  UserCheck, BookOpen, FileText, Award, ArrowRight, RotateCcw
 } from 'lucide-react';
 import StudentLink from '../components/StudentLink';
 
@@ -38,6 +38,7 @@ const SOURCE_META = {
 const PointsManager = () => {
   const { user } = useAuth();
   const { isDark } = useTheme();
+  const isAdmin = user?.role === 'admin';
 
   const [rows, setRows] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -52,6 +53,9 @@ const PointsManager = () => {
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // تصفير النقاط (للمدير فقط): { scope, label, student_id?, group_id? }
+  const [resetTarget, setResetTarget] = useState(null);
 
   // السجل
   const [ledgerOpen, setLedgerOpen] = useState(false);
@@ -113,6 +117,28 @@ const PointsManager = () => {
       fetchOverview();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'فشل في تنفيذ العملية');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const openResetAll = () => {
+    const group = groups.find((g) => g.id === groupId);
+    setResetTarget(group
+      ? { scope: 'group', group_id: group.id, label: `طلاب مجموعة «${group.name}»` }
+      : { scope: 'all', label: 'جميع الطلاب' });
+  };
+
+  const submitReset = async () => {
+    setSubmitting(true);
+    try {
+      const { label, ...body } = resetTarget;
+      const res = await axios.post(`${API}/points/reset`, body);
+      toast.success(res.data.message);
+      setResetTarget(null);
+      fetchOverview();
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'فشل في تصفير النقاط');
     } finally {
       setSubmitting(false);
     }
@@ -204,6 +230,12 @@ const PointsManager = () => {
                 className={`pr-10 h-10 w-full md:w-56 ${isDark ? 'bg-slate-800 border-slate-700 text-white' : ''}`}
               />
             </div>
+            {isAdmin && (
+              <Button variant="outline" onClick={openResetAll} className="border-red-500/40 text-red-400 hover:bg-red-500/10" data-testid="reset-points-btn">
+                <RotateCcw className="w-4 h-4 ml-1" />
+                تصفير النقاط
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -286,6 +318,17 @@ const PointsManager = () => {
                       >
                         <History className="w-4 h-4" />
                       </Button>
+                      {isAdmin && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setResetTarget({ scope: 'student', student_id: r.student_id, label: `الطالب ${r.student_name}` })}
+                          className="text-red-400 hover:bg-red-500/10"
+                          title="تصفير نقاط الطالب"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
 
@@ -403,6 +446,28 @@ const PointsManager = () => {
         </DialogContent>
       </Dialog>
 
+      {/* تأكيد تصفير النقاط */}
+      <Dialog open={!!resetTarget} onOpenChange={(o) => !o && setResetTarget(null)}>
+        <DialogContent className={isDark ? 'bg-slate-900 border-slate-700' : 'bg-white'}>
+          <DialogHeader>
+            <DialogTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <RotateCcw className="w-5 h-5 text-red-400" />
+              تصفير النقاط
+            </DialogTitle>
+            <DialogDescription className={isDark ? 'text-slate-400' : 'text-slate-600'}>
+              سيصبح رصيد {resetTarget?.label} صفرًا وتُفك تجميداتهم. تبقى سجلات الحضور والتسميع كما هي، ويظهر التصفير في سجل نقاط كل طالب، ويمكن التراجع عنه بحذفه من السجل.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 mt-4">
+            <Button variant="ghost" onClick={() => setResetTarget(null)}>إلغاء</Button>
+            <Button onClick={submitReset} disabled={submitting} className="bg-red-600 hover:bg-red-700">
+              {submitting ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : null}
+              تصفير
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* سجل النقاط */}
       <Dialog open={ledgerOpen} onOpenChange={setLedgerOpen}>
         <DialogContent className={`max-w-2xl max-h-[85vh] overflow-hidden flex flex-col ${isDark ? 'bg-slate-900 border-slate-700' : 'bg-white'}`}>
@@ -495,7 +560,7 @@ const PointsManager = () => {
                         }`}>
                           {isFreeze ? `🔒 ${e.points}` : `${e.points > 0 ? '+' : ''}${e.points}`}
                         </span>
-                        {e.adjustment_id && (
+                        {e.adjustment_id && (isAdmin || !e.is_reset) && (
                           <Button
                             size="sm" variant="ghost"
                             onClick={() => deleteAdjustment(e.adjustment_id)}

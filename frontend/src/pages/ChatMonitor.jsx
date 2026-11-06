@@ -16,8 +16,15 @@ const ROLE_BUBBLE = {
   admin: 'bg-purple-600 text-white',
 };
 
-const convoKey = (c) => (c.type === 'admin_sheikh' ? `sh-${c.sheikh_id}` : `st-${c.student_id}`);
-const convoName = (c) => (c.type === 'admin_sheikh' ? `الإدارة ↔ ${c.sheikh_name}` : c.student_name);
+const convoKey = (c) => (c.type === 'admin_sheikh' ? `sh-${c.sheikh_id}` : `${c.type}-${c.student_id}`);
+const convoName = (c) => {
+  if (c.type === 'admin_sheikh') return `الإدارة ↔ ${c.sheikh_name}`;
+  return `${c.student_name} ↔ ${c.type === 'student_admin' ? 'الإدارة' : 'المشرف'}`;
+};
+const convoQuery = (c) => {
+  if (c.type === 'admin_sheikh') return `sheikh_id=${c.sheikh_id}`;
+  return `student_id=${c.student_id}${c.type === 'student_admin' ? '&channel=admin' : ''}`;
+};
 
 // #3 — المدير يرى كل المحادثات بعرض مباشر، ويستطيع حذف رسالة أو محادثة كاملة
 const ChatMonitor = () => {
@@ -42,8 +49,7 @@ const ChatMonitor = () => {
     if (!c) return;
     if (!silent) setMsgLoading(true);
     try {
-      const q = c.type === 'admin_sheikh' ? `sheikh_id=${c.sheikh_id}` : `student_id=${c.student_id}`;
-      const r = await axios.get(`${API}/chat/messages?${q}`);
+      const r = await axios.get(`${API}/chat/messages?${convoQuery(c)}`);
       setMessages(r.data.messages || []);
     } catch (e) { /* ignore */ } finally { if (!silent) setMsgLoading(false); }
   };
@@ -78,8 +84,7 @@ const ChatMonitor = () => {
   const deleteConversation = async () => {
     if (!active || !window.confirm(`حذف محادثة «${convoName(active)}» كاملة؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
     try {
-      const q = active.type === 'admin_sheikh' ? `sheikh_id=${active.sheikh_id}` : `student_id=${active.student_id}`;
-      const r = await axios.delete(`${API}/chat/conversation?${q}`);
+      const r = await axios.delete(`${API}/chat/conversation?${convoQuery(active)}`);
       toast.success(r.data.message);
       setActive(null); setMessages([]);
       loadConversations();

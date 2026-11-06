@@ -28,6 +28,7 @@ const ScheduleManagement = () => {
   const [viewMode, setViewMode] = useState('grid'); // grid = جدول مدرسي | list = قوائم
   const [groupFilter, setGroupFilter] = useState('all');
   const [editingSlot, setEditingSlot] = useState(null);
+  const [editingScheduleId, setEditingScheduleId] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -81,14 +82,37 @@ const ScheduleManagement = () => {
   const handleCreateSchedule = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post(`${API}/schedule`, formData);
-      toast.success('تم إنشاء الجدول بنجاح');
-      setDialogOpen(false);
-      setFormData({ name: '', description: '', start_date: '', end_date: '', lesson_days: [] });
+      if (editingScheduleId) {
+        await axios.put(`${API}/schedule/${editingScheduleId}`, formData);
+        toast.success('تم تعديل الجدول بنجاح');
+        if (selectedSchedule?.id === editingScheduleId) fetchScheduleDetails(editingScheduleId);
+      } else {
+        await axios.post(`${API}/schedule`, formData);
+        toast.success('تم إنشاء الجدول بنجاح');
+      }
+      closeScheduleDialog();
       fetchSchedules();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'فشل في إنشاء الجدول');
+      toast.error(error.response?.data?.detail || 'فشل في حفظ الجدول');
     }
+  };
+
+  const closeScheduleDialog = () => {
+    setDialogOpen(false);
+    setEditingScheduleId(null);
+    setFormData({ name: '', description: '', start_date: '', end_date: '', lesson_days: [] });
+  };
+
+  const openEditSchedule = (schedule) => {
+    setEditingScheduleId(schedule.id);
+    setFormData({
+      name: schedule.name,
+      description: schedule.description || '',
+      start_date: schedule.start_date || '',
+      end_date: schedule.end_date || '',
+      lesson_days: schedule.lesson_days || []
+    });
+    setDialogOpen(true);
   };
 
   const handleActivateSchedule = async (id) => {
@@ -117,12 +141,14 @@ const ScheduleManagement = () => {
 
   const handleAddSlot = async (e) => {
     e.preventDefault();
+    // السبت الافتراضي قد لا يكون من أيام الدوام
+    const body = { ...slotData, day: lessonDays.includes(slotData.day) ? slotData.day : lessonDays[0] };
     try {
       if (editingSlot) {
-        await axios.put(`${API}/schedule/slots/${editingSlot.id}`, slotData);
+        await axios.put(`${API}/schedule/slots/${editingSlot.id}`, body);
         toast.success('تم تحديث الحصة بنجاح');
       } else {
-        await axios.post(`${API}/schedule/${selectedSchedule.id}/slots`, slotData);
+        await axios.post(`${API}/schedule/${selectedSchedule.id}/slots`, body);
         toast.success('تمت إضافة الحصة بنجاح');
       }
       setSlotDialogOpen(false);
@@ -159,9 +185,14 @@ const ScheduleManagement = () => {
     setSlotDialogOpen(true);
   };
 
-  // فلترة الحصص حسب المجموعة المختارة
+  // أيام الدوام فقط، بترتيب الأسبوع (الجدول القديم بلا أيام محددة يعرض الأسبوع كاملًا)
+  const lessonDays = selectedSchedule?.lesson_days?.length
+    ? DAYS.filter((day) => selectedSchedule.lesson_days.includes(day))
+    : DAYS;
+
+  // فلترة الحصص حسب أيام الدوام والمجموعة المختارة
   const visibleSlots = (selectedSchedule?.slots || []).filter(
-    (s) => groupFilter === 'all' || s.group_id === groupFilter || !s.group_id
+    (s) => lessonDays.includes(s.day) && (groupFilter === 'all' || s.group_id === groupFilter || !s.group_id)
   );
 
   const getSlotsByDay = (day) =>
@@ -170,27 +201,17 @@ const ScheduleManagement = () => {
   const groupLabel = (groupId) =>
     groupId ? (groups.find((g) => g.id === groupId)?.name || 'مجموعة') : 'كل المجموعات';
 
-  /* صفوف الجدول المدرسي: نجمّع الحصص حسب اسم الحصة إن وُجد، وإلا حسب وقت البداية.
-     كل صف بيحمل الحصص موزّعة على أيام الأسبوع. */
-  const periodRows = (() => {
-    const map = new Map();
-    for (const s of visibleSlots) {
-      const key = (s.period_name || '').trim() || s.start_time;
-      if (!map.has(key)) {
-        map.set(key, {
-          key,
-          label: (s.period_name || '').trim() || `${s.start_time}`,
-          time: `${s.start_time} – ${s.end_time}`,
-          sortKey: s.start_time,
-          byDay: {},
-        });
-      }
-      const row = map.get(key);
-      (row.byDay[s.day] = row.byDay[s.day] || []).push(s);
-      if (s.start_time < row.sortKey) row.sortKey = s.start_time;
-    }
-    return [...map.values()].sort((a, b) => a.sortKey.localeCompare(b.sortKey));
+  /* صفوف جدول الدوام: صف لكل شعبة (مجموعة)، وصف للحصص المشتركة بين كل المجموعات.
+     كل خلية تعرض حصة الشعبة في ذلك اليوم. */
+  const groupRows = (() => {
+    const shared = { id: '', name: 'كل المجموعات' };
+    const shown = groupFilter === 'all' ? groups : groups.filter((g) => g.id === groupFilter);
+    const rows = (visibleSlots.some((s) => !s.group_id) ? [shared] : []).concat(shown);
+    return rows.map((g) => ({ ...g, byDay: Object.fromEntries(lessonDays.map((day) => [day, []])) }));
   })();
+  for (const s of [...visibleSlots].sort((a, b) => a.start_time.localeCompare(b.start_time))) {
+    groupRows.find((r) => r.id === (s.group_id || ''))?.byDay[s.day].push(s);
+  }
 
   const isAdmin = user?.role === 'admin';
 
@@ -217,7 +238,7 @@ const ScheduleManagement = () => {
             </div>
           </div>
           {isAdmin && (
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <Dialog open={dialogOpen} onOpenChange={(open) => (open ? setDialogOpen(true) : closeScheduleDialog())}>
               <DialogTrigger asChild>
                 <Button className="bg-blue-600 hover:bg-blue-700">
                   <Plus className="w-4 h-4 ml-2" />
@@ -226,7 +247,7 @@ const ScheduleManagement = () => {
               </DialogTrigger>
               <DialogContent className={isDark ? 'bg-slate-900 border-white/10' : 'bg-white'}>
                 <DialogHeader>
-                  <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>إنشاء جدول جديد</DialogTitle>
+                  <DialogTitle className={isDark ? 'text-white' : 'text-slate-900'}>{editingScheduleId ? 'تعديل الجدول' : 'إنشاء جدول جديد'}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleCreateSchedule} className="space-y-4">
                   <div>
@@ -271,7 +292,7 @@ const ScheduleManagement = () => {
                   
                   {/* أيام الدروس */}
                   <div>
-                    <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>أيام الدروس</Label>
+                    <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>أيام الدوام</Label>
                     <div className="grid grid-cols-4 gap-2 mt-2">
                       {DAYS.map((day) => (
                         <label
@@ -302,7 +323,7 @@ const ScheduleManagement = () => {
                     </div>
                   </div>
                   
-                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">إنشاء</Button>
+                  <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700">{editingScheduleId ? 'حفظ' : 'إنشاء'}</Button>
                 </form>
               </DialogContent>
             </Dialog>
@@ -347,6 +368,15 @@ const ScheduleManagement = () => {
                       </div>
                       {isAdmin && (
                         <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="تعديل الجدول وأيام الدوام"
+                            onClick={(e) => { e.stopPropagation(); openEditSchedule(schedule); }}
+                            className="text-blue-400 hover:text-blue-300"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
                           {!schedule.is_active && (
                             <Button
                               variant="ghost"
@@ -408,7 +438,7 @@ const ScheduleManagement = () => {
                             onChange={(e) => setSlotData({ ...slotData, day: e.target.value })}
                             className={`w-full p-2 rounded-md border ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white border-slate-300'}`}
                           >
-                            {DAYS.map((day) => (
+                            {lessonDays.map((day) => (
                               <option key={day} value={day}>{day}</option>
                             ))}
                           </select>
@@ -443,9 +473,6 @@ const ScheduleManagement = () => {
                             placeholder="مثال: الحصة الأولى"
                             className={isDark ? 'bg-slate-800 border-white/10 text-white' : ''}
                           />
-                          <p className="text-xs text-slate-500 mt-1">
-                            الحصص التي تحمل الاسم نفسه تُعرض في الصف نفسه من الجدول المدرسي.
-                          </p>
                         </div>
                         <div>
                           <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>الدرس / الموضوع</Label>
@@ -486,10 +513,10 @@ const ScheduleManagement = () => {
                 )}
               </CardHeader>
               <CardContent>
-                {/* أدوات العرض: شبكة مدرسية أو قوائم + فلتر مجموعة */}
+                {/* أدوات العرض: جدول الدوام أو قوائم + فلتر مجموعة */}
                 <div className="flex items-center justify-between gap-2 flex-wrap mb-4">
                   <div className={`inline-flex rounded-lg border overflow-hidden ${isDark ? 'border-white/10' : 'border-slate-300'}`}>
-                    {[{ k: 'grid', t: 'جدول مدرسي' }, { k: 'list', t: 'قوائم' }].map((v) => (
+                    {[{ k: 'grid', t: 'جدول الدوام' }, { k: 'list', t: 'قوائم' }].map((v) => (
                       <button
                         key={v.k}
                         onClick={() => setViewMode(v.k)}
@@ -513,9 +540,9 @@ const ScheduleManagement = () => {
                   </select>
                 </div>
 
-                {/* عرض الجدول المدرسي: صفوف = الحصص، أعمدة = الأيام */}
+                {/* جدول الدوام: صفوف = الشعب، أعمدة = أيام الدوام */}
                 {viewMode === 'grid' ? (
-                  periodRows.length === 0 ? (
+                  groupRows.length === 0 ? (
                     <p className={`text-center py-8 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>لا توجد حصص بعد</p>
                   ) : (
                     <div className="overflow-x-auto">
@@ -523,9 +550,9 @@ const ScheduleManagement = () => {
                         <thead>
                           <tr>
                             <th className={`p-2 text-right border ${isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
-                              الحصة
+                              الشعبة
                             </th>
-                            {DAYS.map((day) => (
+                            {lessonDays.map((day) => (
                               <th key={day} className={`p-2 text-center border min-w-[130px] ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-700'}`}>
                                 {day}
                               </th>
@@ -533,39 +560,35 @@ const ScheduleManagement = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {periodRows.map((row) => (
-                            <tr key={row.key}>
+                          {groupRows.map((row) => (
+                            <tr key={row.id || 'shared'}>
                               <td className={`p-2 border align-top ${isDark ? 'border-white/10 bg-slate-800/40' : 'border-slate-200 bg-slate-50'}`}>
-                                <p className={`font-medium text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>{row.label}</p>
-                                {row.time && <p className="text-[10px] text-slate-500">{row.time}</p>}
+                                <p className={`font-medium text-xs ${isDark ? 'text-white' : 'text-slate-900'}`}>{row.name}</p>
                               </td>
-                              {DAYS.map((day) => {
-                                const cellSlots = row.byDay[day] || [];
-                                return (
-                                  <td key={day} className={`p-1 border align-top ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-                                    {cellSlots.map((slot) => (
-                                      <div
-                                        key={slot.id}
-                                        className={`p-1.5 rounded mb-1 text-center ${isDark ? 'bg-blue-500/15 border border-blue-500/25' : 'bg-blue-50 border border-blue-200'}`}
-                                      >
-                                        <p className={`text-xs font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{slot.subject}</p>
-                                        <p className="text-[10px] text-slate-500">{slot.start_time}–{slot.end_time}</p>
-                                        <p className="text-[10px] text-purple-400 truncate">{groupLabel(slot.group_id)}</p>
-                                        {isAdmin && (
-                                          <div className="flex items-center justify-center gap-0.5 mt-1">
-                                            <button onClick={() => openEditSlot(slot)} className="text-blue-400 hover:text-blue-300" title="تعديل">
-                                              <Edit className="w-3 h-3" />
-                                            </button>
-                                            <button onClick={() => handleDeleteSlot(slot.id)} className="text-red-400 hover:text-red-300" title="حذف">
-                                              <Trash2 className="w-3 h-3" />
-                                            </button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </td>
-                                );
-                              })}
+                              {lessonDays.map((day) => (
+                                <td key={day} className={`p-1 border align-top ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+                                  {row.byDay[day].map((slot) => (
+                                    <div
+                                      key={slot.id}
+                                      className={`p-1.5 rounded mb-1 text-center ${isDark ? 'bg-blue-500/15 border border-blue-500/25' : 'bg-blue-50 border border-blue-200'}`}
+                                    >
+                                      {slot.period_name && <p className="text-[10px] text-purple-400 truncate">{slot.period_name}</p>}
+                                      <p className={`text-xs font-medium ${isDark ? 'text-white' : 'text-slate-900'}`}>{slot.subject}</p>
+                                      <p className="text-[10px] text-slate-500">{slot.start_time}–{slot.end_time}</p>
+                                      {isAdmin && (
+                                        <div className="flex items-center justify-center gap-0.5 mt-1">
+                                          <button onClick={() => openEditSlot(slot)} className="text-blue-400 hover:text-blue-300" title="تعديل">
+                                            <Edit className="w-3 h-3" />
+                                          </button>
+                                          <button onClick={() => handleDeleteSlot(slot.id)} className="text-red-400 hover:text-red-300" title="حذف">
+                                            <Trash2 className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </td>
+                              ))}
                             </tr>
                           ))}
                         </tbody>
@@ -574,7 +597,7 @@ const ScheduleManagement = () => {
                   )
                 ) : (
                 <div className="space-y-4">
-                  {DAYS.map((day) => {
+                  {lessonDays.map((day) => {
                     const slots = getSlotsByDay(day);
                     if (slots.length === 0) return null;
                     return (

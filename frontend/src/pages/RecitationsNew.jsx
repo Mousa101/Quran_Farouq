@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -57,6 +58,10 @@ const JUZ_PAGE_RANGES = {
 
 const RecitationsNew = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const [groups, setGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState(''); // المدير يعرض مجموعة واحدة، مثل صفحة الحضور
   const [students, setStudents] = useState([]);
   const [recitations, setRecitations] = useState({});
   const [attendanceMap, setAttendanceMap] = useState({}); // حالة حضور كل طالب في التاريخ المختار
@@ -97,6 +102,10 @@ const RecitationsNew = () => {
   }, []);
 
   useEffect(() => {
+    if (selectedGroup) fetchGroupStudents(selectedGroup);
+  }, [selectedGroup]);
+
+  useEffect(() => {
     if (students.length > 0) {
       fetchRecitations();
       fetchAttendance();
@@ -135,6 +144,12 @@ const RecitationsNew = () => {
       // جلب مجموعات المشرف
       const groupsRes = await axios.get(`${API}/groups`);
       const myGroups = groupsRes.data;
+
+      if (isAdmin) {
+        setGroups(myGroups);
+        if (myGroups.length > 0) setSelectedGroup(myGroups[0].id);
+        return;
+      }
       
       // جلب طلاب كل مجموعة
       let allStudents = [];
@@ -158,6 +173,16 @@ const RecitationsNew = () => {
       toast.error('فشل في جلب قائمة الطلاب');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchGroupStudents = async (groupId) => {
+    try {
+      const res = await axios.get(`${API}/groups/${groupId}/students`);
+      setStudents(res.data.map((s) => ({ ...s, group_id: groupId })));
+    } catch (error) {
+      console.error('Error fetching group students:', error);
+      toast.error('فشل في جلب قائمة الطلاب');
     }
   };
 
@@ -431,7 +456,7 @@ const RecitationsNew = () => {
         {/* Calendar Selection */}
         <Card className="glass-card border-white/10">
           <CardHeader>
-            <CardTitle className="text-lg font-bold text-white">اختر التاريخ والفصل</CardTitle>
+            <CardTitle className="text-lg font-bold text-white">{isAdmin ? 'اختر التاريخ والمجموعة' : 'اختر التاريخ والفصل'}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* اختيار الفصل */}
@@ -458,6 +483,22 @@ const RecitationsNew = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* اختيار المجموعة (للمدير) */}
+            {isAdmin && (
+              <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                <SelectTrigger className="bg-slate-800 border-slate-700 text-white" data-testid="group-select">
+                  <SelectValue placeholder="اختر المجموعة" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-700">
+                  {groups.map((group) => (
+                    <SelectItem key={group.id} value={group.id} className="text-white">
+                      {group.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
 
             <Calendar
               mode="single"
@@ -494,14 +535,14 @@ const RecitationsNew = () => {
           <CardHeader>
             <CardTitle className="text-lg font-bold text-white flex items-center gap-3">
               <Users className="w-6 h-6 text-emerald-400" />
-              طلابي - {format(selectedDate, 'EEEE d MMMM yyyy', { locale: ar })}
+              {isAdmin ? 'الطلاب' : 'طلابي'} - {format(selectedDate, 'EEEE d MMMM yyyy', { locale: ar })}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {students.length === 0 ? (
               <div className="text-center py-12 text-slate-400">
                 <Users className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                <p>لا يوجد طلاب في مجموعاتك</p>
+                <p>{isAdmin ? 'لا يوجد طلاب في هذه المجموعة' : 'لا يوجد طلاب في مجموعاتك'}</p>
               </div>
             ) : (
               <div className="space-y-3 max-h-[500px] overflow-y-auto">

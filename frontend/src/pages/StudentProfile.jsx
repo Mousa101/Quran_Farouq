@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import {
   User, BookOpen, UserCheck, Star, Trophy, Calendar, ArrowRight,
   CheckCircle, XCircle, Clock, FileText, AlertTriangle, School, Home, Phone, TrendingUp,
-  ChevronDown, ChevronUp, Edit, Loader2
+  ChevronDown, ChevronUp, Edit, Loader2, GraduationCap
 } from 'lucide-react';
 import { defaultAvatar, onAvatarError } from '../lib/avatar';
 import { toast } from 'sonner';
@@ -360,6 +360,16 @@ const StudentProfile = () => {
               </div>
             </div>
 
+            <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/50" data-testid="student-average">
+              <GraduationCap className="w-4 h-4 text-slate-400" />
+              <div>
+                <p className="text-xs text-slate-400">المعدل الدراسي</p>
+                <p className="text-emerald-400 text-sm font-bold">
+                  {student.school_average ? `${String(student.school_average).replace(/%/g, '')}%` : '-'}
+                </p>
+              </div>
+            </div>
+
             {/* Expandable info */}
             {showAllPersonalInfo && (
               <>
@@ -368,9 +378,6 @@ const StudentProfile = () => {
                   <div>
                     <p className="text-xs text-slate-400">المدرسة / الصف</p>
                     <p className="text-white text-sm">{student.school_name || '-'} {student.school_grade ? `(${student.school_grade})` : ''}</p>
-                    {student.school_average && (
-                      <p className="text-emerald-400 text-xs mt-1">المعدل: {String(student.school_average).replace(/%/g, '')}%</p>
-                    )}
                   </div>
                 </div>
                 
