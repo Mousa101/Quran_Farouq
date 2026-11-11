@@ -21,6 +21,7 @@ import { format, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { formatDate as fmtDate } from '../lib/utils';
 import MemorizationBar from '../components/MemorizationBar';
+import HifzProgressCard from '../components/HifzProgressCard';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -233,6 +234,7 @@ const StudentProfile = () => {
                   previousPages={progressData.previous_memorization?.total_pages || 0}
                   termPages={progressData.new_memorization?.total_pages || 0}
                 />
+                <div className="mt-3 text-right"><HifzProgressCard studentId={studentId} /></div>
               </div>
 
               {/* Previous Memorization */}

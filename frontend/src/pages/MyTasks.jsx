@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { ClipboardCheck, PlayCircle, CheckCircle2, RotateCcw } from 'lucide-react';
 import { formatDate as fmtDate } from '../lib/utils';
 import { TASK_STATUS, TASK_PRIORITY } from '../lib/tasks';
+import { RichText } from '../components/RichText';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -83,7 +84,7 @@ const MyTasks = () => {
                     <span className={`text-xs px-2 py-0.5 rounded-full ${TASK_PRIORITY[t.priority]?.cls}`}>أولوية {TASK_PRIORITY[t.priority]?.label}</span>
                     {t.is_overdue && <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400">متأخرة</span>}
                   </div>
-                  {t.details && <p className={`text-sm whitespace-pre-line ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{t.details}</p>}
+                  {t.details && <RichText text={t.details} className={isDark ? 'text-slate-300' : 'text-slate-700'} />}
                   <div className={`text-xs flex flex-wrap gap-x-4 gap-y-1 ${muted}`}>
                     {t.due_date && <span className={t.is_overdue ? 'text-red-400' : ''}>آخر موعد: {fmtDate(t.due_date, { withWeekday: true })}</span>}
                     {t.meeting_title && <span>من اجتماع: {t.meeting_title}</span>}

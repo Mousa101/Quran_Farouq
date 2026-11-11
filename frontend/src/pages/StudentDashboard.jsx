@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import MemorizationBar from '../components/MemorizationBar';
+import HifzProgressCard from '../components/HifzProgressCard';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -702,7 +703,9 @@ console.log(stats)
                 previousPages={stats?.memorization?.total_previous || 0}
                 termPages={stats?.memorization?.new_pages || 0}
               />
-              
+              {/* العدّاد الحي: يتحدّث مع كل تسميع جديد */}
+              <HifzProgressCard studentId={user?.id} />
+
             </div>
           </CardContent>
         </Card>

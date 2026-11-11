@@ -6,6 +6,7 @@ import { LogOut, Sun, Moon, Menu, X } from 'lucide-react';
 import { navItemsFor } from '../lib/navItems';
 import { loginPathFor } from '../lib/authRoutes';
 import { Button } from './ui/button';
+import { canOpenRoute, isAssistant } from '../lib/permissions';
 
 const Sidebar = () => {
   const { user, logout, uiSettings } = useAuth();
@@ -48,7 +49,8 @@ const Sidebar = () => {
     navigate(loginPathFor(role));
   };
 
-  const navItems = navItemsFor(user?.role, uiSettings);
+  const navItems = navItemsFor(user?.role, uiSettings)
+    .filter((item) => canOpenRoute(user, item.to)); // المدير المساعد يرى أقسامه فقط
 
   const SidebarContent = ({ isMobile = false }) => (
     <div className="flex flex-col h-full">
@@ -70,7 +72,7 @@ const Sidebar = () => {
         <div className={`p-2 md:p-3 rounded-xl ${isDark ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
           <p className={`font-medium text-sm md:text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>{user?.name}</p>
           <p className="text-xs text-emerald-500">
-            {user?.role === 'admin' && 'مدير'}
+            {user?.role === 'admin' && (isAssistant(user) ? 'مدير مساعد' : 'مدير')}
             {user?.role === 'sheikh' && 'مشرف'}
             {user?.role === 'student' && 'طالب'}
           </p>

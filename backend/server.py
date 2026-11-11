@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, status
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -12,7 +12,8 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
 import xlsxwriter
 
-from pydantic import BaseModel as PydanticBaseModel
+import jwt
+from pydantic import BaseModel as PydanticBaseModel, EmailStr
 from models import (
     UserCreate, UserLogin, User, UserResponse, 
     GroupCreate, Group,
@@ -42,7 +43,7 @@ class BaseModel(PydanticBaseModel):
     pass
 from auth import (
     get_password_hash, verify_password, create_access_token,
-    get_current_user, security, ensure_role
+    get_current_user, security, ensure_role, SECRET_KEY, ALGORITHM
 )
 from image_analysis import analyze_tracking_sheet
 from analytics import build_center_timeseries
@@ -330,6 +331,10 @@ async def _login(credentials: UserLogin, role: Optional[str] = None):
             status_code=403, 
             detail="حسابك غير مفعّل بعد. يرجى إدخال رمز التفعيل من الإدارة"
         )
+
+    # حساب مدير مساعد أوقفه المدير الرئيسي
+    if user.get("is_assistant") and user.get("is_active") is False:
+        raise HTTPException(status_code=403, detail="هذا الحساب موقوف. راجع المدير الرئيسي")
     
     token = create_access_token({
         "user_id": user["id"],
@@ -346,7 +351,9 @@ async def _login(credentials: UserLogin, role: Optional[str] = None):
             name=user["name"],
             role=user["role"],
             group_id=user.get("group_id"),
-            is_activated=user.get("is_activated", True)
+            is_activated=user.get("is_activated", True),
+            is_assistant=bool(user.get("is_assistant")),
+            permissions=user.get("permissions") if user.get("is_assistant") else None
         )
     }
 
@@ -487,6 +494,10 @@ async def admin_reset_password(data: PasswordResetRequest, current_user: dict = 
     user = await db.users.find_one({"email": data.email})
     if not user:
         raise HTTPException(status_code=404, detail="المستخدم غير موجود")
+
+    # المدير المساعد لا يغيّر كلمة مرور أي حساب مدير (منع تصعيد الصلاحيات)
+    if user.get("role") == "admin" and await is_assistant_admin(current_user):
+        raise HTTPException(status_code=403, detail=OWNER_ONLY_DETAIL)
     
     # Validate new password
     if len(data.new_password) < 6:
@@ -511,6 +522,286 @@ async def admin_reset_password(data: PasswordResetRequest, current_user: dict = 
                            f"إعادة تعيين كلمة المرور ({user.get('role')})")
 
     return {"message": f"تمت إعادة تعيين كلمة المرور للمستخدم {user['name']} بنجاح"}
+
+# ============== ASSISTANT ADMINS (مدراء مساعدون بصلاحيات محدّدة) ==============
+# المدير المساعد = مستخدم بدور "admin" + is_assistant=True + قائمة permissions (مفاتيح الأقسام).
+# المدير الرئيسي (بلا is_assistant) صلاحياته كاملة. الفحص مركزي في enforce_assistant_permissions
+# (dependency على كل /api) — أي مسار غير مذكور في الجداول تحت = للمدير الرئيسي فقط.
+
+OWNER_ONLY_DETAIL = "هذا الإجراء متاح للمدير الرئيسي فقط"
+
+ASSISTANT_SECTIONS = [
+    ("students", "إدارة الطلاب وطلبات التسجيل"),
+    ("sheikhs", "إدارة المشرفين"),
+    ("groups", "إدارة المجموعات"),
+    ("attendance", "تسجيل الحضور"),
+    ("recitations", "تسجيل التسميع"),
+    ("statistics", "الإحصائيات والترتيب"),
+    ("points", "إدارة النقاط"),
+    ("struggling", "الطلاب المتعثّرون"),
+    ("fees", "الرسوم المالية"),
+    ("homework", "الواجبات"),
+    ("exams", "الاختبارات"),
+    ("curriculum", "إدارة المنهج"),
+    ("schedule", "إدارة الجداول"),
+    ("tracking", "ورق المتابعة وإعداداته"),
+    ("announcements", "الإعلانات"),
+    ("activities", "الأنشطة"),
+    ("audit", "سجل العمليات"),
+    ("chat", "مراقبة المحادثات"),
+    ("competitions", "مرشّحو المسابقات"),
+]
+ASSISTANT_SECTION_KEYS = {k for k, _ in ASSISTANT_SECTIONS}
+
+# (بادئة المسار بعد /api، الصلاحيات الكافية لأي طلب، صلاحيات إضافية تكفي للقراءة GET فقط)
+ASSISTANT_RULES = [
+    ("/students", ("students",), ()),
+    ("/admin/students", ("students",), ()),
+    ("/admin/student", ("students",), ()),
+    ("/admin/pending-students", ("students",), ()),
+    ("/admin/pending-registrations", ("students",), ()),
+    ("/admin/bulk", ("students",), ()),
+    ("/admin/warnings", ("students",), ()),
+    ("/export/student", ("students",), ()),
+    ("/export/students", ("students",), ()),
+    ("/export/student-recitations", ("students",), ()),
+    ("/admin/reset-password", ("students", "sheikhs"), ()),
+    ("/admin/sheikhs", ("sheikhs",), ()),
+    ("/admin/sheikh", ("sheikhs",), ()),
+    ("/sheikh", ("sheikhs",), ()),
+    ("/export/teachers", ("sheikhs",), ()),
+    ("/reports/teachers", ("sheikhs", "statistics"), ()),
+    ("/reports/late-sheikhs", ("sheikhs",), ()),
+    ("/groups", ("groups",), ()),
+    ("/attendance", ("attendance",), ("students", "statistics")),
+    ("/recitations", ("recitations",), ("students", "statistics")),
+    ("/memorization-plans", ("recitations",), ("students",)),
+    ("/reports/student-stats", ("statistics",), ("students",)),
+    ("/export/student-stats", ("statistics",), ()),
+    ("/statistics", ("statistics",), ("students",)),
+    ("/analytics", ("statistics",), ()),
+    ("/rankings", ("statistics",), ()),
+    ("/reports/juz-classification", ("statistics",), ()),
+    ("/admin/tracking-weekly", ("statistics",), ()),
+    ("/points", ("points",), ()),
+    ("/badges", ("points", "students", "attendance"), ()),
+    ("/reports/struggling-students", ("struggling",), ()),
+    ("/settings/struggling-criteria", ("struggling",), ()),
+    ("/fees", ("fees",), ()),
+    ("/admin/fees", ("fees",), ()),
+    ("/reports/financial", ("fees",), ()),
+    ("/export/fees", ("fees",), ()),
+    ("/export/groups-financial", ("fees",), ()),
+    ("/settings/fees", ("fees",), ()),
+    ("/homework", ("homework",), ()),
+    ("/admin-exams", ("exams",), ()),
+    ("/online-exams", ("exams",), ()),
+    ("/tajweed-exams", ("exams",), ()),
+    ("/curriculum", ("curriculum",), ()),
+    ("/schedule", ("schedule",), ()),
+    ("/tracking-items", ("tracking",), ()),
+    ("/tracking-sheets", ("tracking",), ("students", "statistics")),
+    ("/settings/tracking-submission", ("tracking",), ()),
+    ("/settings/excellence-points", ("tracking",), ()),
+    ("/announcements", ("announcements",), ()),
+    ("/activities", ("activities",), ()),
+    ("/admin/audit-logs", ("audit",), ()),
+    ("/audit-logs", ("audit",), ()),
+    ("/chat", ("chat",), ()),
+    ("/competitions", ("competitions",), ()),
+]
+# متاحة لأي مدير مساعد (حسابه الشخصي + الصفحة الرئيسية)
+ASSISTANT_OPEN = ("/auth/me", "/auth/login", "/users/me", "/notifications", "/health",
+                  "/admin/dashboard-stats")
+# قوائم مرجعية تحتاجها أغلب الصفحات — قراءة فقط
+ASSISTANT_OPEN_GET = ("/groups", "/students", "/sheikhs", "/users", "/admin/sheikhs", "/config/points",
+                      "/quran", "/badges", "/tracking-items", "/announcements",
+                      "/settings/excellence-points", "/settings/tracking-submission")
+ASSISTANT_OPEN_GET_EXACT = ("/terms", "/terms/active")
+
+
+def _path_under(path: str, prefix: str) -> bool:
+    return path == prefix or path.startswith(prefix + "/")
+
+
+def assistant_can_access(method: str, path: str, permissions) -> bool:
+    """هل يُسمح لمدير مساعد بهذه الصلاحيات بطلب (method, path)؟ path بدون بادئة /api."""
+    path = path.rstrip("/") or "/"
+    perms = set(permissions or [])
+    is_read = method.upper() in ("GET", "HEAD")
+    if path == "/" or any(_path_under(path, p) for p in ASSISTANT_OPEN):
+        return True
+    if is_read and (path in ASSISTANT_OPEN_GET_EXACT or any(_path_under(path, p) for p in ASSISTANT_OPEN_GET)):
+        return True
+    # أطول بادئة مطابقة هي اللي بتحكم
+    best = None
+    for prefix, need, read_extra in ASSISTANT_RULES:
+        if _path_under(path, prefix) and (best is None or len(prefix) > len(best[0])):
+            best = (prefix, need, read_extra)
+    if not best:
+        return False  # غير مذكور = للمدير الرئيسي فقط
+    allowed = set(best[1]) | (set(best[2]) if is_read else set())
+    return bool(perms & allowed)
+
+
+async def enforce_assistant_permissions(request: Request):
+    """Dependency على كل مسارات /api: يقيّد المدير المساعد بأقسامه. لا يمسّ باقي الأدوار."""
+    auth_header = request.headers.get("Authorization") or ""
+    if not auth_header.lower().startswith("bearer "):
+        return
+    try:
+        payload = jwt.decode(auth_header[7:].strip(), SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.PyJWTError:
+        return  # نقطة النهاية نفسها بترفض التوكن
+    if payload.get("role") != "admin":
+        return
+    user = await db.users.find_one(
+        {"id": payload.get("user_id")},
+        {"_id": 0, "role": 1, "is_assistant": 1, "is_active": 1, "permissions": 1})
+    if not user or user.get("role") != "admin":
+        raise HTTPException(status_code=401, detail="الحساب غير موجود")
+    if not user.get("is_assistant"):
+        return
+    if user.get("is_active") is False:
+        raise HTTPException(status_code=401, detail="هذا الحساب موقوف. راجع المدير الرئيسي")
+    path = request.url.path
+    if path.startswith("/api"):
+        path = path[4:]
+    if not assistant_can_access(request.method, path, user.get("permissions")):
+        raise HTTPException(status_code=403, detail="ليست لديك صلاحية لهذا القسم")
+
+
+async def is_assistant_admin(current_user: dict) -> bool:
+    u = await db.users.find_one({"id": current_user.get("user_id")}, {"_id": 0, "is_assistant": 1})
+    return bool(u and u.get("is_assistant"))
+
+
+async def ensure_owner_admin(current_user: dict):
+    """المدير الرئيسي فقط (مدير وليس مساعدًا)."""
+    ensure_role(current_user, "admin", OWNER_ONLY_DETAIL)
+    if await is_assistant_admin(current_user):
+        raise HTTPException(status_code=403, detail=OWNER_ONLY_DETAIL)
+
+
+class AssistantCreate(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+    permissions: List[str] = []
+
+
+class AssistantUpdate(BaseModel):
+    name: Optional[str] = None
+    password: Optional[str] = None
+    permissions: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+
+def _clean_permissions(permissions: List[str]) -> List[str]:
+    unknown = [p for p in permissions if p not in ASSISTANT_SECTION_KEYS]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"صلاحية غير معروفة: {unknown[0]}")
+    return [k for k, _ in ASSISTANT_SECTIONS if k in set(permissions)]
+
+
+def _assistant_row(u: dict) -> dict:
+    return {
+        "id": u["id"],
+        "name": u.get("name") or "",
+        "email": u.get("email") or "",
+        "is_active": u.get("is_active") is not False,
+        "permissions": u.get("permissions") or [],
+        "created_at": str(u.get("created_at") or ""),
+    }
+
+
+@api_router.get("/admin/assistants")
+async def list_assistants(current_user: dict = Depends(get_current_user)):
+    """حسابات المدراء المساعدين + قائمة الأقسام اللي بتنعطى كصلاحيات."""
+    await ensure_owner_admin(current_user)
+    users = await db.users.find(
+        {"role": "admin", "is_assistant": True}, {"_id": 0, "password_hash": 0}
+    ).sort("created_at", 1).to_list(500)
+    return {
+        "sections": [{"key": k, "label": label} for k, label in ASSISTANT_SECTIONS],
+        "assistants": [_assistant_row(u) for u in users],
+    }
+
+
+@api_router.post("/admin/assistants")
+async def create_assistant(data: AssistantCreate, current_user: dict = Depends(get_current_user)):
+    """إنشاء حساب مدير مساعد بصلاحيات محدّدة — الحساب مفعّل مباشرة."""
+    await ensure_owner_admin(current_user)
+    name = data.name.strip()
+    email = data.email.strip().lower()
+    if not name:
+        raise HTTPException(status_code=400, detail="الاسم مطلوب")
+    if len(data.password) < 6:
+        raise HTTPException(status_code=400, detail="كلمة المرور يجب أن تكون 6 أحرف على الأقل")
+    permissions = _clean_permissions(data.permissions)
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="البريد الإلكتروني مسجل مسبقاً")
+
+    user = User(email=email, name=name, role="admin", is_active=True, is_activated=True)
+    user_dict = user.model_dump()
+    user_dict["password_hash"] = get_password_hash(data.password)
+    user_dict["created_at"] = user_dict["created_at"].isoformat()
+    user_dict["registration_date"] = user_dict["registration_date"].isoformat()
+    user_dict["is_assistant"] = True
+    user_dict["permissions"] = permissions
+    user_dict["created_by"] = current_user["user_id"]
+    await db.users.insert_one(dict(user_dict))
+
+    await log_admin_action(current_user, "create", "assistant", user.id, name,
+                           f"إنشاء حساب مدير مساعد ({len(permissions)} صلاحية)")
+    return {"message": "تم إنشاء الحساب بنجاح", "assistant": _assistant_row(user_dict)}
+
+
+@api_router.put("/admin/assistants/{assistant_id}")
+async def update_assistant(assistant_id: str, data: AssistantUpdate,
+                           current_user: dict = Depends(get_current_user)):
+    """تعديل اسم/صلاحيات/حالة/كلمة مرور مدير مساعد. التغيير يسري فورًا على جلسته الحالية."""
+    await ensure_owner_admin(current_user)
+    target = await db.users.find_one({"id": assistant_id, "role": "admin", "is_assistant": True})
+    if not target:
+        raise HTTPException(status_code=404, detail="الحساب غير موجود")
+
+    update = {}
+    if data.name is not None:
+        if not data.name.strip():
+            raise HTTPException(status_code=400, detail="الاسم مطلوب")
+        update["name"] = data.name.strip()
+    if data.permissions is not None:
+        update["permissions"] = _clean_permissions(data.permissions)
+    if data.is_active is not None:
+        update["is_active"] = data.is_active
+    if data.password:
+        if len(data.password) < 6:
+            raise HTTPException(status_code=400, detail="كلمة المرور يجب أن تكون 6 أحرف على الأقل")
+        update["password_hash"] = get_password_hash(data.password)
+    if not update:
+        raise HTTPException(status_code=400, detail="لا توجد تعديلات")
+
+    await db.users.update_one({"id": assistant_id}, {"$set": update})
+    labels = {"name": "الاسم", "permissions": "الصلاحيات", "is_active": "الحالة", "password_hash": "كلمة المرور"}
+    changed = "، ".join(v for k, v in labels.items() if k in update)
+    await log_admin_action(current_user, "update", "assistant", assistant_id,
+                           update.get("name") or target.get("name"), f"تعديل مدير مساعد: {changed}")
+    fresh = await db.users.find_one({"id": assistant_id}, {"_id": 0, "password_hash": 0})
+    return {"message": "تم حفظ التعديلات", "assistant": _assistant_row(fresh)}
+
+
+@api_router.delete("/admin/assistants/{assistant_id}")
+async def delete_assistant(assistant_id: str, current_user: dict = Depends(get_current_user)):
+    await ensure_owner_admin(current_user)
+    target = await db.users.find_one({"id": assistant_id, "role": "admin", "is_assistant": True})
+    if not target:
+        raise HTTPException(status_code=404, detail="الحساب غير موجود")
+    await db.users.delete_one({"id": assistant_id})
+    await log_admin_action(current_user, "delete", "assistant", assistant_id, target.get("name"),
+                           "حذف حساب مدير مساعد")
+    return {"message": "تم حذف الحساب"}
+
 
 # ============== ADMIN: SHEIKH MANAGEMENT ==============
 
@@ -684,7 +975,9 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         email=user["email"],
         name=user["name"],
         role=user["role"],
-        group_id=user.get("group_id")
+        group_id=user.get("group_id"),
+        is_assistant=bool(user.get("is_assistant")),
+        permissions=user.get("permissions") if user.get("is_assistant") else None
     )
 
 # ============== USER PROFILE UPDATE ==============
@@ -1354,6 +1647,7 @@ DB_INDEXES = {
     "activities": [[("id", 1)]],
     "announcements": [[("id", 1)]],
     "meetings": [[("id", 1)], [("date", -1)]],
+    "meeting_items": [[("id", 1)], [("meeting_id", 1)], [("task_id", 1)]],
     "admin_tasks": [[("id", 1)], [("assignee_id", 1), ("status", 1)], [("meeting_id", 1)], [("due_date", 1)]],
     "audit_logs": [[("action", 1)], [("created_at", -1)]],
     "warnings": [[("student_id", 1)], [("student_id", 1), ("created_at", -1)]],
@@ -3439,6 +3733,133 @@ def _week_sort_key(last_sheet) -> int:
         return 0
 
 
+@api_router.get("/admin/tracking-weekly")
+async def admin_tracking_weekly(
+    week_start: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """تقدّم ورق المتابعة لأسبوع واحد بالأرقام — لكل مجموعة ولكل طالب (لوحة المدير).
+    week_start: أي تاريخ داخل الأسبوع المطلوب (YYYY-MM-DD)؛ يُقرَّب لسبت ذلك الأسبوع. الافتراضي الأسبوع الحالي."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه الوصول")
+
+    current_week = get_current_week_start()
+    if week_start:
+        try:
+            d = datetime.strptime(week_start, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="صيغة التاريخ غير صحيحة")
+        week_start = (d - timedelta(days=(d.weekday() + 2) % 7)).isoformat()
+    else:
+        week_start = current_week
+    week_end = (datetime.strptime(week_start, "%Y-%m-%d") + timedelta(days=6)).strftime("%Y-%m-%d")
+
+    students = await db.users.find(
+        {"role": "student", "is_active": True},
+        {"_id": 0, "id": 1, "name": 1, "group_id": 1}
+    ).to_list(5000)
+    sids = [s["id"] for s in students]
+    groups = await db.groups.find({}, {"_id": 0, "id": 1, "name": 1, "sheikh_id": 1}).to_list(3000)
+    group_by_id = {g["id"]: g for g in groups}
+    sheikh_names = {u["id"]: u["name"] for u in await db.users.find(
+        {"role": "sheikh"}, {"_id": 0, "id": 1, "name": 1}).to_list(500)}
+
+    # الحدّ الأقصى للورقة = الأساس + البنود العامة + بنود مشرف المجموعة
+    global_items_max = 0
+    sheikh_items_max = {}
+    for it in await db.tracking_items.find({"active": {"$ne": False}}, {"_id": 0}).to_list(2000):
+        mx = int(it.get("max_points") or 0)
+        if it.get("is_global"):
+            global_items_max += mx
+        elif it.get("sheikh_id"):
+            sheikh_items_max[it["sheikh_id"]] = sheikh_items_max.get(it["sheikh_id"], 0) + mx
+
+    def _max_for_group(gid) -> int:
+        sheikh_id = (group_by_id.get(gid) or {}).get("sheikh_id")
+        return TRACKING_BASE_MAX + global_items_max + sheikh_items_max.get(sheikh_id, 0)
+
+    sheets = await db.tracking_sheets.find(
+        {"student_id": {"$in": sids}, "week_start": week_start},
+        {"_id": 0, "student_id": 1, "data": 1, "points_earned": 1, "created_at": 1}
+    ).to_list(20000)
+    # ورقة واحدة لكل طالب بالأسبوع؛ لو وُجد تكرار قديم نعتمد الأحدث
+    sheet_by_student = {}
+    for sh in sorted(sheets, key=lambda s: str(s.get("created_at") or "")):
+        sheet_by_student[sh["student_id"]] = sh
+
+    def _empty_group():
+        return {"students_count": 0, "submitted_count": 0, "prayers_total": 0,
+                "sitting_total": 0, "custom_total": 0, "points_total": 0, "max_total": 0}
+
+    per_group = {g["id"]: _empty_group() for g in groups}
+    student_rows = []
+    for s in students:
+        gid = s.get("group_id")
+        sh = sheet_by_student.get(s["id"])
+        max_points = _max_for_group(gid)
+        prayers = sitting = custom = points = 0
+        if sh:
+            prayers, sitting = _sheet_prayers_sitting(sh)
+            for v in ((sh.get("data") or {}).get("custom_values") or {}).values():
+                try:
+                    custom += int(v or 0)
+                except (TypeError, ValueError):
+                    pass
+            points = int(sh.get("points_earned") or 0)
+        student_rows.append({
+            "student_id": s["id"],
+            "student_name": s.get("name") or "",
+            "group_id": gid,
+            "group_name": (group_by_id.get(gid) or {}).get("name", "بدون مجموعة"),
+            "submitted": bool(sh),
+            "prayers": prayers,
+            "sitting": sitting,
+            "custom": custom,
+            "points": points,
+            "max_points": max_points,
+        })
+        st = per_group.get(gid)
+        if st is not None:
+            st["students_count"] += 1
+            st["max_total"] += max_points
+            if sh:
+                st["submitted_count"] += 1
+                st["prayers_total"] += prayers
+                st["sitting_total"] += sitting
+                st["custom_total"] += custom
+                st["points_total"] += points
+
+    group_rows = []
+    for g in groups:
+        st = per_group[g["id"]]
+        group_rows.append({
+            "group_id": g["id"],
+            "group_name": g["name"],
+            "sheikh_name": sheikh_names.get(g.get("sheikh_id"), "غير معين"),
+            **st,
+            "avg_points": round(st["points_total"] / st["students_count"], 1) if st["students_count"] else 0,
+        })
+    group_rows.sort(key=lambda r: (-r["avg_points"], r["group_name"]))
+    student_rows.sort(key=lambda r: (not r["submitted"], -r["points"], r["student_name"]))
+
+    submitted = sum(1 for r in student_rows if r["submitted"])
+    return {
+        "week_start": week_start,
+        "week_end": week_end,
+        "is_current_week": week_start == current_week,
+        "summary": {
+            "students_count": len(student_rows),
+            "submitted_count": submitted,
+            "prayers_total": sum(r["prayers"] for r in student_rows),
+            "sitting_total": sum(r["sitting"] for r in student_rows),
+            "custom_total": sum(r["custom"] for r in student_rows),
+            "points_total": sum(r["points"] for r in student_rows),
+            "max_total": sum(r["max_points"] for r in student_rows),
+        },
+        "groups": group_rows,
+        "students": student_rows,
+    }
+
+
 class TrackingSheetUpdate(BaseModel):
     """تعديل ورقة المتابعة من المشرف"""
     prayers_count: Optional[int] = None
@@ -3774,8 +4195,22 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     
     recitation_dict = recitation.model_dump()
     recitation_dict["created_at"] = recitation_date.isoformat()
-    
+
+    # التسميع الذكي: هل يُتمّ هذا التسميع الجزء؟ (وصل لآخر صفحة ولم يكن مكتملًا من قبل)
+    juz_completed = None
+    jn, pto = recitation_data.juz_number, recitation_data.page_to
+    if new_pages > 0 and jn and isinstance(pto, int) and 1 <= jn <= 30 and pto >= juz_page_range(jn)[1]:
+        already = await db.recitations.count_documents({
+            "student_id": recitation_data.student_id, "juz_number": jn,
+            "did_not_recite": {"$ne": True}, "page_to": {"$gte": juz_page_range(jn)[1]}})
+        if not already:
+            juz_completed = jn
+
     await db.recitations.insert_one(recitation_dict)
+    if juz_completed:
+        await create_notification_internal(
+            recitation_data.student_id, f"🎉 أتممت حفظ الجزء {juz_completed}",
+            "بارك الله فيك! سيبدأ تسميعك القادم من الجزء التالي حسب خطتك.", "success")
     
     # Notify student
     await create_notification_internal(
@@ -3799,7 +4234,8 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
     if recitation_count == 1:
         await award_badge(recitation_data.student_id, "first_recitation")
     
-    return {"message": "تم تسجيل التسميع بنجاح", "recitation_id": recitation.id, "points_earned": points, "new_pages": new_pages, "review_pages": review_pages}
+    return {"message": "تم تسجيل التسميع بنجاح", "recitation_id": recitation.id, "points_earned": points,
+            "new_pages": new_pages, "review_pages": review_pages, "juz_completed": juz_completed}
 
 class RecitationUpdate(BaseModel):
     recitation_type: Optional[str] = None
@@ -4205,6 +4641,271 @@ async def last_recitation_hint(student_id: str, current_user: dict = Depends(get
         "last_date": l.get("record_date"),
         "suggested_from_page": (pt + 1) if isinstance(pt, int) else None,
     }
+
+
+# ============== التسميع الذكي: خطة الحفظ + اقتراح التسميع + إتمام الأجزاء ==============
+# صفحات المصحف (1–604). الجزء يُعدّ مكتملًا حين يصل تسميع حفظ جديد فيه إلى آخر صفحة منه،
+# ويُحسب ذلك من التسميعات نفسها (فحذف تسميع أو تعديله يصحّح الحالة تلقائيًا).
+
+def juz_page_range(j: int):
+    """مدى صفحات الجزء في المصحف (مطابق لـ JUZ_PAGE_RANGES في الواجهة)."""
+    if j == 1:
+        return 1, 21
+    start = 2 + 20 * (j - 1)
+    return start, (604 if j == 30 else start + 19)
+
+
+def _merge_ranges(pages) -> list:
+    out = []
+    for pg in sorted(pages):
+        if out and pg == out[-1][1] + 1:
+            out[-1][1] = pg
+        else:
+            out.append([pg, pg])
+    return out
+
+
+class MemorizationPlanIn(BaseModel):
+    direction: str = "desc"            # desc: من جزء عمّ نزولًا (30←29…)، asc: من البقرة صعودًا، custom: أجزاء مختارة
+    juz_order: List[int] = []           # للترتيب المخصص: الأجزاء المختارة بالترتيب الذي يحفظ به الطالب
+    pages_per_session: int = 1          # مقدار الحفظ الجديد في كل تسميع
+    review_pages: int = 0               # مقدار المراجعة المقترح في كل تسميع (صفحات، 20 = جزء)
+    target_pages: Optional[int] = None  # الهدف: عدد صفحات حفظ جديد…
+    target_date: Optional[str] = None   # …حتى هذا التاريخ (اختياري)
+    start_date: Optional[str] = None    # بداية احتساب الخطة (افتراضيًا اليوم)
+    notes: str = ""
+
+
+async def _hifz_state(student: dict) -> dict:
+    """حالة حفظ الطالب كاملة: المحفوظ، الجزء الحالي، الاقتراح التالي حسب الخطة، وحالة الخطة."""
+    sid = student["id"]
+    recs = await db.recitations.find(
+        {"student_id": sid, "did_not_recite": {"$ne": True}}, {"_id": 0}
+    ).sort([("record_date", 1), ("created_at", 1)]).to_list(100000)
+    plan = await db.memorization_plans.find_one({"student_id": sid}, {"_id": 0})
+
+    new_recs = [r for r in recs if r.get("juz_number") and isinstance(r.get("page_from"), int)
+                and isinstance(r.get("page_to"), int) and _new_pages_of(r) > 0]
+    covered: Dict[int, set] = {}
+    completed = set()
+    for r in new_recs:
+        j = r["juz_number"]
+        covered.setdefault(j, set()).update(range(r["page_from"], r["page_to"] + 1))
+        if r["page_to"] >= juz_page_range(j)[1]:
+            completed.add(j)
+    prev_juz = set(student_memorized_prev_juz(student))
+    memorized = prev_juz | completed
+
+    direction = (plan or {}).get("direction") or "desc"
+    step = -1 if direction == "desc" else 1
+    last = new_recs[-1] if new_recs else None
+    per_session = (plan or {}).get("pages_per_session") or (
+        (last["page_to"] - last["page_from"] + 1) if last else 1)
+
+    juz_order = [j for j in ((plan or {}).get("juz_order") or []) if 1 <= j <= 30]
+
+    def next_juz_from(j):
+        if direction == "custom":
+            # أول جزء في قائمة الخطة لم يُحفظ بعد (بالترتيب الذي حدّده المشرف)
+            return next((k for k in juz_order if k not in memorized), None)
+        k = j
+        for _ in range(30):
+            k += step
+            if not 1 <= k <= 30:
+                return None
+            if k not in memorized:
+                return k
+        return None
+
+    if last and last["juz_number"] not in completed:
+        cur = last["juz_number"]
+        nxt = min(last["page_to"] + 1, juz_page_range(cur)[1])
+        reason = f"يكمل الجزء {cur} من حيث توقف (آخر تسميع انتهى عند ص {last['page_to']})"
+    elif direction == "custom" and not juz_order:
+        cur, nxt, reason = None, None, "الخطة بترتيب مخصص بلا أجزاء مختارة"
+    else:
+        base = last["juz_number"] if last else (31 if direction == "desc" else 0)
+        cur = next_juz_from(base)
+        nxt = juz_page_range(cur)[0] if cur else None
+        if last:
+            reason = f"أتمّ الجزء {last['juz_number']} — يبدأ الجزء {cur}" if cur else "أتمّ كل الأجزاء حسب ترتيب خطته"
+            if cur and direction == "custom":
+                reason += " (التالي في قائمة الأجزاء المختارة)"
+        else:
+            reason = f"بداية الحفظ حسب الخطة من الجزء {cur}" if cur else "لا أجزاء متبقية"
+
+    suggestion = None
+    current = None
+    if cur:
+        start, end = juz_page_range(cur)
+        done_in_cur = len(covered.get(cur, set()) & set(range(start, end + 1)))
+        total_in_cur = end - start + 1
+        page_to = min(end, nxt + max(1, per_session) - 1)
+        suggestion = {"juz_number": cur, "page_from": nxt, "page_to": page_to,
+                      "completes_juz": page_to >= end, "reason": reason}
+        current = {"juz": cur, "start": start, "end": end, "done": done_in_cur,
+                   "total": total_in_cur, "remaining": total_in_cur - done_in_cur}
+
+    # المراجعة المقترحة: أقدم الأجزاء المحفوظة مراجعةً (أو التي لم تُراجَع أبدًا)
+    review = None
+    review_pages = (plan or {}).get("review_pages") or 0
+    if review_pages > 0 and memorized:
+        last_review: Dict[int, str] = {}
+        for r in recs:
+            d = r.get("record_date") or ""
+            for j in (r.get("review_juz") or []):
+                last_review[j] = max(last_review.get(j, ""), d)
+            if r.get("partial_review_juz") and (r.get("partial_review_pages") or 0) > 0:
+                j = r["partial_review_juz"]
+                last_review[j] = max(last_review.get(j, ""), d)
+        pool = sorted((j for j in memorized if j != cur), key=lambda j: (last_review.get(j, ""), j))
+        if pool:
+            full = min(review_pages // 20, len(pool))
+            rest = review_pages % 20
+            review = {"review_juz": pool[:full], "partial_review_juz": None, "partial_review_pages": 0,
+                      "last_reviewed": {str(j): last_review.get(j) for j in pool[:full + 1]}}
+            if rest and len(pool) > full:
+                review["partial_review_juz"] = pool[full]
+                review["partial_review_pages"] = rest
+
+    # إجمالي المحفوظ (نفس منطق /progress)
+    prev_total = pages_for_juz_list(list(student_memorized_prev_juz(student))) + (student.get("previous_memorization_pages") or 0)
+    new_total = sum(_new_pages_of(r) for r in recs)
+    total_pages = prev_total + new_total
+
+    return {
+        "student_id": sid,
+        "plan": plan,
+        "direction": direction,
+        "pages_per_session": per_session,
+        "memorized_juz": sorted(memorized),
+        "completed_juz": sorted(completed),
+        "previous_juz": sorted(prev_juz),
+        "current": current,
+        "suggestion": suggestion,
+        "review_suggestion": review,
+        "covered": {str(j): _merge_ranges(pgs) for j, pgs in covered.items()},
+        "totals": {"total_pages": total_pages, "new_pages": new_total, "previous_pages": prev_total,
+                   "juz_count": len(memorized),
+                   "percentage": round(total_pages / TOTAL_QURAN_PAGES * 100, 1)},
+        "plan_status": _plan_status(plan, recs),
+    }
+
+
+def _plan_status(plan: Optional[dict], recs: list) -> Optional[dict]:
+    """التقدّم مقابل هدف الخطة: متقدم / على المسار / متأخر (يحتاج هدفًا وتاريخًا)."""
+    if not plan or not plan.get("target_pages") or not plan.get("target_date"):
+        return None
+    start = plan.get("start_date") or (plan.get("created_at") or "")[:10]
+    done = sum(_new_pages_of(r) for r in recs if (r.get("record_date") or "") >= start)
+    target = plan["target_pages"]
+    try:
+        d0 = datetime.strptime(start, "%Y-%m-%d").date()
+        d1 = datetime.strptime(plan["target_date"], "%Y-%m-%d").date()
+        today = datetime.now(JORDAN_TZ).date()
+        frac = 1.0 if d1 <= d0 else min(max((today - d0).days / (d1 - d0).days, 0), 1)
+    except ValueError:
+        return None
+    expected = round(target * frac, 1)
+    tolerance = max(1, plan.get("pages_per_session") or 1)
+    if done >= target:
+        status, label = "achieved", "حقّق هدف الخطة"
+    elif done + tolerance < expected:
+        status, label = "behind", "متأخر عن الخطة"
+    elif done > expected + tolerance:
+        status, label = "ahead", "متقدم على الخطة"
+    else:
+        status, label = "on_track", "على المسار"
+    return {"status": status, "label": label, "done": done, "expected": expected, "target": target,
+            "target_date": plan["target_date"], "start_date": start,
+            "behind_by": round(max(expected - done, 0), 1)}
+
+
+async def _get_student_or_404(student_id: str) -> dict:
+    student = await db.users.find_one({"id": student_id, "role": "student"}, {"_id": 0, "password_hash": 0})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    return student
+
+
+@api_router.get("/students/{student_id}/hifz-status")
+async def hifz_status(student_id: str, current_user: dict = Depends(get_current_user)):
+    """حالة الحفظ والاقتراح التالي — للمشرف والمدير، وللطالب عن نفسه (العدّاد الحي)."""
+    if current_user["role"] == "student" and current_user["user_id"] != student_id:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    return await _hifz_state(await _get_student_or_404(student_id))
+
+
+@api_router.get("/students/{student_id}/memorization-plan")
+async def get_memorization_plan(student_id: str, current_user: dict = Depends(get_current_user)):
+    if current_user["role"] == "student" and current_user["user_id"] != student_id:
+        raise HTTPException(status_code=403, detail="غير مصرح لك")
+    return await db.memorization_plans.find_one({"student_id": student_id}, {"_id": 0}) or {}
+
+
+@api_router.put("/students/{student_id}/memorization-plan")
+async def save_memorization_plan(student_id: str, data: MemorizationPlanIn,
+                                 current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, ["sheikh", "admin"], "فقط المشرف أو المدير يكتب خطة الحفظ")
+    student = await _get_student_or_404(student_id)
+    if data.direction not in ("desc", "asc", "custom"):
+        raise HTTPException(status_code=400, detail="اتجاه الحفظ غير صالح")
+    juz_order = list(dict.fromkeys(data.juz_order or []))
+    if any(not 1 <= j <= 30 for j in juz_order):
+        raise HTTPException(status_code=400, detail="رقم جزء غير صالح في قائمة الأجزاء")
+    if data.direction == "custom" and not juz_order:
+        raise HTTPException(status_code=400, detail="اختر الأجزاء وترتيبها للترتيب المخصص")
+    if not 1 <= data.pages_per_session <= 20:
+        raise HTTPException(status_code=400, detail="مقدار الحفظ في التسميع بين 1 و20 صفحة")
+    if not 0 <= data.review_pages <= 200:
+        raise HTTPException(status_code=400, detail="مقدار المراجعة غير صالح")
+    if data.target_pages is not None and not 1 <= data.target_pages <= TOTAL_QURAN_PAGES:
+        raise HTTPException(status_code=400, detail="هدف الخطة غير صالح")
+    now = datetime.now(timezone.utc).isoformat()
+    existing = await db.memorization_plans.find_one({"student_id": student_id}, {"_id": 0})
+    plan = {
+        "student_id": student_id,
+        "direction": data.direction,
+        "juz_order": juz_order if data.direction == "custom" else [],
+        "pages_per_session": data.pages_per_session,
+        "review_pages": data.review_pages,
+        "target_pages": data.target_pages,
+        "target_date": _valid_date(data.target_date, "تاريخ الهدف"),
+        "start_date": _valid_date(data.start_date, "تاريخ البداية") or (existing or {}).get("start_date") or _jordan_today(),
+        "notes": (data.notes or "").strip(),
+        "updated_by": current_user["user_id"],
+        "updated_at": now,
+        "created_at": (existing or {}).get("created_at") or now,
+    }
+    await db.memorization_plans.update_one({"student_id": student_id}, {"$set": plan}, upsert=True)
+    if not existing:
+        await create_notification_internal(student_id, "📋 خطة حفظ جديدة",
+                                           f"وُضعت لك خطة حفظ: {data.pages_per_session} صفحة في كل تسميع", "info")
+    return plan
+
+
+@api_router.get("/memorization-plans/status")
+async def memorization_plans_status(student_ids: str = "", current_user: dict = Depends(get_current_user)):
+    """حالة خطط مجموعة طلاب دفعة واحدة (لشارة «متأخر عن الخطة» في قوائم الطلاب)."""
+    ensure_role(current_user, ["sheikh", "admin"], "غير مصرح لك")
+    ids = [i for i in student_ids.split(",") if i][:300]
+    if not ids:
+        return {}
+    plans = {pl["student_id"]: pl for pl in await db.memorization_plans.find(
+        {"student_id": {"$in": ids}}, {"_id": 0}).to_list(None)}
+    if not plans:
+        return {}
+    recs_by: Dict[str, list] = {}
+    for r in await db.recitations.find(
+            {"student_id": {"$in": list(plans)}, "did_not_recite": {"$ne": True}},
+            {"_id": 0, "student_id": 1, "record_date": 1, "new_pages": 1, "recitation_type": 1, "pages_count": 1}
+    ).to_list(None):
+        recs_by.setdefault(r["student_id"], []).append(r)
+    out = {}
+    for sid, pl in plans.items():
+        st = _plan_status(pl, recs_by.get(sid, []))
+        out[sid] = st or {"status": "no_target", "label": "خطة بلا هدف زمني"}
+    return out
 
 
 @api_router.get("/attendance")
@@ -11722,7 +12423,7 @@ def _valid_date(value: Optional[str], label: str) -> Optional[str]:
 
 class MeetingIn(BaseModel):
     title: str
-    date: str
+    date: Optional[str] = None  # اختياري
     time: Optional[str] = None
     type: str = "sheikhs"
     status: str = "scheduled"
@@ -11732,6 +12433,16 @@ class MeetingIn(BaseModel):
     minutes: str = ""
 
 
+class MeetingItemIn(BaseModel):
+    """بند في محضر الاجتماع (قرار/توصية). يبقى في المحضر، ويمكن ترحيله إلى قائمة المهام."""
+    text: str
+    details: str = ""
+    assignee_id: Optional[str] = None
+    due_date: Optional[str] = None  # اختياري
+    priority: str = "normal"
+    category_id: Optional[str] = None
+
+
 class TaskIn(BaseModel):
     title: str
     details: str = ""
@@ -11739,6 +12450,12 @@ class TaskIn(BaseModel):
     due_date: Optional[str] = None
     assignee_id: Optional[str] = None  # None = المدير نفسه
     meeting_id: Optional[str] = None
+    category_id: Optional[str] = None
+
+
+class TaskCategoryIn(BaseModel):
+    name: str
+    color: str = "emerald"
 
 
 class TaskUpdate(BaseModel):
@@ -11748,6 +12465,7 @@ class TaskUpdate(BaseModel):
     due_date: Optional[str] = None
     assignee_id: Optional[str] = None
     meeting_id: Optional[str] = None
+    category_id: Optional[str] = None
     status: Optional[str] = None
 
 
@@ -11759,8 +12477,6 @@ class TaskStatusIn(BaseModel):
 async def _clean_meeting(data: MeetingIn) -> dict:
     if not data.title.strip():
         raise HTTPException(status_code=400, detail="عنوان الاجتماع مطلوب")
-    if not _valid_date(data.date, "تاريخ الاجتماع"):
-        raise HTTPException(status_code=400, detail="تاريخ الاجتماع مطلوب")
     ids = list(dict.fromkeys(data.attendee_ids))
     if ids:
         found = await db.users.count_documents({"id": {"$in": ids}, "role": {"$in": ["sheikh", "admin"]}})
@@ -11768,7 +12484,7 @@ async def _clean_meeting(data: MeetingIn) -> dict:
             raise HTTPException(status_code=400, detail="أحد الحضور غير موجود")
     return {
         "title": data.title.strip(),
-        "date": data.date,
+        "date": _valid_date(data.date, "تاريخ الاجتماع"),
         "time": (data.time or "").strip() or None,
         "type": data.type if data.type in MEETING_TYPES else "other",
         "status": data.status if data.status in MEETING_STATUSES else "scheduled",
@@ -11794,6 +12510,14 @@ async def _check_meeting(meeting_id: Optional[str]):
         raise HTTPException(status_code=400, detail="الاجتماع غير موجود")
 
 
+TASK_CATEGORY_COLORS = ("emerald", "blue", "amber", "red", "purple", "pink", "slate")
+
+
+async def _check_category(category_id: Optional[str]):
+    if category_id and not await db.task_categories.find_one({"id": category_id}, {"_id": 1}):
+        raise HTTPException(status_code=400, detail="التصنيف غير موجود")
+
+
 async def _notify_task_assigned(task: dict, assignee: Optional[dict]):
     if assignee and assignee["role"] == "sheikh":
         due = f" — آخر موعد {task['due_date']}" if task.get("due_date") else ""
@@ -11809,12 +12533,18 @@ async def _enrich_tasks(tasks: list) -> list:
         {"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "name": 1}).to_list(None)}
     meetings = {m["id"]: m for m in await db.meetings.find(
         {"id": {"$in": meeting_ids}}, {"_id": 0, "id": 1, "title": 1, "date": 1}).to_list(None)}
+    category_ids = list({t["category_id"] for t in tasks if t.get("category_id")})
+    categories = {c["id"]: c for c in await db.task_categories.find(
+        {"id": {"$in": category_ids}}, {"_id": 0}).to_list(None)}
     today = _jordan_today()
     for t in tasks:
         t["assignee_name"] = names.get(t.get("assignee_id"))
         m = meetings.get(t.get("meeting_id"))
         t["meeting_title"] = m["title"] if m else None
         t["meeting_date"] = m["date"] if m else None
+        c = categories.get(t.get("category_id"))
+        t["category_name"] = c["name"] if c else None
+        t["category_color"] = c["color"] if c else None
         t["is_overdue"] = bool(t["status"] != "done" and t.get("due_date") and t["due_date"] < today)
     return tasks
 
@@ -11837,11 +12567,50 @@ async def list_meetings(current_user: dict = Depends(get_current_user)):
                     "done": {"$sum": {"$cond": [{"$eq": ["$status", "done"]}, 1, 0]}}}},
     ]):
         progress[row["_id"]] = row
+    items = {}
+    async for row in db.meeting_items.aggregate([
+        {"$group": {"_id": "$meeting_id", "total": {"$sum": 1},
+                    "transferred": {"$sum": {"$cond": [{"$ifNull": ["$task_id", False]}, 1, 0]}}}},
+    ]):
+        items[row["_id"]] = row
     for m in meetings:
         p = progress.get(m["id"], {})
         m["tasks_total"] = p.get("total", 0)
         m["tasks_done"] = p.get("done", 0)
+        it = items.get(m["id"], {})
+        m["items_total"] = it.get("total", 0)
+        m["items_transferred"] = it.get("transferred", 0)
     return meetings
+
+
+async def _adopt_legacy_outcomes(meeting_id: str):
+    """المخرجات القديمة كانت مهامًا مباشرة: ننشئ لكل منها بندًا في المحضر مرتبطًا بها (مرة واحدة)."""
+    linked = {i["task_id"] for i in await db.meeting_items.find(
+        {"meeting_id": meeting_id, "task_id": {"$ne": None}}, {"_id": 0, "task_id": 1}).to_list(None)}
+    legacy = [t for t in await db.admin_tasks.find({"meeting_id": meeting_id}, {"_id": 0}).to_list(1000)
+              if t["id"] not in linked]
+    if legacy:
+        await db.meeting_items.insert_many([{
+            "id": str(uuid.uuid4()), "meeting_id": meeting_id, "text": t["title"], "details": t.get("details", ""),
+            "assignee_id": t.get("assignee_id"), "due_date": t.get("due_date"), "priority": t.get("priority", "normal"),
+            "category_id": t.get("category_id"), "task_id": t["id"], "created_at": t.get("created_at"),
+        } for t in legacy])
+
+
+async def _meeting_items(meeting_id: str) -> list:
+    items = await db.meeting_items.find({"meeting_id": meeting_id}, {"_id": 0}).sort("created_at", 1).to_list(1000)
+    tasks = {t["id"]: t for t in await _enrich_tasks(await db.admin_tasks.find(
+        {"id": {"$in": [i["task_id"] for i in items if i.get("task_id")]}}, {"_id": 0}).to_list(1000))}
+    shown = await _enrich_tasks([{**i, "title": i["text"], "status": "todo"} for i in items])
+    for item, view in zip(items, shown):
+        item["assignee_name"] = view.get("assignee_name")
+        item["category_name"] = view.get("category_name")
+        item["category_color"] = view.get("category_color")
+        task = tasks.get(item.get("task_id"))
+        if item.get("task_id") and not task:
+            item["task_id"] = None  # حُذفت المهمة من القائمة، فيعود البند غير مرحّل
+        item["task"] = {"id": task["id"], "status": task["status"], "is_overdue": task["is_overdue"]} if task else None
+    return items
 
 
 @api_router.get("/meetings/{meeting_id}")
@@ -11851,11 +12620,17 @@ async def get_meeting(meeting_id: str, current_user: dict = Depends(get_current_
     meeting = await db.meetings.find_one({"id": meeting_id}, {"_id": 0})
     if not meeting:
         raise HTTPException(status_code=404, detail="الاجتماع غير موجود")
+    await _adopt_legacy_outcomes(meeting_id)
     tasks = await db.admin_tasks.find({"meeting_id": meeting_id}, {"_id": 0}).to_list(1000)
-    earlier_ids = [m["id"] for m in await db.meetings.find(
-        {"date": {"$lt": meeting["date"]}}, {"_id": 0, "id": 1}).to_list(1000)]
+    # الاجتماعات الأقدم: حسب التاريخ إن وُجد، وإلا حسب وقت الإنشاء
+    if meeting.get("date"):
+        older = {"date": {"$lt": meeting["date"], "$ne": None}}
+    else:
+        older = {"created_at": {"$lt": meeting.get("created_at") or ""}}
+    earlier_ids = [m["id"] for m in await db.meetings.find(older, {"_id": 0, "id": 1}).to_list(1000)]
     carried = await db.admin_tasks.find(
         {"meeting_id": {"$in": earlier_ids}, "status": {"$ne": "done"}}, {"_id": 0}).to_list(1000)
+    meeting["items"] = await _meeting_items(meeting_id)
     meeting["attendees"] = await db.users.find({"id": {"$in": meeting.get("attendee_ids", [])}},
                                                {"_id": 0, "id": 1, "name": 1}).to_list(None)
     meeting["tasks"] = _sort_tasks(await _enrich_tasks(tasks))
@@ -11898,14 +12673,103 @@ async def delete_meeting(meeting_id: str, delete_tasks: bool = False,
         removed = (await db.admin_tasks.delete_many({"meeting_id": meeting_id})).deleted_count
     else:
         await db.admin_tasks.update_many({"meeting_id": meeting_id}, {"$set": {"meeting_id": None}})
+    await db.meeting_items.delete_many({"meeting_id": meeting_id})
     await db.meetings.delete_one({"id": meeting_id})
     await log_admin_action(current_user, "delete_meeting", "meeting", meeting_id, meeting["title"],
                            f"حُذفت {removed} مهمة مرتبطة" if delete_tasks else "أُبقيت المهام المرتبطة")
     return {"message": "تم حذف الاجتماع", "tasks_deleted": removed}
 
 
+async def _clean_item(data: MeetingItemIn) -> dict:
+    if not data.text.strip():
+        raise HTTPException(status_code=400, detail="نص البند مطلوب")
+    await _check_assignee(data.assignee_id)
+    await _check_category(data.category_id)
+    return {
+        "text": data.text.strip(),
+        "details": (data.details or "").strip(),
+        "assignee_id": data.assignee_id or None,
+        "due_date": _valid_date(data.due_date, "التاريخ"),
+        "priority": data.priority if data.priority in TASK_PRIORITIES else "normal",
+        "category_id": data.category_id or None,
+    }
+
+
+@api_router.post("/meetings/{meeting_id}/items")
+async def add_meeting_item(meeting_id: str, data: MeetingItemIn, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل المحضر")
+    await _check_meeting(meeting_id)
+    item = {"id": str(uuid.uuid4()), "meeting_id": meeting_id, **(await _clean_item(data)),
+            "task_id": None, "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.meeting_items.insert_one(item)
+    item.pop("_id", None)
+    return item
+
+
+@api_router.put("/meeting-items/{item_id}")
+async def update_meeting_item(item_id: str, data: MeetingItemIn, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل المحضر")
+    result = await db.meeting_items.update_one({"id": item_id}, {"$set": await _clean_item(data)})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="البند غير موجود")
+    return await db.meeting_items.find_one({"id": item_id}, {"_id": 0})
+
+
+@api_router.delete("/meeting-items/{item_id}")
+async def delete_meeting_item(item_id: str, current_user: dict = Depends(get_current_user)):
+    """حذف البند من المحضر فقط؛ المهمة المرحّلة (إن وُجدت) تبقى في قائمة المهام."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل المحضر")
+    result = await db.meeting_items.delete_one({"id": item_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="البند غير موجود")
+    return {"message": "تم حذف البند"}
+
+
+async def _transfer_item(item: dict, current_user: dict) -> dict:
+    """ترحيل بند من المحضر إلى قائمة المهام (مرة واحدة لكل بند)."""
+    if item.get("task_id") and await db.admin_tasks.find_one({"id": item["task_id"]}, {"_id": 1}):
+        raise HTTPException(status_code=400, detail="هذا البند مرحّل إلى المهام مسبقًا")
+    assignee = await _check_assignee(item.get("assignee_id"))
+    now = datetime.now(timezone.utc).isoformat()
+    task = {
+        "id": str(uuid.uuid4()), "title": item["text"], "details": item.get("details", ""),
+        "priority": item.get("priority", "normal"), "due_date": item.get("due_date"),
+        "assignee_id": item.get("assignee_id"), "meeting_id": item["meeting_id"],
+        "category_id": item.get("category_id"), "status": "todo", "note": None, "done_at": None,
+        "created_by": current_user["user_id"], "created_at": now, "updated_at": now,
+    }
+    await db.admin_tasks.insert_one(task)
+    task.pop("_id", None)
+    await db.meeting_items.update_one({"id": item["id"]}, {"$set": {"task_id": task["id"], "transferred_at": now}})
+    await _notify_task_assigned(task, assignee)
+    return task
+
+
+@api_router.post("/meeting-items/{item_id}/transfer")
+async def transfer_meeting_item(item_id: str, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه ترحيل المهام")
+    item = await db.meeting_items.find_one({"id": item_id}, {"_id": 0})
+    if not item:
+        raise HTTPException(status_code=404, detail="البند غير موجود")
+    return await _transfer_item(item, current_user)
+
+
+@api_router.post("/meetings/{meeting_id}/transfer-all")
+async def transfer_all_meeting_items(meeting_id: str, current_user: dict = Depends(get_current_user)):
+    """ترحيل كل بنود المحضر غير المرحّلة إلى قائمة المهام دفعة واحدة."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه ترحيل المهام")
+    await _check_meeting(meeting_id)
+    count = 0
+    for item in await _meeting_items(meeting_id):
+        if not item.get("task_id"):
+            await _transfer_item(item, current_user)
+            count += 1
+    return {"message": f"تم ترحيل {count} بند إلى المهام", "transferred": count}
+
+
 @api_router.get("/tasks")
 async def list_tasks(status: Optional[str] = None, meeting_id: Optional[str] = None,
+                     category_id: Optional[str] = None,
                      assignee: Optional[str] = None, overdue: bool = False,
                      current_user: dict = Depends(get_current_user)):
     """المدير: كل المهام (assignee = me | sheikhs | <user id>). المشرف: المسندة إليه فقط.
@@ -11927,11 +12791,72 @@ async def list_tasks(status: Optional[str] = None, meeting_id: Optional[str] = N
         query["status"] = {"$ne": "done"}
     if meeting_id:
         query["meeting_id"] = meeting_id
+    if category_id:
+        query["category_id"] = category_id
     if overdue:
         query["status"] = {"$ne": "done"}
         query["due_date"] = {"$lt": _jordan_today(), "$ne": None}
     tasks = await db.admin_tasks.find(query, {"_id": 0}).to_list(5000)
     return _sort_tasks(await _enrich_tasks(tasks))
+
+
+# تصنيفات مخرجات الاجتماعات والمهام — يديرها المدير (إضافة/تعديل/حذف)
+@api_router.get("/task-categories")
+async def list_task_categories(current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    cats = await db.task_categories.find({}, {"_id": 0}).sort("created_at", 1).to_list(500)
+    counts = {r["_id"]: r["n"] for r in await db.admin_tasks.aggregate([
+        {"$match": {"category_id": {"$ne": None}}},
+        {"$group": {"_id": "$category_id", "n": {"$sum": 1}}}]).to_list(None)}
+    for c in cats:
+        c["tasks_count"] = counts.get(c["id"], 0)
+    return cats
+
+
+def _clean_category(data: TaskCategoryIn) -> dict:
+    name = data.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="اسم التصنيف مطلوب")
+    return {"name": name[:60], "color": data.color if data.color in TASK_CATEGORY_COLORS else "emerald"}
+
+
+@api_router.post("/task-categories")
+async def create_task_category(data: TaskCategoryIn, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إضافة تصنيف")
+    fields = _clean_category(data)
+    if await db.task_categories.find_one({"name": fields["name"]}, {"_id": 1}):
+        raise HTTPException(status_code=400, detail="يوجد تصنيف بهذا الاسم")
+    cat = {"id": str(uuid.uuid4()), **fields, "created_at": datetime.now(timezone.utc).isoformat()}
+    await db.task_categories.insert_one(cat)
+    cat.pop("_id", None)
+    await log_admin_action(current_user, "create_task_category", "task_category", cat["id"], cat["name"])
+    return {**cat, "tasks_count": 0}
+
+
+@api_router.put("/task-categories/{category_id}")
+async def update_task_category(category_id: str, data: TaskCategoryIn,
+                               current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل التصنيف")
+    fields = _clean_category(data)
+    if await db.task_categories.find_one({"name": fields["name"], "id": {"$ne": category_id}}, {"_id": 1}):
+        raise HTTPException(status_code=400, detail="يوجد تصنيف بهذا الاسم")
+    result = await db.task_categories.update_one({"id": category_id}, {"$set": fields})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="التصنيف غير موجود")
+    return await db.task_categories.find_one({"id": category_id}, {"_id": 0})
+
+
+@api_router.delete("/task-categories/{category_id}")
+async def delete_task_category(category_id: str, current_user: dict = Depends(get_current_user)):
+    """حذف التصنيف يُبقي المهام، فقط يزيل تصنيفها."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف التصنيف")
+    cat = await db.task_categories.find_one({"id": category_id}, {"_id": 0})
+    if not cat:
+        raise HTTPException(status_code=404, detail="التصنيف غير موجود")
+    await db.admin_tasks.update_many({"category_id": category_id}, {"$set": {"category_id": None}})
+    await db.task_categories.delete_one({"id": category_id})
+    await log_admin_action(current_user, "delete_task_category", "task_category", category_id, cat["name"])
+    return {"message": "تم حذف التصنيف"}
 
 
 @api_router.get("/tasks/summary")
@@ -11961,6 +12886,7 @@ async def create_task(data: TaskIn, current_user: dict = Depends(get_current_use
         raise HTTPException(status_code=400, detail="عنوان المهمة مطلوب")
     assignee = await _check_assignee(data.assignee_id)
     await _check_meeting(data.meeting_id)
+    await _check_category(data.category_id)
     now = datetime.now(timezone.utc).isoformat()
     task = {
         "id": str(uuid.uuid4()),
@@ -11970,6 +12896,7 @@ async def create_task(data: TaskIn, current_user: dict = Depends(get_current_use
         "due_date": _valid_date(data.due_date, "تاريخ الاستحقاق"),
         "assignee_id": data.assignee_id or None,
         "meeting_id": data.meeting_id or None,
+        "category_id": data.category_id or None,
         "status": "todo",
         "note": None,
         "done_at": None,
@@ -12010,6 +12937,9 @@ async def update_task(task_id: str, data: TaskUpdate, current_user: dict = Depen
     if "meeting_id" in sent:
         await _check_meeting(data.meeting_id)
         fields["meeting_id"] = data.meeting_id or None
+    if "category_id" in sent:
+        await _check_category(data.category_id)
+        fields["category_id"] = data.category_id or None
     if data.status in TASK_STATUSES and data.status != task["status"]:
         fields["status"] = data.status
         fields["done_at"] = now if data.status == "done" else None
@@ -12077,8 +13007,158 @@ async def full_database_backup(current_user: dict = Depends(get_current_user)):
     )
 
 
+# ============== مستندات Word (رفع + عرض + تعديل داخل الموقع) ==============
+# يُرفع ملف .docx فيُحوَّل إلى HTML (mammoth) ويُعرض ويُعدَّل في المتصفح بلا تنزيل.
+# كل HTML يُنظَّف (nh3) قبل الحفظ، والتصدير إلى Word اختياري (htmldocx).
+import re
+import mammoth
+import nh3
+from docx import Document as DocxDocument
+from htmldocx import HtmlToDocx
+
+DOC_MAX_BYTES = 8 * 1024 * 1024
+DOC_TAGS = {"p", "br", "h1", "h2", "h3", "h4", "strong", "b", "em", "i", "u", "s", "strike", "del",
+            "mark", "span", "ul", "ol", "li", "table", "thead", "tbody", "tr", "td", "th",
+            "blockquote", "a", "img", "hr", "sub", "sup", "div", "font"}
+DOC_ATTRS = {"*": {"style", "dir", "align"}, "a": {"href"}, "img": {"src", "alt", "width", "height"},
+             "td": {"colspan", "rowspan"}, "th": {"colspan", "rowspan"}, "font": {"color", "size"},
+             "li": {"class"}}
+
+
+def _doc_attr_filter(tag: str, attr: str, value: str):
+    # الصور: فقط مضمّنة (data:image) أو روابط http(s)، وغيرها يُحذف
+    if tag == "img" and attr == "src" and not value.startswith(("data:image/", "http://", "https://")):
+        return None
+    if attr == "class":  # الصنف الوحيد المسموح: عنصر قائمة مهام
+        return "chk" if value == "chk" else None
+    return value
+
+
+def _clean_doc_html(html: str) -> str:
+    cleaned = nh3.clean(html or "", tags=DOC_TAGS, attributes=DOC_ATTRS, attribute_filter=_doc_attr_filter,
+                        url_schemes={"http", "https", "data", "mailto"}, link_rel="noopener noreferrer")
+    return re.sub(r"<img(?![^>]*\bsrc=)[^>]*>", "", cleaned)
+
+
+class DocumentUpdate(BaseModel):
+    title: Optional[str] = None
+    html: Optional[str] = None
+
+
+@api_router.get("/documents")
+async def list_documents(current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    return await db.documents.find({}, {"_id": 0, "html": 0}).sort("updated_at", -1).to_list(1000)
+
+
+@api_router.post("/documents")
+async def upload_document(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه رفع المستندات")
+    name = file.filename or ""
+    if not name.lower().endswith(".docx"):
+        raise HTTPException(status_code=400, detail="يجب أن يكون الملف بصيغة Word (.docx)")
+    content = await file.read()
+    if len(content) > DOC_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="حجم الملف أكبر من 8 ميغابايت")
+    try:
+        result = mammoth.convert_to_html(io.BytesIO(content))
+    except Exception:
+        raise HTTPException(status_code=400, detail="تعذّرت قراءة الملف — تأكد أنه ملف Word سليم")
+    html = _clean_doc_html(result.value) or "<p></p>"
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {
+        "id": str(uuid.uuid4()),
+        "title": name[:-5].strip() or "مستند",
+        "filename": name,
+        "html": html,
+        "size": len(content),
+        "created_by": current_user["user_id"],
+        "created_at": now,
+        "updated_at": now,
+    }
+    await db.documents.insert_one(doc)
+    doc.pop("_id", None)
+    await log_admin_action(current_user, "upload_document", "document", doc["id"], doc["title"])
+    return doc
+
+
+@api_router.post("/documents/blank")
+async def create_blank_document(data: DocumentUpdate, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه إنشاء المستندات")
+    now = datetime.now(timezone.utc).isoformat()
+    doc = {"id": str(uuid.uuid4()), "title": (data.title or "").strip()[:120] or "مستند جديد",
+           "filename": None, "html": "<p></p>", "size": 0, "created_by": current_user["user_id"],
+           "created_at": now, "updated_at": now}
+    await db.documents.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.get("/documents/{doc_id}")
+async def get_document(doc_id: str, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    doc = await db.documents.find_one({"id": doc_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="المستند غير موجود")
+    return doc
+
+
+@api_router.put("/documents/{doc_id}")
+async def update_document(doc_id: str, data: DocumentUpdate, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه تعديل المستندات")
+    fields: Dict[str, Any] = {"updated_at": datetime.now(timezone.utc).isoformat(),
+                              "updated_by": current_user["user_id"]}
+    if data.title is not None:
+        if not data.title.strip():
+            raise HTTPException(status_code=400, detail="عنوان المستند مطلوب")
+        fields["title"] = data.title.strip()[:120]
+    if data.html is not None:
+        if len(data.html.encode("utf-8")) > 12 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="المستند كبير جدًا")
+        fields["html"] = _clean_doc_html(data.html)
+    result = await db.documents.update_one({"id": doc_id}, {"$set": fields})
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="المستند غير موجود")
+    return await db.documents.find_one({"id": doc_id}, {"_id": 0, "html": 0})
+
+
+@api_router.get("/documents/{doc_id}/export")
+async def export_document(doc_id: str, current_user: dict = Depends(get_current_user)):
+    """تصدير النسخة المعدّلة إلى ملف Word (اختياري)."""
+    ensure_role(current_user, "admin", "غير مصرح لك")
+    doc = await db.documents.find_one({"id": doc_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="المستند غير موجود")
+    out = DocxDocument()
+    try:
+        HtmlToDocx().add_html_to_document(doc["html"], out)
+    except Exception:
+        # إن فشل تحويل جزء (مثل صورة)، نصدّر النص فقط حتى لا يضيع المحتوى
+        import re as _re
+        out = DocxDocument()
+        HtmlToDocx().add_html_to_document(_re.sub(r"<img[^>]*>", "", doc["html"]), out)
+    buf = io.BytesIO()
+    out.save(buf)
+    buf.seek(0)
+    from urllib.parse import quote
+    fname = quote(f"{doc['title']}.docx")
+    return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                             headers={"Content-Disposition": f"attachment; filename*=UTF-8''{fname}"})
+
+
+@api_router.delete("/documents/{doc_id}")
+async def delete_document(doc_id: str, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف المستندات")
+    doc = await db.documents.find_one({"id": doc_id}, {"_id": 0, "title": 1})
+    if not doc:
+        raise HTTPException(status_code=404, detail="المستند غير موجود")
+    await db.documents.delete_one({"id": doc_id})
+    await log_admin_action(current_user, "delete_document", "document", doc_id, doc["title"])
+    return {"message": "تم حذف المستند"}
+
+
 # Include the router
-app.include_router(api_router)
+app.include_router(api_router, dependencies=[Depends(enforce_assistant_permissions)])
 
 app.add_middleware(
     CORSMiddleware,

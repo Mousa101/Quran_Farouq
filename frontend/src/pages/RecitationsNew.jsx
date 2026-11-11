@@ -13,8 +13,10 @@ import { Calendar } from '../components/ui/calendar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import { 
   BookOpen, CheckCircle, XCircle, Loader2, Info, Users,
-  FileText, RotateCcw, Clock, Trash2, Archive, Eye, RefreshCw, UserX
+  FileText, RotateCcw, Clock, Trash2, Archive, Eye, RefreshCw, UserX,
+  Sparkles, ClipboardList, AlertTriangle, PartyPopper
 } from 'lucide-react';
+import MemorizationPlanDialog from '../components/MemorizationPlanDialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -79,7 +81,12 @@ const RecitationsNew = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [recitationToDelete, setRecitationToDelete] = useState(null);
-  
+
+  // التسميع الذكي: حالة حفظ الطالب المفتوح، وخطته، وحالة خطط الطلاب في القائمة
+  const [hifz, setHifz] = useState(null);
+  const [planStudent, setPlanStudent] = useState(null);
+  const [planStatuses, setPlanStatuses] = useState({});
+
   // Form state for recitation
   const [formData, setFormData] = useState({
     has_new_memorization: true,
@@ -111,6 +118,16 @@ const RecitationsNew = () => {
       fetchAttendance();
     }
   }, [selectedDate, students, selectedTermId]);
+
+  const fetchPlanStatuses = async () => {
+    if (students.length === 0) return;
+    try {
+      const res = await axios.get(`${API}/memorization-plans/status`, { params: { student_ids: students.map((s) => s.id).join(',') } });
+      setPlanStatuses(res.data || {});
+    } catch (e) { /* الشارات اختيارية */ }
+  };
+
+  useEffect(() => { fetchPlanStatuses(); }, [students]); // eslint-disable-line
 
   // انعكاس الغياب تلقائيًا: يُحدَّث كل 15 ثانية ليظهر أثر تسجيل الحضور دون تحديث الصفحة
   useEffect(() => {
@@ -272,30 +289,88 @@ const RecitationsNew = () => {
       passed_review_minimum: false,
       notes: ''
     });
+    setHifz(null);
     setDialogOpen(true);
+    await loadSuggestion(student);
+  };
 
-    // T3: اقتراح صفحة البداية والجزء من آخر جلسة (قيم ذكية)
+  // التسميع الذكي: تعبئة الجزء والصفحات والمراجعة حسب خطة الطالب وآخر تسميع له
+  const loadSuggestion = async (student) => {
     try {
-      const res = await axios.get(`${API}/students/${student.id}/last-recitation`);
-      if (res.data?.has_previous && res.data?.suggested_from_page) {
-        setFormData(prev => ({
-          ...prev,
-          juz_number: res.data.last_juz || prev.juz_number,
-          page_from: String(res.data.suggested_from_page),
-        }));
-        toast.info(`آخر تسميع انتهى عند صفحة ${res.data.last_page_to} — اقتُرحت البداية تلقائيًا`);
-      }
-    } catch (e) { /* تجاهل: لا اقتراح */ }
+      const res = await axios.get(`${API}/students/${student.id}/hifz-status`);
+      const h = res.data;
+      setHifz(h);
+      const sg = h.suggestion;
+      const rv = h.review_suggestion;
+      setFormData((prev) => ({
+        ...prev,
+        ...(sg ? { juz_number: sg.juz_number, page_from: String(sg.page_from), page_to: String(sg.page_to) } : {}),
+        ...(rv ? {
+          has_review: true,
+          review_juz: rv.review_juz || [],
+          partial_review_juz: rv.partial_review_juz || null,
+          partial_review_pages: rv.partial_review_pages || 0,
+        } : {}),
+      }));
+    } catch (e) { /* بلا اقتراح: يُدخل المشرف القيم بنفسه */ }
+  };
+
+  // أول صفحة لم تُسمَّع بعد في الجزء (لاقتراح البداية عند تغيير الجزء يدويًا)
+  const firstUncovered = (juz) => {
+    const r = JUZ_PAGE_RANGES[juz];
+    const ranges = hifz?.covered?.[String(juz)] || [];
+    for (let p = r.start; p <= r.end; p += 1) {
+      if (!ranges.some(([a, b]) => p >= a && p <= b)) return p;
+    }
+    return null;
   };
 
   const handleJuzChange = (newJuzNumber) => {
-    // لا قيم افتراضية للصفحات — تُترك فارغة ليُدخلها المشرف بنفسه (أبسط وبدون تعليق)
+    const start = hifz ? firstUncovered(newJuzNumber) : null;
+    const per = hifz?.pages_per_session || 1;
+    const end = JUZ_PAGE_RANGES[newJuzNumber].end;
     setFormData(prev => ({
       ...prev,
       juz_number: newJuzNumber,
-      page_from: '',
-      page_to: ''
+      page_from: start ? String(start) : '',
+      page_to: start ? String(Math.min(end, start + per - 1)) : ''
     }));
+  };
+
+  // تنبيهات قبل الحفظ: تخطّي صفحات، أو تكرار صفحات مُسمَّعة، أو جزء محفوظ مسبقًا
+  const recitationWarnings = () => {
+    if (!hifz || !formData.has_new_memorization) return [];
+    const juz = formData.juz_number;
+    const pf = parseInt(formData.page_from, 10);
+    const pt = parseInt(formData.page_to, 10);
+    const out = [];
+    if (hifz.previous_juz?.includes(juz)) out.push(`الجزء ${juz} مسجّل محفوظًا مسبقًا في تقييم الطالب`);
+    else if (hifz.completed_juz?.includes(juz)) out.push(`الجزء ${juz} أتمّه الطالب مسبقًا`);
+    if (isNaN(pf)) return out;
+    const ranges = hifz.covered?.[String(juz)] || [];
+    const last = ranges.length ? ranges[ranges.length - 1][1] : null;
+    if (hifz.current?.juz === juz && hifz.suggestion && pf > hifz.suggestion.page_from) {
+      const startedJuz = (hifz.current?.done || 0) > 0;
+      out.push(startedJuz
+        ? `تخطّي صفحات: آخر حفظ انتهى عند ص ${hifz.suggestion.page_from - 1}، والتسميع يبدأ من ص ${pf} (الصفحات ${hifz.suggestion.page_from}–${pf - 1} لم تُسمَّع)`
+        : `تخطّي صفحات: الجزء ${juz} يبدأ من ص ${hifz.suggestion.page_from}، والتسميع يبدأ من ص ${pf} (الصفحات ${hifz.suggestion.page_from}–${pf - 1} لم تُسمَّع)`);
+    } else if (last && pf > last + 1 && hifz.current?.juz !== juz) {
+      out.push(`تخطّي صفحات في الجزء ${juz}: آخر صفحة مُسمَّعة ${last}`);
+    }
+    const to = isNaN(pt) ? pf : pt;
+    const repeated = [];
+    for (let p = pf; p <= to; p += 1) if (ranges.some(([a, b]) => p >= a && p <= b)) repeated.push(p);
+    if (repeated.length) {
+      out.push(`تكرار: ${repeated.length === 1 ? `الصفحة ${repeated[0]} مُسمَّعة` : `الصفحات ${repeated[0]}–${repeated[repeated.length - 1]} مُسمَّعة`} سابقًا كحفظ جديد`);
+    }
+    return out;
+  };
+
+  const willCompleteJuz = () => {
+    if (!formData.has_new_memorization) return false;
+    const pt = parseInt(formData.page_to, 10);
+    const juz = formData.juz_number;
+    return !isNaN(pt) && pt >= JUZ_PAGE_RANGES[juz].end && !hifz?.completed_juz?.includes(juz);
   };
 
   const handleJuzToggle = (juzNumber) => {
@@ -344,8 +419,12 @@ const RecitationsNew = () => {
       
       const response = await axios.post(`${API}/recitations`, payload);
       toast.success(`تم تسجيل التسميع بنجاح - ${response.data.points_earned} نقطة`);
+      if (response.data.juz_completed) {
+        toast.success(`🎉 أتمّ ${selectedStudent.name} حفظ الجزء ${response.data.juz_completed} — التسميع القادم من الجزء التالي حسب خطته`, { duration: 6000 });
+      }
       setDialogOpen(false);
       fetchRecitations();
+      fetchPlanStatuses();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'فشل تسجيل التسميع');
     } finally {
@@ -565,6 +644,15 @@ const RecitationsNew = () => {
                             )}
                           </div>
                           {getStatusBadge(status, student.id)}
+                          {planStatuses[student.id]?.status === 'behind' && (
+                            <span className="px-2 py-1 text-xs rounded-full bg-red-500/20 text-red-400 flex items-center gap-1"
+                              title={`أنجز ${planStatuses[student.id].done} من ${planStatuses[student.id].expected} صفحة متوقعة حتى اليوم`}>
+                              <AlertTriangle className="w-3 h-3" />متأخر عن الخطة ({planStatuses[student.id].behind_by} ص)
+                            </span>
+                          )}
+                          {['ahead', 'achieved'].includes(planStatuses[student.id]?.status) && (
+                            <span className="px-2 py-1 text-xs rounded-full bg-emerald-500/20 text-emerald-400">{planStatuses[student.id].label}</span>
+                          )}
                         </div>
                         
                         <div className="flex gap-2">
@@ -587,6 +675,16 @@ const RecitationsNew = () => {
                           >
                             <XCircle className="w-4 h-4 ml-1" />
                             لم يسمّع
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setPlanStudent(student)}
+                            className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                            title="خطة حفظ الطالب"
+                          >
+                            <ClipboardList className="w-4 h-4 ml-1" />
+                            الخطة
                           </Button>
                           <Button
                             size="sm"
@@ -674,6 +772,42 @@ const RecitationsNew = () => {
           </DialogHeader>
           
           <div className="space-y-6 mt-4">
+            {/* التسميع الذكي: ملخص الحفظ واقتراح الخطة */}
+            {hifz && (
+              <div className="p-4 rounded-xl bg-gradient-to-l from-emerald-500/10 to-blue-500/10 border border-emerald-500/30 space-y-2">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <p className="text-white font-bold flex items-center gap-2"><Sparkles className="w-4 h-4 text-amber-300" />اقتراح حسب الخطة</p>
+                  <Button size="sm" variant="ghost" onClick={() => setPlanStudent(selectedStudent)} className="text-emerald-300 h-7">
+                    <ClipboardList className="w-4 h-4 ml-1" />{hifz.plan ? 'تعديل الخطة' : 'كتابة خطة'}
+                  </Button>
+                </div>
+                {hifz.suggestion ? (
+                  <p className="text-emerald-200 text-sm">
+                    {hifz.suggestion.reason} — المقترح: الجزء {hifz.suggestion.juz_number} من ص {hifz.suggestion.page_from} إلى ص {hifz.suggestion.page_to}
+                  </p>
+                ) : <p className="text-slate-300 text-sm">لا يوجد جزء متبقٍّ حسب ترتيب الخطة.</p>}
+                {hifz.review_suggestion && (
+                  <p className="text-blue-200 text-sm">
+                    مراجعة مقترحة: {[
+                      hifz.review_suggestion.review_juz?.length ? `الأجزاء ${hifz.review_suggestion.review_juz.join('، ')}` : '',
+                      hifz.review_suggestion.partial_review_pages ? `${hifz.review_suggestion.partial_review_pages} صفحات من جزء ${hifz.review_suggestion.partial_review_juz}` : '',
+                    ].filter(Boolean).join(' و')} (الأقدم مراجعةً)
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-300">
+                  <span>المحفوظ: {hifz.totals.total_pages} صفحة ({hifz.totals.juz_count} جزء مكتمل)</span>
+                  {hifz.current && <span>الجزء {hifz.current.juz}: أُنجز {hifz.current.done} من {hifz.current.total} — متبقٍّ {hifz.current.remaining}</span>}
+                  {!hifz.plan && <span className="text-amber-300">لا خطة بعد — المقدار حسب آخر تسميع</span>}
+                  {hifz.plan && <span>الخطة: {hifz.plan.pages_per_session} ص/تسميع — {hifz.direction === 'custom' ? `أجزاء مختارة: ${(hifz.plan.juz_order || []).join(' ← ')}` : (hifz.direction === 'desc' ? 'تنازلي' : 'تصاعدي')}</span>}
+                  {hifz.plan_status && (
+                    <span className={hifz.plan_status.status === 'behind' ? 'text-red-300' : 'text-emerald-300'}>
+                      {hifz.plan_status.label}: {hifz.plan_status.done} من {hifz.plan_status.expected} صفحة متوقعة
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* حفظ جديد */}
             <div className="space-y-4">
               <div className="flex items-center gap-3">
@@ -752,6 +886,20 @@ const RecitationsNew = () => {
                       />
                     </div>
                   </div>
+
+                  {recitationWarnings().map((w) => (
+                    <div key={w} className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                      <p className="text-amber-200 text-sm">{w}</p>
+                    </div>
+                  ))}
+
+                  {willCompleteJuz() && (
+                    <div className="p-3 rounded-lg bg-emerald-500/15 border border-emerald-500/40 flex items-center gap-2">
+                      <PartyPopper className="w-4 h-4 text-emerald-300 flex-shrink-0" />
+                      <p className="text-emerald-200 text-sm">بهذا التسميع يُتمّ الطالب الجزء {formData.juz_number} — سيُسجَّل محفوظًا وينتقل الاقتراح القادم إلى الجزء التالي.</p>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label className="text-slate-300">عدد الأخطاء</Label>
@@ -913,6 +1061,16 @@ const RecitationsNew = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <MemorizationPlanDialog
+        student={planStudent}
+        open={!!planStudent}
+        onOpenChange={(o) => { if (!o) setPlanStudent(null); }}
+        onSaved={() => {
+          fetchPlanStatuses();
+          if (dialogOpen && selectedStudent) loadSuggestion(selectedStudent);
+        }}
+      />
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>

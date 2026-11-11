@@ -1,3 +1,4 @@
+import { can } from '../lib/permissions';
 import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { MessageCircle, X, Send, ArrowRight, Loader2, Users, BookUser, Shield, Trash2 } from 'lucide-react';
@@ -38,7 +39,8 @@ const ChatWidget = () => {
 
   const role = user?.role;
   const isStudent = role === 'student';
-  const enabled = ['student', 'sheikh', 'admin'].includes(role);
+  // المدير المساعد بلا صلاحية «المحادثات» ما بتظهرله الأداة
+  const enabled = ['student', 'sheikh', 'admin'].includes(role) && can(user, 'chat');
 
   const fetchUnread = async () => {
     try { const r = await axios.get(`${API}/chat/unread-count`); setUnread(r.data.unread || 0); } catch (e) {}

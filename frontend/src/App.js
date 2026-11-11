@@ -59,8 +59,12 @@ import StudentTracking from './pages/StudentTracking';
 import MyProgress from './pages/MyProgress';
 import StudentHomework from './pages/StudentHomework';
 import StudentRecord from './pages/StudentRecord';
+import AssistantAccounts from './pages/AssistantAccounts';
+import { canOpenRoute } from './lib/permissions';
 import TrackingSettings from './pages/TrackingSettings';
 import DisplaySettings from './pages/DisplaySettings';
+import Documents from './pages/Documents';
+import Meetings from './pages/Meetings';
 import TasksMeetings from './pages/TasksMeetings';
 import MyTasks from './pages/MyTasks';
 import { hiddenPathsFor } from './lib/navItems';
@@ -93,6 +97,11 @@ const ProtectedRoute = ({ children, allow }) => {
   }
 
   if (hiddenPathsFor(user.role, uiSettings).includes(location.pathname)) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // المدير المساعد: الصفحات خارج صلاحياته تُعاد للرئيسية (والخادم بيمنعها أصلًا)
+  if (!canOpenRoute(user, location.pathname)) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -564,6 +573,39 @@ function AppRoutes() {
           <ProtectedRoute allow={['admin']}>
             <Layout>
               <DisplaySettings />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/meetings"
+        element={
+          <ProtectedRoute allow={['admin']}>
+            <Layout>
+              <Meetings />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/documents"
+        element={
+          <ProtectedRoute allow={['admin']}>
+            <Layout>
+              <Documents />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin-accounts"
+        element={
+          <ProtectedRoute allow={['admin']}>
+            <Layout>
+              <AssistantAccounts />
             </Layout>
           </ProtectedRoute>
         }

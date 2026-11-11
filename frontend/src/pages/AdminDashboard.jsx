@@ -3,8 +3,11 @@ import { Link } from 'react-router-dom';
 import StudentLink from '../components/StudentLink';
 import OnlineUsers from '../components/OnlineUsers';
 import TasksSummaryCard from '../components/TasksSummaryCard';
+import WeeklyTrackingBoard from '../components/WeeklyTrackingBoard';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { can, OWNER } from '../lib/permissions';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -16,7 +19,7 @@ import {
   Users, BookOpen, Calendar, Trophy, TrendingUp, 
   GraduationCap, UserCheck, Target, Eye, Medal,
   ArrowUpRight, UserPlus, Clock, Archive, RefreshCw, Download, FileSpreadsheet, Edit,
-  ChevronDown, ChevronUp, Loader2, BookUser, AlertTriangle, Bell
+  ChevronDown, ChevronUp, Loader2, BookUser, AlertTriangle, Bell, ShieldCheck
 } from 'lucide-react';
 import { formatDate as fmtDate } from '../lib/utils';
 
@@ -45,6 +48,8 @@ const RateBar = ({ label, value, color, isDark }) => {
 
 const AdminDashboard = () => {
   const { isDark } = useTheme();
+  const { user } = useAuth();
+  const isOwner = can(user, OWNER); // المدير الرئيسي (مش مساعد)
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [termDialogOpen, setTermDialogOpen] = useState(false);
@@ -79,7 +84,7 @@ const AdminDashboard = () => {
     fetchActiveTerm();
     fetchAllTerms();
     fetchPointsConfig();
-    fetchLateSheikhs();
+    if (can(user, 'sheikhs')) fetchLateSheikhs();
   }, []);
 
   const fetchPointsConfig = async () => {
@@ -419,25 +424,33 @@ const AdminDashboard = () => {
         <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
           <p className={`text-xs mb-2 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>وصول سريع</p>
           <div className="flex flex-wrap gap-2">
-            <Link to="/sheikh-management">
+            {isOwner && (
+              <Link to="/admin-accounts">
+                <Button variant="outline" size="sm" className={`text-xs text-rose-400 border-rose-500/30 hover:bg-rose-500/10 ${isDark ? '' : 'border-rose-300'}`}>
+                  <ShieldCheck className="w-3 h-3 ml-1" />
+                  إنشاء حسابات وصلاحيات
+                </Button>
+              </Link>
+            )}
+            {can(user, 'sheikhs') && <Link to="/sheikh-management">
               <Button variant="outline" size="sm" className={`text-xs text-blue-400 border-blue-500/30 hover:bg-blue-500/10 ${isDark ? '' : 'border-blue-300'}`}>
                 <UserPlus className="w-3 h-3 ml-1" />
                 إضافة مشرف
               </Button>
-            </Link>
-            <Link to="/tracking-settings">
+            </Link>}
+            {can(user, 'tracking') && <Link to="/tracking-settings">
               <Button variant="outline" size="sm" className={`text-xs text-amber-400 border-amber-500/30 hover:bg-amber-500/10 ${isDark ? '' : 'border-amber-300'}`}>
                 <Trophy className="w-3 h-3 ml-1" />
                 إعدادات نقاط التميز
               </Button>
-            </Link>
-            <Link to="/student-management">
+            </Link>}
+            {can(user, 'students') && <Link to="/student-management">
               <Button variant="outline" size="sm" className={`text-xs text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 ${isDark ? '' : 'border-emerald-300'}`}>
                 <GraduationCap className="w-3 h-3 ml-1" />
                 إدارة الطلاب
               </Button>
-            </Link>
-            <Button
+            </Link>}
+            {isOwner && <Button
               onClick={() => setExportDialogOpen(true)}
               variant="outline"
               size="sm"
@@ -445,7 +458,7 @@ const AdminDashboard = () => {
             >
               <FileSpreadsheet className="w-3 h-3 ml-1" />
               تحميل Excel
-            </Button>
+            </Button>}
           </div>
         </div>
       </div>
@@ -640,6 +653,9 @@ const AdminDashboard = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* ورق المتابعة الأسبوعي بالأرقام — مجموعات / طلاب */}
+      {can(user, 'statistics') && <WeeklyTrackingBoard />}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Top Groups */}
@@ -956,8 +972,8 @@ const AdminDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* جدول الفصول الدراسية */}
-      <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
+      {/* جدول الفصول الدراسية — المدير الرئيسي فقط */}
+      {isOwner && <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
         <CardHeader>
           <CardTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
             <Calendar className="w-5 h-5 text-purple-400" />
@@ -1031,7 +1047,7 @@ const AdminDashboard = () => {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Points System Info (F2) + N2 editor */}
       <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>
@@ -1041,14 +1057,14 @@ const AdminDashboard = () => {
               <Target className="w-5 h-5 text-emerald-400" />
               نظام النقاط
             </CardTitle>
-            <div className="flex items-center gap-2">
+            {isOwner && <div className="flex items-center gap-2">
               <Button size="sm" variant="outline" onClick={recomputePoints} disabled={recomputing} className={isDark ? 'border-white/10 text-white hover:bg-white/5' : ''}>
                 <RefreshCw className={`w-4 h-4 ml-1 ${recomputing ? 'animate-spin' : ''}`} /> إعادة احتساب النقاط
               </Button>
               <Button size="sm" variant="outline" onClick={openPointsEditor} className={isDark ? 'border-white/10 text-white hover:bg-white/5' : ''}>
                 <Edit className="w-4 h-4 ml-1" /> تعديل القواعد
               </Button>
-            </div>
+            </div>}
           </div>
         </CardHeader>
         <CardContent>

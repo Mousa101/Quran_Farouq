@@ -175,6 +175,9 @@ class UserResponse(BaseModel):
     role: str
     group_id: Optional[str] = None
     is_activated: bool = False
+    # مدير مساعد: is_assistant + مفاتيح الأقسام المسموحة (None للمدير الرئيسي وباقي الأدوار)
+    is_assistant: bool = False
+    permissions: Optional[List[str]] = None
     student_phone: Optional[str] = None
     father_phone: Optional[str] = None
     mother_phone: Optional[str] = None

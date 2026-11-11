@@ -56,7 +56,7 @@ const TopBar = () => {
         )}
         <div className="min-w-0">
           <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{user.name}</p>
-          <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{ROLE_LABEL[user.role] || user.role}</p>
+          <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{user.is_assistant ? 'مدير مساعد' : (ROLE_LABEL[user.role] || user.role)}</p>
         </div>
       </div>
 
