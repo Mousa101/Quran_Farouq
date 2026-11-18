@@ -609,6 +609,8 @@ ASSISTANT_RULES = [
     ("/audit-logs", ("audit",), ()),
     ("/chat", ("chat",), ()),
     ("/competitions", ("competitions",), ()),
+    ("/reports/groups-overview", ("groups", "attendance", "recitations", "statistics"), ()),
+    ("/parent-contacts", ("students",), ()),
 ]
 # متاحة لأي مدير مساعد (حسابه الشخصي + الصفحة الرئيسية)
 ASSISTANT_OPEN = ("/auth/me", "/auth/login", "/users/me", "/notifications", "/health",
@@ -1621,6 +1623,7 @@ DB_INDEXES = {
                     [("student_id", 1), ("record_date", -1)],
                     [("student_id", 1), ("did_not_recite", 1)]],
     "recitations_archives": [[("student_id", 1)], [("term_id", 1)]],
+    "parent_contacts": [[("student_id", 1)], [("contact_date", -1)]],
     "attendance": [[("student_id", 1)], [("term_id", 1)], [("group_id", 1)],
                    [("student_id", 1), ("date", 1)], [("status", 1)]],
     "attendance_archives": [[("student_id", 1)], [("term_id", 1)]],
@@ -2133,18 +2136,25 @@ async def late_sheikhs_report(days: int = LATE_ATTENDANCE_DEFAULT_DAYS,
     students = await db.users.find({"role": "student"}, {"_id": 0, "id": 1, "group_id": 1}).to_list(5000)
 
     group_sheikh = {g["id"]: g.get("sheikh_id") for g in groups}
-    student_sheikh = {s["id"]: group_sheikh.get(s.get("group_id")) for s in students}
+    group_all_sheikhs = {g["id"]: group_sheikh_ids(g) for g in groups}
+    student_group = {s["id"]: s.get("group_id") for s in students}
 
-    # آخر تاريخ حضور مسجَّل لكل مشرف (عبر طلابه)
-    atts = await db.attendance.find({}, {"_id": 0, "student_id": 1, "date": 1}).to_list(200000)
-    last_by_sheikh = {}
+    # آخر تاريخ حضور مسجَّل لكل مجموعة — أيًّا كان من سجّله (المشرف أو المساعد أو المدير)،
+    # فتسجيل أحدهم يغني عن الباقين ولا يُحسب أي مشرف في المجموعة متأخرًا.
+    atts = await db.attendance.find({}, {"_id": 0, "student_id": 1, "group_id": 1, "date": 1}).to_list(200000)
+    last_by_group = {}
     for a in atts:
-        shid = student_sheikh.get(a["student_id"])
-        if not shid:
+        gid = a.get("group_id") or student_group.get(a["student_id"])
+        if not gid:
             continue
         d = a.get("date") or ""
-        if d > last_by_sheikh.get(shid, ""):
-            last_by_sheikh[shid] = d
+        if d > last_by_group.get(gid, ""):
+            last_by_group[gid] = d
+    last_by_sheikh = {}
+    for gid, d in last_by_group.items():
+        for shid in group_all_sheikhs.get(gid, []):
+            if d > last_by_sheikh.get(shid, ""):
+                last_by_sheikh[shid] = d
 
     today = datetime.now(timezone.utc).date()
     rows = []
@@ -4114,6 +4124,7 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
         
         recitation_dict = recitation.model_dump()
         recitation_dict["created_at"] = recitation_date.isoformat()
+        recitation_dict["recorded_by"] = current_user["user_id"]
         await db.recitations.insert_one(recitation_dict)
         
         return {"message": "تم تسجيل عدم التسميع", "recitation_id": recitation.id, "points_earned": 0}
@@ -4206,6 +4217,7 @@ async def create_recitation(recitation_data: RecitationCreate, current_user: dic
         if not already:
             juz_completed = jn
 
+    recitation_dict["recorded_by"] = current_user["user_id"]
     await db.recitations.insert_one(recitation_dict)
     if juz_completed:
         await create_notification_internal(
@@ -4506,6 +4518,7 @@ async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict 
     
     attendance_dict = attendance.model_dump()
     attendance_dict["created_at"] = attendance_dict["created_at"].isoformat()
+    attendance_dict["recorded_by"] = current_user["user_id"]  # من سجّل فعليًا (مشرف/مساعد/مدير)
     
     await db.attendance.insert_one(attendance_dict)
     
@@ -13156,6 +13169,280 @@ async def delete_document(doc_id: str, current_user: dict = Depends(get_current_
     await log_admin_action(current_user, "delete_document", "document", doc_id, doc["title"])
     return {"message": "تم حذف المستند"}
 
+
+
+# ============== نظرة عامة على المجموعات (تسميع + حضور + ورقة المتابعة يوم السبت) ==============
+def _jordan_today() -> str:
+    from datetime import timedelta
+    return (datetime.now(timezone.utc) + timedelta(hours=3)).date().isoformat()
+
+
+@api_router.get("/reports/groups-overview")
+async def groups_overview(date: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """لكل مجموعة في يوم محدد: عدد الحضور وعدد من سمّع ومن سجّل.
+    تسجيل أي مشرف في المجموعة (الرئيسي أو المساعد) أو المدير يكفي — لا يُحسب أحد متأخرًا.
+    يوم السبت (بداية الأسبوع) تظهر أيضًا حالة تسليم ورقة المتابعة."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    from datetime import timedelta
+    day = (date or _jordan_today())[:10]
+    try:
+        day_d = datetime.strptime(day, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="تاريخ غير صالح")
+
+    gq = {}
+    if current_user["role"] == "sheikh":
+        gq = {"id": {"$in": await _sheikh_group_ids(current_user["user_id"])}}
+    groups = await db.groups.find(gq, {"_id": 0}).to_list(3000)
+    gids = [g["id"] for g in groups]
+    students = await db.users.find({"role": "student", "group_id": {"$in": gids}},
+                                   {"_id": 0, "id": 1, "name": 1, "group_id": 1}).to_list(10000)
+    sids = [s["id"] for s in students]
+
+    atts = await db.attendance.find({"student_id": {"$in": sids}, "date": day},
+                                    {"_id": 0, "student_id": 1, "status": 1, "sheikh_id": 1,
+                                     "recorded_by": 1}).to_list(20000)
+    recs = await db.recitations.find({"student_id": {"$in": sids}, "record_date": day},
+                                     {"_id": 0, "student_id": 1, "did_not_recite": 1, "sheikh_id": 1,
+                                      "recorded_by": 1, "new_pages": 1}).to_list(20000)
+
+    is_saturday = day_d.weekday() == 5
+    sheets_by_student = {}
+    if is_saturday:
+        weeks = [day, (day_d - timedelta(days=7)).isoformat()]
+        for sh in await db.tracking_sheets.find({"student_id": {"$in": sids}, "week_start": {"$in": weeks}},
+                                                {"_id": 0, "student_id": 1, "week_start": 1,
+                                                 "points_earned": 1}).to_list(20000):
+            prev = sheets_by_student.get(sh["student_id"])
+            if not prev or sh["week_start"] > prev["week_start"]:
+                sheets_by_student[sh["student_id"]] = sh
+
+    user_ids = set()
+    for g in groups:
+        user_ids.update(group_sheikh_ids(g))
+    for r in atts + recs:
+        user_ids.add(r.get("recorded_by") or r.get("sheikh_id"))
+    users = {u["id"]: u for u in await db.users.find(
+        {"id": {"$in": [i for i in user_ids if i]}},
+        {"_id": 0, "id": 1, "name": 1, "role": 1, "is_assistant": 1}).to_list(2000)}
+
+    def who(uid):
+        u = users.get(uid) or {}
+        role = {"admin": "مدير", "sheikh": "مشرف"}.get(u.get("role"), "")
+        if u.get("is_assistant"):
+            role = "مدير مساعد"
+        return {"id": uid, "name": u.get("name") or "—", "role": role}
+
+    att_by = {a["student_id"]: a for a in atts}
+    rec_by = {}
+    for r in recs:
+        rec_by.setdefault(r["student_id"], []).append(r)
+
+    lesson_days = await get_active_lesson_days()
+    day_name = arabic_weekday_of(day)
+    rows = []
+    for g in groups:
+        g_students = [s for s in students if s.get("group_id") == g["id"]]
+        st_rows, recorders = [], {}
+        present = absent = excused = recited = not_recited = sheets = 0
+        for s in g_students:
+            a = att_by.get(s["id"])
+            rl = rec_by.get(s["id"], [])
+            if a:
+                st = a.get("status")
+                present += st == "present"
+                absent += st == "absent"
+                excused += st not in ("present", "absent")
+                uid = a.get("recorded_by") or a.get("sheikh_id")
+                recorders[uid] = who(uid)
+            did = any(not r.get("did_not_recite") for r in rl)
+            if did:
+                recited += 1
+            elif rl:
+                not_recited += 1
+            for r in rl:
+                uid = r.get("recorded_by") or r.get("sheikh_id")
+                recorders[uid] = who(uid)
+            sheet = sheets_by_student.get(s["id"]) if is_saturday else None
+            sheets += bool(sheet)
+            st_rows.append({
+                "student_id": s["id"], "name": s.get("name") or "",
+                "attendance": a.get("status") if a else None,
+                "recited": did, "recitation_recorded": bool(rl),
+                "pages": sum((r.get("new_pages") or 0) for r in rl),
+                "sheet": {"week_start": sheet["week_start"], "points": sheet.get("points_earned", 0)} if sheet else None,
+            })
+        total = len(g_students)
+        att_done = sum(1 for s in g_students if s["id"] in att_by)
+        rec_done = sum(1 for s in g_students if s["id"] in rec_by)
+        if total == 0:
+            status = "empty"
+        elif att_done == 0 and rec_done == 0:
+            status = "none"
+        elif att_done >= total:
+            status = "done"
+        else:
+            status = "partial"
+        st_rows.sort(key=lambda r: r["name"])
+        rows.append({
+            "group_id": g["id"], "group_name": g.get("name") or "",
+            "sheikhs": [who(i) for i in group_sheikh_ids(g)],
+            "students_count": total,
+            "attendance_recorded": att_done, "present": present, "absent": absent, "excused": excused,
+            "recitation_recorded": rec_done, "recited": recited, "not_recited": not_recited,
+            "tracking_sheets": sheets if is_saturday else None,
+            "recorded_by": list(recorders.values()),
+            "status": status,
+            "students": st_rows,
+        })
+    rows.sort(key=lambda r: r["group_name"])
+    return {
+        "date": day, "day_name": day_name, "is_saturday": is_saturday,
+        "is_lesson_day": (not lesson_days) or (day_name in lesson_days),
+        "totals": {
+            "groups": len(rows),
+            "students": len(students),
+            "present": sum(r["present"] for r in rows),
+            "attendance_recorded": sum(r["attendance_recorded"] for r in rows),
+            "recited": sum(r["recited"] for r in rows),
+            "groups_done": sum(1 for r in rows if r["status"] == "done"),
+            "groups_none": sum(1 for r in rows if r["status"] == "none"),
+            "tracking_sheets": sum(r["tracking_sheets"] or 0 for r in rows) if is_saturday else None,
+        },
+        "groups": rows,
+    }
+
+
+# ============== ملف التواصل مع الأهل ==============
+class ParentContactIn(BaseModel):
+    student_id: str
+    contacted: bool = True
+    contact_date: Optional[str] = None
+    method: Optional[str] = None   # اتصال / واتساب / زيارة / رسالة / أخرى
+    notes: Optional[str] = None
+
+
+async def _contact_allowed_student_ids(current_user: dict) -> Optional[set]:
+    """None = كل الطلاب (المدير)؛ للمشرف: طلاب مجموعاته فقط."""
+    if current_user["role"] == "admin":
+        return None
+    gids = await _sheikh_group_ids(current_user["user_id"])
+    docs = await db.users.find({"role": "student", "group_id": {"$in": gids}}, {"_id": 0, "id": 1}).to_list(5000)
+    return {d["id"] for d in docs}
+
+
+@api_router.post("/parent-contacts")
+async def create_parent_contact(data: ParentContactIn, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    allowed = await _contact_allowed_student_ids(current_user)
+    if allowed is not None and data.student_id not in allowed:
+        raise HTTPException(status_code=403, detail="هذا الطالب ليس من طلابك")
+    student = await db.users.find_one({"id": data.student_id, "role": "student"}, {"_id": 0, "name": 1})
+    if not student:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    me = await db.users.find_one({"id": current_user["user_id"]}, {"_id": 0, "name": 1})
+    doc = {
+        "id": str(uuid.uuid4()),
+        "student_id": data.student_id,
+        "contacted": bool(data.contacted),
+        "contact_date": (data.contact_date or _jordan_today())[:10],
+        "method": (data.method or "").strip()[:50],
+        "notes": (data.notes or "").strip()[:3000],
+        "created_by": current_user["user_id"],
+        "created_by_name": (me or {}).get("name") or "",
+        "created_by_role": current_user["role"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.parent_contacts.insert_one(dict(doc))
+    return {"message": "تم حفظ التواصل", "contact": doc}
+
+
+@api_router.get("/parent-contacts")
+async def list_parent_contacts(student_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """سجل التواصل مع الأهل. المدير يرى الكل؛ المشرف يرى طلابه."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    allowed = await _contact_allowed_student_ids(current_user)
+    q = {}
+    if student_id:
+        if allowed is not None and student_id not in allowed:
+            raise HTTPException(status_code=403, detail="هذا الطالب ليس من طلابك")
+        q["student_id"] = student_id
+    elif allowed is not None:
+        q["student_id"] = {"$in": list(allowed)}
+    return await db.parent_contacts.find(q, {"_id": 0}).sort(
+        [("contact_date", -1), ("created_at", -1)]).to_list(5000)
+
+
+@api_router.get("/parent-contacts/summary")
+async def parent_contacts_summary(group_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """لكل طالب: آخر تواصل (تم أم لا + الملاحظات) وعدد مرات التواصل."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    uq = {"role": "student"}
+    if current_user["role"] == "sheikh":
+        gids = await _sheikh_group_ids(current_user["user_id"])
+        uq["group_id"] = group_id if (group_id and group_id in gids) else {"$in": gids}
+    elif group_id:
+        uq["group_id"] = group_id
+    students = await db.users.find(uq, {"_id": 0, "id": 1, "name": 1, "group_id": 1,
+                                        "father_phone": 1, "mother_phone": 1, "parent_phone": 1}).to_list(5000)
+    sids = [s["id"] for s in students]
+    contacts = await db.parent_contacts.find({"student_id": {"$in": sids}}, {"_id": 0}).sort(
+        [("contact_date", 1), ("created_at", 1)]).to_list(50000)
+    last, count = {}, {}
+    for c in contacts:
+        last[c["student_id"]] = c
+        count[c["student_id"]] = count.get(c["student_id"], 0) + (1 if c.get("contacted") else 0)
+    gnames = {g["id"]: g["name"] for g in await db.groups.find({}, {"_id": 0, "id": 1, "name": 1}).to_list(3000)}
+    rows = [{
+        "student_id": s["id"], "student_name": s.get("name") or "",
+        "group_id": s.get("group_id"), "group_name": gnames.get(s.get("group_id"), "بدون مجموعة"),
+        "parent_phone": s.get("father_phone") or s.get("mother_phone") or s.get("parent_phone") or "",
+        "last_contact": last.get(s["id"]),
+        "contacts_count": count.get(s["id"], 0),
+    } for s in students]
+    rows.sort(key=lambda r: (r["last_contact"] is not None, r["student_name"]))
+    return rows
+
+
+@api_router.delete("/parent-contacts/{contact_id}")
+async def delete_parent_contact(contact_id: str, current_user: dict = Depends(get_current_user)):
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    c = await db.parent_contacts.find_one({"id": contact_id}, {"_id": 0})
+    if not c:
+        raise HTTPException(status_code=404, detail="السجل غير موجود")
+    if current_user["role"] != "admin" and c.get("created_by") != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="يمكنك حذف سجلاتك فقط")
+    await db.parent_contacts.delete_one({"id": contact_id})
+    return {"message": "تم الحذف"}
+
+
+
+
+# ============== حذف فصل دراسي نهائيًا ==============
+@api_router.delete("/terms/{term_id}")
+async def delete_term_permanently(term_id: str, confirm_name: str = "", current_user: dict = Depends(get_current_user)):
+    """حذف فصل مغلق نهائيًا مع كل سجلاته المؤرشفة (المدير الرئيسي فقط).
+    لا يُحذف الفصل النشط. يشترط كتابة اسم الفصل للتأكيد. لا يمكن التراجع."""
+    ensure_role(current_user, "admin", "فقط المدير يمكنه حذف الفصول")
+    if await is_assistant_admin(current_user):
+        raise HTTPException(status_code=403, detail=OWNER_ONLY_DETAIL)
+    term = await db.terms.find_one({"id": term_id}, {"_id": 0})
+    if not term:
+        raise HTTPException(status_code=404, detail="الفصل غير موجود")
+    if term.get("is_active"):
+        raise HTTPException(status_code=400, detail="لا يمكن حذف الفصل النشط — أغلقه وابدأ فصلًا جديدًا أولًا")
+    if (confirm_name or "").strip() != (term.get("name") or "").strip():
+        raise HTTPException(status_code=400, detail=f"للتأكيد اكتب اسم الفصل بالضبط: «{term.get('name')}»")
+
+    removed = {}
+    for coll in ("term_archives", "attendance_archives", "recitations_archives",
+                 "tracking_sheets_archives", "points_adjustments_archives"):
+        res = await db[coll].delete_many({"term_id": term_id})
+        removed[coll] = res.deleted_count
+    await db.terms.delete_one({"id": term_id})
+    await log_admin_action(current_user, "delete_term", "term", term_id, term.get("name"),
+                           f"حذف الفصل نهائيًا مع {sum(removed.values())} سجل مؤرشف")
+    return {"message": f"تم حذف الفصل «{term.get('name')}» نهائيًا", "removed": removed}
 
 # Include the router
 app.include_router(api_router, dependencies=[Depends(enforce_assistant_permissions)])

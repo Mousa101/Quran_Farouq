@@ -4,6 +4,7 @@ import StudentLink from '../components/StudentLink';
 import OnlineUsers from '../components/OnlineUsers';
 import TasksSummaryCard from '../components/TasksSummaryCard';
 import WeeklyTrackingBoard from '../components/WeeklyTrackingBoard';
+import GlobalSearch from '../components/GlobalSearch';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -19,7 +20,7 @@ import {
   Users, BookOpen, Calendar, Trophy, TrendingUp, 
   GraduationCap, UserCheck, Target, Eye, Medal,
   ArrowUpRight, UserPlus, Clock, Archive, RefreshCw, Download, FileSpreadsheet, Edit,
-  ChevronDown, ChevronUp, Loader2, BookUser, AlertTriangle, Bell, ShieldCheck
+  ChevronDown, ChevronUp, Loader2, BookUser, AlertTriangle, Bell, ShieldCheck, Trash2
 } from 'lucide-react';
 import { formatDate as fmtDate } from '../lib/utils';
 
@@ -58,6 +59,9 @@ const AdminDashboard = () => {
   const [closingTerm, setClosingTerm] = useState(false);
   const [activeTerm, setActiveTerm] = useState(null);
   const [allTerms, setAllTerms] = useState([]);
+  const [deleteTerm, setDeleteTerm] = useState(null);       // الفصل المراد حذفه نهائيًا
+  const [deleteTermConfirm, setDeleteTermConfirm] = useState('');
+  const [deletingTerm, setDeletingTerm] = useState(false);
   const [selectedTermId, setSelectedTermId] = useState('new');
   const [loadingTerms, setLoadingTerms] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -226,6 +230,26 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleDeleteTerm = async () => {
+    if (!deleteTerm) return;
+    if (deleteTermConfirm.trim() !== (deleteTerm.name || '').trim()) {
+      toast.error(`اكتب اسم الفصل بالضبط: «${deleteTerm.name}»`);
+      return;
+    }
+    setDeletingTerm(true);
+    try {
+      const res = await axios.delete(`${API}/terms/${deleteTerm.id}`, { params: { confirm_name: deleteTermConfirm.trim() } });
+      toast.success(res.data.message);
+      setDeleteTerm(null);
+      setDeleteTermConfirm('');
+      fetchAllTerms();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل حذف الفصل');
+    } finally {
+      setDeletingTerm(false);
+    }
+  };
+
   const handleExportStudents = async (termId = null) => {
     setExporting(true);
     try {
@@ -382,6 +406,8 @@ const AdminDashboard = () => {
 
   return (
     <div className="space-y-4 md:space-y-6 animate-fadeIn">
+      {/* بحث عام: مجموعة / طالب / خدمة */}
+      <GlobalSearch />
       {/* Welcome Header */}
       <div className={`p-4 md:p-6 rounded-xl ${isDark ? 'glass-card border border-white/10' : 'bg-white border border-slate-200 shadow-sm'}`}>
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -1039,6 +1065,18 @@ const AdminDashboard = () => {
                         >
                           <Download className="w-4 h-4" />
                         </Button>
+                        {isOwner && !term.is_active && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="حذف الفصل نهائيًا"
+                            onClick={() => { setDeleteTerm(term); setDeleteTermConfirm(''); }}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            data-testid={`delete-term-${term.id}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1048,6 +1086,32 @@ const AdminDashboard = () => {
           )}
         </CardContent>
       </Card>}
+
+      {/* حذف فصل نهائيًا */}
+      <Dialog open={!!deleteTerm} onOpenChange={(o) => { if (!o) setDeleteTerm(null); }}>
+        <DialogContent className={isDark ? 'bg-slate-900 border-slate-700' : 'bg-white'}>
+          <DialogHeader>
+            <DialogTitle className={`flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+              <Trash2 className="w-5 h-5 text-red-400" />
+              حذف الفصل نهائيًا
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p className="text-red-400">
+              سيُحذف الفصل «{deleteTerm?.name}» من الموقع مع كل سجلاته المؤرشفة (الحضور، التسميع، ورق المتابعة، النقاط). لا يمكن التراجع عن هذا الإجراء.
+            </p>
+            <Label className={isDark ? 'text-slate-300' : 'text-slate-700'}>للتأكيد اكتب اسم الفصل:</Label>
+            <Input value={deleteTermConfirm} onChange={(e) => setDeleteTermConfirm(e.target.value)} placeholder={deleteTerm?.name || ''} data-testid="delete-term-confirm" />
+          </div>
+          <DialogFooter className="gap-2 mt-2">
+            <Button variant="ghost" onClick={() => setDeleteTerm(null)}>إلغاء</Button>
+            <Button onClick={handleDeleteTerm} disabled={deletingTerm || deleteTermConfirm.trim() !== (deleteTerm?.name || '').trim()} className="bg-red-600 hover:bg-red-700" data-testid="delete-term-submit">
+              {deletingTerm ? <Loader2 className="w-4 h-4 ml-1 animate-spin" /> : <Trash2 className="w-4 h-4 ml-1" />}
+              حذف نهائي
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Points System Info (F2) + N2 editor */}
       <Card className={isDark ? 'glass-card border-white/10' : 'bg-white border-slate-200'}>

@@ -22,6 +22,7 @@ import { ar } from 'date-fns/locale';
 import { formatDate as fmtDate } from '../lib/utils';
 import MemorizationBar from '../components/MemorizationBar';
 import HifzProgressCard from '../components/HifzProgressCard';
+import StudentPlanButton from '../components/StudentPlanButton';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -184,6 +185,7 @@ const StudentProfile = () => {
                     <Edit className="w-4 h-4 ml-1" />تعديل البيانات
                   </Button>
                 )}
+                <StudentPlanButton student={{ id: student.id, name: student.name }} className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 bg-transparent" />
               </div>
               <p className="text-slate-400 text-sm">{student.email}</p>
               {group && (

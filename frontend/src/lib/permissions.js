@@ -12,6 +12,8 @@ export const ROUTE_PERMS = {
   student: 'students',
   'student-record': 'students',
   'group-management': 'groups',
+  'groups-overview': 'groups',
+  'parent-contacts': 'students',
   attendance: 'attendance',
   recitations: 'recitations',
   'recitations-old': 'recitations',

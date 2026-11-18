@@ -67,6 +67,8 @@ import Documents from './pages/Documents';
 import Meetings from './pages/Meetings';
 import TasksMeetings from './pages/TasksMeetings';
 import MyTasks from './pages/MyTasks';
+import GroupsOverview from './pages/GroupsOverview';
+import ParentContacts from './pages/ParentContacts';
 import { hiddenPathsFor } from './lib/navItems';
 import { ROLE_SLUGS, loginPathFor, registerPathFor, lastLoginPath } from './lib/authRoutes';
 import './App.css';
@@ -397,6 +399,28 @@ function AppRoutes() {
           <ProtectedRoute allow={['admin']}>
             <Layout>
               <GroupManagement />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/groups-overview"
+        element={
+          <ProtectedRoute allow={['admin', 'sheikh']}>
+            <Layout>
+              <GroupsOverview />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/parent-contacts"
+        element={
+          <ProtectedRoute allow={['admin', 'sheikh']}>
+            <Layout>
+              <ParentContacts />
             </Layout>
           </ProtectedRoute>
         }

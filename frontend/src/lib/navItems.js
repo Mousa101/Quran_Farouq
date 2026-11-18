@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, Trophy, Calendar, Bell, BookOpen, UserCheck, FileText, UsersRound, Star,
   GraduationCap, ClipboardList, UserCog, UserPlus, BookMarked, CalendarDays, TrendingUp, DollarSign,
   BookText, Award, Settings, BarChart3, AlertTriangle, Shield, Table2, Megaphone, MessageSquare,
-  BookUser, SlidersHorizontal, FolderOpen, ClipboardCheck, ShieldCheck,
+  BookUser, SlidersHorizontal, FolderOpen, ClipboardCheck, ShieldCheck, LayoutGrid, PhoneCall,
 } from 'lucide-react';
 
 // روابط القائمة الجانبية لكل دور. المدير يتحكم في إظهار روابط المشرف والطالب
@@ -16,6 +16,8 @@ export const NAV_ITEMS = {
     { to: '/sheikh-management', icon: BookUser, label: 'إدارة المشرفين' },
     { to: '/student-management', icon: GraduationCap, label: 'إدارة الطلاب' },
     { to: '/group-management', icon: UsersRound, label: 'إدارة المجموعات' },
+    { to: '/groups-overview', icon: LayoutGrid, label: 'نظرة عامة على المجموعات' },
+    { to: '/parent-contacts', icon: PhoneCall, label: 'ملف التواصل' },
     { to: '/pending-students', icon: UserPlus, label: 'طلبات التسجيل' },
     { to: '/attendance', icon: UserCheck, label: 'تسجيل الحضور' },
     { to: '/recitations', icon: BookOpen, label: 'تسجيل التسميع' },
@@ -43,6 +45,8 @@ export const NAV_ITEMS = {
     { to: '/dashboard', icon: LayoutDashboard, label: 'الرئيسية' },
     { to: '/my-tasks', icon: ClipboardCheck, label: 'مهامي' },
     { to: '/groups', icon: UsersRound, label: 'مجموعاتي' },
+    { to: '/groups-overview', icon: LayoutGrid, label: 'نظرة عامة على المجموعات' },
+    { to: '/parent-contacts', icon: PhoneCall, label: 'ملف التواصل' },
     { to: '/initial-assessment', icon: ClipboardList, label: 'تقييم الطلاب الجدد' },
     { to: '/attendance', icon: UserCheck, label: 'الحضور' },
     { to: '/tracking', icon: FileText, label: 'ورق المتابعة' },

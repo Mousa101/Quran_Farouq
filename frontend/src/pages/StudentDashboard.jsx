@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import MemorizationBar from '../components/MemorizationBar';
 import HifzProgressCard from '../components/HifzProgressCard';
+import StudentPlanButton from '../components/StudentPlanButton';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -245,6 +246,7 @@ console.log(stats)
                     {groupInfo.name}
                   </Badge>
                 )}
+                {user?.id && <StudentPlanButton student={{ id: user.id, name: stats?.student?.name || user?.name }} label="خطتي" className="h-7 text-xs border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 bg-transparent" />}
               </div>
               <div className="flex flex-wrap gap-1 md:gap-2 mt-1 md:mt-2">
                 
