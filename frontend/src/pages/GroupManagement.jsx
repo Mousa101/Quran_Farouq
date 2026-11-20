@@ -146,8 +146,35 @@ const GroupManagement = () => {
     setManageStudentsDialogOpen(true);
   };
 
+  // نقل طالب من مجموعة أخرى: نسأل عن طريقة النقل (مع بياناته / تبقى عند القديم / بداية جديدة)
+  const [moveTarget, setMoveTarget] = useState(null); // {student, mode}
+  const [moving, setMoving] = useState(false);
+  const confirmMoveStudent = async () => {
+    if (!moveTarget || !selectedGroup) return;
+    setMoving(true);
+    try {
+      const res = await axios.post(`${API}/students/${moveTarget.student.id}/change-group`, null, {
+        params: { group_id: selectedGroup.id, mode: moveTarget.mode },
+      });
+      toast.success(res.data?.message || 'تم نقل الطالب');
+      setMoveTarget(null);
+      const r = await axios.get(`${API}/groups/${selectedGroup.id}/students`);
+      setGroupStudents(r.data);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'فشل نقل الطالب');
+    } finally {
+      setMoving(false);
+    }
+  };
+
   const handleAddStudentToGroup = async (studentId) => {
     if (!selectedGroup) return;
+    const st = (allStudents || []).find((x) => x.id === studentId);
+    if (st?.group_id && st.group_id !== selectedGroup.id) {
+      setMoveTarget({ student: st, mode: 'with_data' });
+      return;
+    }
     try {
       await axios.post(`${API}/groups/${selectedGroup.id}/add-student`, { student_id: studentId });
       toast.success('تمت إضافة الطالب للمجموعة');
@@ -555,6 +582,38 @@ const GroupManagement = () => {
 
           <DialogFooter className="mt-4">
             <Button variant="ghost" onClick={() => setManageStudentsDialogOpen(false)}>إغلاق</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* خيارات نقل طالب واحد */}
+      <Dialog open={!!moveTarget} onOpenChange={(o) => !o && setMoveTarget(null)}>
+        <DialogContent className="bg-slate-900 border-slate-700" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="text-white">نقل {moveTarget?.student?.name} إلى «{selectedGroup?.name}»</DialogTitle>
+          </DialogHeader>
+          <p className="text-slate-400 text-sm">من مجموعة: {getGroupName(moveTarget?.student?.group_id)}</p>
+          <div className="space-y-2">
+            {[
+              { v: 'with_data', t: 'نقل مع بياناته', d: 'الحضور والتسميع والنقاط تنتقل مع الطالب لمشرف المجموعة الجديدة.' },
+              { v: 'keep_old', t: 'نقل بدون بياناته', d: 'تبقى سجلاته السابقة عند المشرف القديم، ويكمل عند الجديد.' },
+              { v: 'fresh_start', t: 'بداية جديدة', d: 'تُؤرشف بياناته وتُصفّر نقاطه ويبدأ من الصفر في المجموعة الجديدة.' },
+            ].map((o) => (
+              <label key={o.v} className={`flex gap-3 p-3 rounded-lg border cursor-pointer ${moveTarget?.mode === o.v ? 'border-emerald-500 bg-emerald-500/10' : 'border-slate-700'}`}>
+                <input type="radio" name="move-mode" className="mt-1" checked={moveTarget?.mode === o.v}
+                  onChange={() => setMoveTarget((m) => ({ ...m, mode: o.v }))} data-testid={`move-mode-${o.v}`} />
+                <span>
+                  <span className="block text-white text-sm font-medium">{o.t}</span>
+                  <span className="block text-slate-400 text-xs">{o.d}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => setMoveTarget(null)}>إلغاء</Button>
+            <Button onClick={confirmMoveStudent} disabled={moving} className="bg-emerald-600 hover:bg-emerald-700" data-testid="move-confirm">
+              {moving ? 'جارٍ النقل...' : 'نقل'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

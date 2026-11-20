@@ -23,6 +23,8 @@ import { formatDate as fmtDate } from '../lib/utils';
 import MemorizationBar from '../components/MemorizationBar';
 import HifzProgressCard from '../components/HifzProgressCard';
 import StudentPlanButton from '../components/StudentPlanButton';
+import GroupAssistantControl from '../components/GroupAssistantControl';
+import { describeRecitation } from '../lib/recitation';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -106,7 +108,7 @@ const StudentProfile = () => {
     try {
       // Handle both ISO datetime and date-only formats
       const date = dateStr.includes('T') ? parseISO(dateStr) : new Date(dateStr + 'T00:00:00');
-      return format(date, 'EEEE d MMMM yyyy', { locale: ar });
+      return format(date, 'EEEE dd/MM/yyyy', { locale: ar });
     } catch {
       return dateStr;
     }
@@ -117,7 +119,7 @@ const StudentProfile = () => {
     if (!dateStr) return '-';
     try {
       const date = parseISO(dateStr);
-      return format(date, 'EEEE d MMMM yyyy - h:mm a', { locale: ar });
+      return format(date, 'EEEE dd/MM/yyyy - h:mm a', { locale: ar });
     } catch {
       return dateStr;
     }
@@ -186,6 +188,7 @@ const StudentProfile = () => {
                   </Button>
                 )}
                 <StudentPlanButton student={{ id: student.id, name: student.name }} className="border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 bg-transparent" />
+                <GroupAssistantControl student={student} className="bg-transparent" onChanged={(r) => setProfileData((p) => ({ ...p, student: { ...p.student, is_group_assistant: r.is_group_assistant, assistant_permissions: r.assistant_permissions } }))} />
               </div>
               <p className="text-slate-400 text-sm">{student.email}</p>
               {group && (
@@ -578,35 +581,39 @@ const StudentProfile = () => {
           <TabsContent value="recitations" className="p-4">
             {recitation_records && recitation_records.length > 0 ? (
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {recitation_records.map((rec) => (
+                {recitation_records.map((rec) => { const info = describeRecitation(rec); return (
                   <div key={rec.id} className="p-4 rounded-lg bg-slate-800/50 border border-white/5">
                     <div className="flex items-center justify-between mb-2">
-                      <Badge className={rec.recitation_type === 'new_memorization' 
-                        ? 'bg-emerald-500/20 text-emerald-400' 
-                        : 'bg-blue-500/20 text-blue-400'}>
-                        {rec.recitation_type === 'new_memorization' ? 'حفظ جديد' : 'مراجعة'}
-                      </Badge>
+                      <div className="flex flex-wrap gap-1">
+                        {!info.recited ? (
+                          <Badge className="bg-red-500/20 text-red-400">لم يسمّع</Badge>
+                        ) : info.parts.map((p) => (
+                          <Badge key={p.kind} className={p.kind === 'new' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}>
+                            {p.kind === 'new' ? 'حفظ جديد' : 'مراجعة'}
+                          </Badge>
+                        ))}
+                      </div>
                       <span className="text-xs text-slate-400">{formatDateTimeWithDay(rec.created_at)}</span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-slate-300 text-sm">
-                        {rec.recitation_type === 'new_memorization' 
-                          ? `${rec.pages_count} صفحة` 
-                          : rec.review_type === 'pages' 
-                            ? `${rec.review_pages} صفحة مراجعة`
-                            : `أجزاء: ${rec.review_juz?.join(', ')}`
-                        }
-                        {(rec.passed_minimum || rec.passed_review_minimum) && (
-                          <CheckCircle className="w-4 h-4 text-emerald-400 inline-block mr-2" />
-                        )}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-slate-300 text-sm space-y-0.5">
+                        {!info.recited && <p>لم يسمّع{rec.record_date ? ` — ${fmtDate(rec.record_date)}` : ''}</p>}
+                        {info.parts.map((p) => (
+                          <p key={p.kind} className="flex items-center gap-1">
+                            {p.text}
+                            {p.passed
+                              ? <CheckCircle className="w-4 h-4 text-emerald-400 inline-block" />
+                              : <span className="text-[11px] text-red-400">(لم يجتز)</span>}
+                          </p>
+                        ))}
                       </div>
-                      <span className="text-amber-400 font-bold">+{rec.points_earned}</span>
+                      <span className="text-amber-400 font-bold">+{rec.points_earned || 0}</span>
                     </div>
                     {rec.notes && (
                       <p className="text-slate-400 text-xs mt-2">{rec.notes}</p>
                     )}
                   </div>
-                ))}
+                ); })}
               </div>
             ) : (
               <div className="text-center py-8 text-slate-400">

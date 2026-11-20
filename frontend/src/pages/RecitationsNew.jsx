@@ -614,7 +614,7 @@ const RecitationsNew = () => {
           <CardHeader>
             <CardTitle className="text-lg font-bold text-white flex items-center gap-3">
               <Users className="w-6 h-6 text-emerald-400" />
-              {isAdmin ? 'الطلاب' : 'طلابي'} - {format(selectedDate, 'EEEE d MMMM yyyy', { locale: ar })}
+              {isAdmin ? 'الطلاب' : 'طلابي'} - {format(selectedDate, 'EEEE dd/MM/yyyy', { locale: ar })}
             </CardTitle>
           </CardHeader>
           <CardContent>

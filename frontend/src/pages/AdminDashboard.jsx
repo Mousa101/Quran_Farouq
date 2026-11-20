@@ -5,6 +5,7 @@ import OnlineUsers from '../components/OnlineUsers';
 import TasksSummaryCard from '../components/TasksSummaryCard';
 import WeeklyTrackingBoard from '../components/WeeklyTrackingBoard';
 import GlobalSearch from '../components/GlobalSearch';
+import DashboardToday from '../components/DashboardToday';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -20,7 +21,8 @@ import {
   Users, BookOpen, Calendar, Trophy, TrendingUp, 
   GraduationCap, UserCheck, Target, Eye, Medal,
   ArrowUpRight, UserPlus, Clock, Archive, RefreshCw, Download, FileSpreadsheet, Edit,
-  ChevronDown, ChevronUp, Loader2, BookUser, AlertTriangle, Bell, ShieldCheck, Trash2
+  ChevronDown, ChevronUp, Loader2, BookUser, AlertTriangle, Bell, ShieldCheck, Trash2,
+  LayoutGrid, PhoneCall, DollarSign, Megaphone, SlidersHorizontal
 } from 'lucide-react';
 import { formatDate as fmtDate } from '../lib/utils';
 
@@ -67,6 +69,14 @@ const AdminDashboard = () => {
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   // قائمة الطلاب بالصفحة الرئيسية + تنزيل سجل التسميع
   const [showWeekBreakdown, setShowWeekBreakdown] = useState(false);
+  // التفاصيل والإدارة المتقدمة مطويّة افتراضيًا (الرئيسية للإجراءات السريعة فقط)
+  const [showDetails, setShowDetailsState] = useState(() => {
+    try { return localStorage.getItem('adminDashDetails') === '1'; } catch { return false; }
+  });
+  const setShowDetails = (v) => {
+    setShowDetailsState(v);
+    try { localStorage.setItem('adminDashDetails', v ? '1' : '0'); } catch { /* ignore */ }
+  };
   // المشرفون المتأخرون في تسجيل الحضور
   const [lateSheikhs, setLateSheikhs] = useState([]);
   const [alertingLate, setAlertingLate] = useState(false);
@@ -408,90 +418,57 @@ const AdminDashboard = () => {
     <div className="space-y-4 md:space-y-6 animate-fadeIn">
       {/* بحث عام: مجموعة / طالب / خدمة */}
       <GlobalSearch />
-      {/* Welcome Header */}
-      <div className={`p-4 md:p-6 rounded-xl ${isDark ? 'glass-card border border-white/10' : 'bg-white border border-slate-200 shadow-sm'}`}>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className={`text-lg md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>مرحباً بك في لوحة التحكم</h1>
-            <p className={`text-sm md:text-base ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>نظرة شاملة على أداء المركز</p>
-            {activeTerm && (
-              <p className={`text-xs mt-1 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                الفصل الحالي: {activeTerm.name}
-              </p>
-            )}
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {/* <Button 
-              onClick={() => setExportDialogOpen(true)}
-              variant="outline" 
-              size="sm" 
-              className={`text-xs md:text-sm text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 ${isDark ? '' : 'border-emerald-300'}`}
-            >
-              <FileSpreadsheet className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
-              تحميل Excel
-            </Button> */}
-           
-            {/* <Link to="/admin-rankings">
-              <Button variant="outline" size="sm" className={`text-xs md:text-sm ${isDark ? 'border-white/10 hover:bg-white/5' : ''}`}>
-                <TrendingUp className="w-3 h-3 md:w-4 md:h-4 ml-1 md:ml-2" />
-                الترتيب التفصيلي
-              </Button>
-            </Link> */}
-            {/* <Link to="/pending-students">
-              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-xs md:text-sm">
-
-                طلبات التسجيل
-              </Button>
-            </Link> */}
-          </div>
-        </div>
-
-        {/* وصول سريع */}
-        <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-          <p className={`text-xs mb-2 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>وصول سريع</p>
-          <div className="flex flex-wrap gap-2">
-            {isOwner && (
-              <Link to="/admin-accounts">
-                <Button variant="outline" size="sm" className={`text-xs text-rose-400 border-rose-500/30 hover:bg-rose-500/10 ${isDark ? '' : 'border-rose-300'}`}>
-                  <ShieldCheck className="w-3 h-3 ml-1" />
-                  إنشاء حسابات وصلاحيات
-                </Button>
-              </Link>
-            )}
-            {can(user, 'sheikhs') && <Link to="/sheikh-management">
-              <Button variant="outline" size="sm" className={`text-xs text-blue-400 border-blue-500/30 hover:bg-blue-500/10 ${isDark ? '' : 'border-blue-300'}`}>
-                <UserPlus className="w-3 h-3 ml-1" />
-                إضافة مشرف
-              </Button>
-            </Link>}
-            {can(user, 'tracking') && <Link to="/tracking-settings">
-              <Button variant="outline" size="sm" className={`text-xs text-amber-400 border-amber-500/30 hover:bg-amber-500/10 ${isDark ? '' : 'border-amber-300'}`}>
-                <Trophy className="w-3 h-3 ml-1" />
-                إعدادات نقاط التميز
-              </Button>
-            </Link>}
-            {can(user, 'students') && <Link to="/student-management">
-              <Button variant="outline" size="sm" className={`text-xs text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 ${isDark ? '' : 'border-emerald-300'}`}>
-                <GraduationCap className="w-3 h-3 ml-1" />
-                إدارة الطلاب
-              </Button>
-            </Link>}
-            {isOwner && <Button
-              onClick={() => setExportDialogOpen(true)}
-              variant="outline"
-              size="sm"
-              className={`text-xs text-purple-400 border-purple-500/30 hover:bg-purple-500/10 ${isDark ? '' : 'border-purple-300'}`}
-            >
-              <FileSpreadsheet className="w-3 h-3 ml-1" />
-              تحميل Excel
-            </Button>}
-          </div>
+      {/* رأس مختصر */}
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h1 className={`text-lg md:text-2xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            {(() => { const h = new Date().getHours(); return h < 12 ? 'صباح الخير' : 'مساء الخير'; })()}{user?.name ? `، ${user.name}` : ''}
+          </h1>
+          <p className={`text-xs md:text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {fmtDate(new Date(), { withWeekday: true })}
+            {activeTerm && <span className="text-emerald-500"> · {activeTerm.name}</span>}
+          </p>
         </div>
       </div>
 
-      <TasksSummaryCard role="admin" />
+      {/* اليوم: حالة التسجيل + تنبيهات */}
+      {(can(user, 'groups') || can(user, 'attendance') || can(user, 'recitations') || can(user, 'statistics')) && (
+        <DashboardToday
+          pendingStudents={can(user, 'students') ? (summary.pending_students || 0) : 0}
+          lateSheikhs={lateSheikhs.length}
+          onLateClick={() => { setShowDetails(true); setTimeout(() => document.getElementById('late-sheikhs')?.scrollIntoView({ behavior: 'smooth' }), 100); }}
+        />
+      )}
 
-      <OnlineUsers />
+      {/* إجراءات سريعة */}
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-2" data-testid="quick-actions">
+        {[
+          { to: '/attendance', icon: UserCheck, label: 'تسجيل الحضور', color: 'text-blue-500', perm: 'attendance' },
+          { to: '/recitations', icon: BookOpen, label: 'تسجيل التسميع', color: 'text-purple-500', perm: 'recitations' },
+          { to: '/groups-overview', icon: LayoutGrid, label: 'نظرة المجموعات', color: 'text-emerald-500', perm: 'groups' },
+          { to: '/parent-contacts', icon: PhoneCall, label: 'ملف التواصل', color: 'text-teal-500', perm: 'students' },
+          { to: '/student-management', icon: GraduationCap, label: 'إدارة الطلاب', color: 'text-emerald-500', perm: 'students' },
+          { to: '/sheikh-management', icon: UserPlus, label: 'إضافة مشرف', color: 'text-blue-500', perm: 'sheikhs' },
+          { to: '/fees', icon: DollarSign, label: 'الرسوم', color: 'text-amber-500', perm: 'fees' },
+          { to: '/announcements', icon: Megaphone, label: 'إعلان جديد', color: 'text-rose-500', perm: 'announcements' },
+          { to: '/tracking-settings', icon: Trophy, label: 'نقاط التميز', color: 'text-amber-500', perm: 'tracking' },
+          { to: '/admin-accounts', icon: ShieldCheck, label: 'حسابات وصلاحيات', color: 'text-rose-500', perm: OWNER },
+          { onClick: () => setExportDialogOpen(true), icon: FileSpreadsheet, label: 'تحميل Excel', color: 'text-purple-500', perm: OWNER },
+          { to: '/display-settings', icon: SlidersHorizontal, label: 'إعدادات العرض', color: 'text-slate-400', perm: OWNER },
+        ].filter((q) => can(user, q.perm)).slice(0, 8).map((q) => {
+          const body = (
+            <div className={`h-full rounded-xl border p-2.5 flex flex-col items-center justify-center gap-1.5 text-center transition-colors ${isDark ? 'glass-card border-white/10 hover:border-emerald-500/40' : 'bg-white border-slate-200 hover:border-emerald-400 shadow-sm'}`}>
+              <q.icon className={`w-5 h-5 ${q.color}`} />
+              <span className={`text-[11px] md:text-xs leading-tight ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{q.label}</span>
+            </div>
+          );
+          return q.to
+            ? <Link key={q.label} to={q.to} className="block">{body}</Link>
+            : <button key={q.label} type="button" onClick={q.onClick} className="block">{body}</button>;
+        })}
+      </div>
+
+      <TasksSummaryCard role="admin" />
 
       {/* Stats Grid — بطاقات مربوطة بصفحاتها */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
@@ -680,6 +657,20 @@ const AdminDashboard = () => {
         </Card>
       )}
 
+      {/* التفاصيل والإدارة المتقدمة — مطويّة افتراضيًا */}
+      <button
+        type="button"
+        onClick={() => setShowDetails(!showDetails)}
+        className={`w-full flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm transition-colors ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+        data-testid="toggle-dashboard-details"
+      >
+        {showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        {showDetails ? 'إخفاء التفاصيل' : 'المزيد من التفاصيل والإدارة (الترتيب، أداء المشرفين، الفصول، نظام النقاط)'}
+      </button>
+
+      {showDetails && (<>
+      <OnlineUsers />
+
       {/* ورق المتابعة الأسبوعي بالأرقام — مجموعات / طلاب */}
       {can(user, 'statistics') && <WeeklyTrackingBoard />}
 
@@ -861,17 +852,17 @@ const AdminDashboard = () => {
 
       {/* المشرفون المتأخرون في تسجيل الحضور */}
       {lateSheikhs.length > 0 && (
-        <Card className={`${isDark ? 'glass-card' : 'bg-white'} border-amber-500/40`}>
+        <Card id="late-sheikhs" className={`${isDark ? 'glass-card' : 'bg-white'} border-amber-500/40`}>
           <CardHeader>
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <CardTitle className={`flex items-center gap-2 text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>
                 <AlertTriangle className="w-5 h-5 text-amber-400" />
-                مشرفون متأخّرون في تسجيل الحضور
+                مجموعات متأخّرة في تسجيل الحضور
                 <span className="text-xs font-normal text-amber-400">({lateSheikhs.length})</span>
               </CardTitle>
               <Button
                 size="sm"
-                onClick={() => alertLateSheikhs(lateSheikhs.map((s) => s.sheikh_id))}
+                onClick={() => alertLateSheikhs([...new Set(lateSheikhs.flatMap((s) => s.sheikh_ids || [s.sheikh_id]))])}
                 disabled={alertingLate}
                 className="bg-amber-600 hover:bg-amber-700 text-xs"
               >
@@ -883,7 +874,7 @@ const AdminDashboard = () => {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {lateSheikhs.map((s) => (
-                <div key={s.sheikh_id} className={`p-3 rounded-lg flex items-center justify-between gap-2 flex-wrap ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+                <div key={s.key || s.sheikh_id} className={`p-3 rounded-lg flex items-center justify-between gap-2 flex-wrap ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
                   <div className="min-w-0">
                     <p className={`font-medium text-sm truncate ${isDark ? 'text-white' : 'text-slate-900'}`}>{s.sheikh_name}</p>
                     <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -897,7 +888,7 @@ const AdminDashboard = () => {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => alertLateSheikhs([s.sheikh_id])}
+                      onClick={() => alertLateSheikhs(s.sheikh_ids || [s.sheikh_id])}
                       className="text-amber-400 hover:bg-amber-500/10"
                       title="إرسال تنبيه"
                     >
@@ -1160,6 +1151,8 @@ const AdminDashboard = () => {
           </div>
         </CardContent>
       </Card>
+
+      </>)}
 
       {/* N2: Points rules editor dialog */}
       <Dialog open={pointsEditorOpen} onOpenChange={setPointsEditorOpen}>

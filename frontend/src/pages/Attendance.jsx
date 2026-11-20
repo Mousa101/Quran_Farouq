@@ -341,7 +341,7 @@ const Attendance = () => {
             <div className="flex items-center justify-between flex-wrap gap-2">
               <CardTitle className="text-lg font-bold text-white flex items-center gap-3">
                 <UserCheck className="w-6 h-6 text-emerald-400" />
-                الطلاب - {format(selectedDate, 'EEEE d MMMM yyyy', { locale: ar })}
+                الطلاب - {format(selectedDate, 'EEEE dd/MM/yyyy', { locale: ar })}
               </CardTitle>
               {/* T2: تسجيل حضور بنقرة واحدة */}
               {students.length > 0 && !isViewingOldTerm && (

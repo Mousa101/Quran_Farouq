@@ -9,7 +9,7 @@ import {
   FileText, Upload, Plus, Trash2, ArrowRight, Save, Download, Bold, Italic, Underline, Strikethrough,
   List, ListOrdered, AlignRight, AlignCenter, AlignLeft, AlignJustify, Undo2, Redo2, Highlighter,
   Heading1, Heading2, Pilcrow, Loader2, RemoveFormatting, Table2, ListChecks, IndentIncrease, IndentDecrease,
-  Minus, ImagePlus, Link2, Rows3, Columns3, X,
+  Minus, ImagePlus, Link2, Rows3, Columns3, X, Search,
 } from 'lucide-react';
 import { formatDate as fmtDate } from '../lib/utils';
 
@@ -75,7 +75,19 @@ const formatSize = (b) => (b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} م
 const Documents = () => {
   const { isDark } = useTheme();
   const [docs, setDocs] = useState([]);
+  const [search, setSearch] = useState('');
+  const [contentHits, setContentHits] = useState(null); // نتائج البحث داخل نص المستندات من الخادم
   const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    const q = search.trim();
+    if (!q) { setContentHits(null); return undefined; }
+    const t = setTimeout(() => {
+      axios.get(`${API}/documents`, { params: { q } })
+        .then((r) => setContentHits(new Set((r.data || []).map((d) => d.id))))
+        .catch(() => setContentHits(null));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
   const [uploading, setUploading] = useState(false);
   const [openDoc, setOpenDoc] = useState(null); // {id, title, ...}
   const [title, setTitle] = useState('');
@@ -531,6 +543,11 @@ const Documents = () => {
     );
   }
 
+  // البحث: العنوان واسم الملف محليًا + نص المستند من الخادم
+  const sq = search.trim().toLowerCase();
+  const shownDocs = !sq ? docs : docs.filter((d) =>
+    (d.title || '').toLowerCase().includes(sq) || (d.filename || '').toLowerCase().includes(sq) || contentHits?.has(d.id));
+
   return (
     <div className="space-y-6 animate-fadeIn">
       <div className={`p-6 rounded-xl ${isDark ? 'glass-card border border-white/10' : 'bg-white border border-slate-200 shadow-sm'}`}>
@@ -554,7 +571,13 @@ const Documents = () => {
       </div>
 
       <Card className={cardCls}>
-        <CardHeader className="pb-2"><CardTitle className={`text-base ${strong}`}>كل المستندات ({docs.length})</CardTitle></CardHeader>
+        <CardHeader className="pb-2 flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+          <CardTitle className={`text-base ${strong}`}>كل المستندات ({shownDocs.length}{search.trim() ? ` من ${docs.length}` : ''})</CardTitle>
+          <div className="relative w-full sm:w-72">
+            <Search className={`w-4 h-4 absolute right-2.5 top-1/2 -translate-y-1/2 ${muted}`} />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="ابحث في العنوان أو داخل المستند..." className="pr-8" data-testid="documents-search" />
+          </div>
+        </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div>
@@ -562,7 +585,8 @@ const Documents = () => {
             <p className={`text-center py-8 ${muted}`}>لا توجد مستندات بعد — ارفع ملف Word للبدء</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-              {docs.map((d) => (
+              {shownDocs.length === 0 && <p className={`col-span-full text-center py-6 ${muted}`}>لا توجد نتائج لـ «{search}»</p>}
+              {shownDocs.map((d) => (
                 <div key={d.id} className={`p-4 rounded-lg flex items-start gap-3 transition hover:ring-1 hover:ring-emerald-500/50 ${isDark ? 'bg-slate-800/50' : 'bg-slate-50'}`}>
                   <button type="button" onClick={() => openDocument(d.id)} className="flex-1 min-w-0 text-right flex items-start gap-3">
                     <FileText className="w-8 h-8 text-blue-500 shrink-0" />

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { LogOut, Sun, Moon, Menu, X } from 'lucide-react';
+import { LogOut, Sun, Moon, Menu, X, UserCog } from 'lucide-react';
+import axios from 'axios';
 import { navItemsFor } from '../lib/navItems';
 import { loginPathFor } from '../lib/authRoutes';
 import { Button } from './ui/button';
@@ -14,6 +15,13 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // الطالب «مساعد المشرف» يظهر له رابط صفحة التسجيل
+  const [isGroupAssistant, setIsGroupAssistant] = useState(false);
+  useEffect(() => {
+    if (user?.role !== 'student') { setIsGroupAssistant(false); return; }
+    axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/assistant/me`)
+      .then((r) => setIsGroupAssistant(!!r.data?.enabled)).catch(() => setIsGroupAssistant(false));
+  }, [user?.id, user?.role]);
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -49,8 +57,11 @@ const Sidebar = () => {
     navigate(loginPathFor(role));
   };
 
-  const navItems = navItemsFor(user?.role, uiSettings)
+  const baseItems = navItemsFor(user?.role, uiSettings)
     .filter((item) => canOpenRoute(user, item.to)); // المدير المساعد يرى أقسامه فقط
+  const navItems = isGroupAssistant
+    ? [baseItems[0], { to: '/assistant', icon: UserCog, label: 'مساعد المشرف' }, ...baseItems.slice(1)]
+    : baseItems;
 
   const SidebarContent = ({ isMobile = false }) => (
     <div className="flex flex-col h-full">

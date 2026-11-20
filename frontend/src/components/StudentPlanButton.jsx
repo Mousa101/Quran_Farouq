@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from './ui/button';
 import MemorizationPlanDialog from './MemorizationPlanDialog';
 import { ClipboardList, Loader2, Pencil, Target, BookOpen } from 'lucide-react';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -66,8 +67,8 @@ const StudentPlanButton = ({ student: studentProp, className = '', size = 'sm', 
               <Row k="ترتيب الأجزاء" v={DIRECTION[plan.direction] || plan.direction} />
               {plan.direction === 'custom' && plan.juz_order?.length > 0 && <Row k="الأجزاء بالترتيب" v={plan.juz_order.join(' ← ')} />}
               <Row k="المراجعة المقترحة" v={plan.review_pages ? `${plan.review_pages} صفحة` : '—'} />
-              <Row k="الهدف" v={plan.target_pages ? `${plan.target_pages} صفحة${plan.target_date ? ` حتى ${plan.target_date}` : ''}` : '—'} />
-              {plan.start_date && <Row k="بداية الخطة" v={plan.start_date} />}
+              <Row k="الهدف" v={plan.target_pages ? `${plan.target_pages} صفحة${plan.target_date ? ` حتى ${fmtDate(plan.target_date)}` : ''}` : '—'} />
+              {plan.start_date && <Row k="بداية الخطة" v={fmtDate(plan.start_date)} />}
               {plan.notes && <Row k="ملاحظات" v={plan.notes} />}
             </div>
           )}

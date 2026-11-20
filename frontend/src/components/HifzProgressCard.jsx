@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { BookOpen, Target, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -80,7 +81,7 @@ const HifzProgressCard = ({ studentId }) => {
             <div className={`h-full transition-all ${ps.status === 'behind' ? 'bg-red-500' : 'bg-amber-400'}`} style={{ width: `${planPct}%` }} />
             <div className="absolute top-0 h-full w-0.5 bg-white/70" style={{ right: `${expectedPct}%` }} title="المتوقع حتى اليوم" />
           </div>
-          <p className="text-xs text-slate-400 mt-1">{ps.done} من {ps.target} صفحة حتى {ps.target_date} — المتوقع حتى اليوم {ps.expected}</p>
+          <p className="text-xs text-slate-400 mt-1">{ps.done} من {ps.target} صفحة حتى {fmtDate(ps.target_date)} — المتوقع حتى اليوم {ps.expected}</p>
         </div>
       )}
     </div>

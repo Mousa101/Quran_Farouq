@@ -69,6 +69,7 @@ import TasksMeetings from './pages/TasksMeetings';
 import MyTasks from './pages/MyTasks';
 import GroupsOverview from './pages/GroupsOverview';
 import ParentContacts from './pages/ParentContacts';
+import AssistantRecording from './pages/AssistantRecording';
 import { hiddenPathsFor } from './lib/navItems';
 import { ROLE_SLUGS, loginPathFor, registerPathFor, lastLoginPath } from './lib/authRoutes';
 import './App.css';
@@ -410,6 +411,17 @@ function AppRoutes() {
           <ProtectedRoute allow={['admin', 'sheikh']}>
             <Layout>
               <GroupsOverview />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/assistant"
+        element={
+          <ProtectedRoute allow={['student']}>
+            <Layout>
+              <AssistantRecording />
             </Layout>
           </ProtectedRoute>
         }

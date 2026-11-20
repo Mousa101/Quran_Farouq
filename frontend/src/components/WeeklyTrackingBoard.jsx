@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import { ClipboardList, ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
 import StudentLink from './StudentLink';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -84,7 +85,7 @@ const WeeklyTrackingBoard = () => {
               <ChevronRight className="w-4 h-4" />
             </Button>
             <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-              {data ? `${data.week_start} — ${data.week_end}` : '...'}
+              {data ? `${fmtDate(data.week_start)} — ${fmtDate(data.week_end)}` : '...'}
               {data?.is_current_week && <span className="text-emerald-400 mr-1">(الحالي)</span>}
             </span>
             <Button

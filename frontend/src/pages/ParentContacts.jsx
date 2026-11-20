@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import StudentLink from '../components/StudentLink';
 import { PhoneCall, Plus, Loader2, History, Trash2, CheckCircle2, XCircle, Search } from 'lucide-react';
+import { formatDate as fmtDate } from '../lib/utils';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const METHODS = ['اتصال', 'واتساب', 'رسالة', 'زيارة', 'لقاء في المركز', 'أخرى'];
@@ -159,7 +160,7 @@ const ParentContacts = () => {
                           <span className="text-red-400 flex items-center gap-1"><XCircle className="w-4 h-4" />{c ? 'لم يتم (محاولة)' : 'لم يتم'}</span>
                         )}
                       </td>
-                      <td className={`px-3 py-2 whitespace-nowrap ${muted}`}>{c ? `${c.contact_date}${c.method ? ` · ${c.method}` : ''}` : '—'}</td>
+                      <td className={`px-3 py-2 whitespace-nowrap ${muted}`}>{c ? `${fmtDate(c.contact_date)}${c.method ? ` · ${c.method}` : ''}` : '—'}</td>
                       <td className={`px-3 py-2 max-w-xs truncate ${muted}`} title={c?.notes || ''}>{c?.notes || '—'}</td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         <Button size="sm" variant="ghost" className="text-emerald-500" onClick={() => { setAddFor(r); setForm({ ...EMPTY, contact_date: today() }); }} data-testid={`add-contact-${r.student_id}`}>
@@ -229,7 +230,7 @@ const ParentContacts = () => {
               <div key={h.id} className={`rounded-lg p-3 border ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
                 <div className="flex items-center justify-between">
                   <span className={h.contacted ? 'text-emerald-500 text-sm' : 'text-red-400 text-sm'}>
-                    {h.contacted ? 'تم التواصل' : 'لم يتم'} · {h.contact_date}{h.method ? ` · ${h.method}` : ''}
+                    {h.contacted ? 'تم التواصل' : 'لم يتم'} · {fmtDate(h.contact_date)}{h.method ? ` · ${h.method}` : ''}
                   </span>
                   {(user?.role === 'admin' || h.created_by === user?.id) && (
                     <Button size="icon" variant="ghost" className="h-7 w-7 text-red-400" onClick={() => remove(h.id)}><Trash2 className="w-3.5 h-3.5" /></Button>

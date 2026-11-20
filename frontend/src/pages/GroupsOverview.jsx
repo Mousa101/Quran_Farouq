@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import StudentLink from '../components/StudentLink';
+import { formatDate as fmtDate } from '../lib/utils';
 import {
   LayoutGrid, Loader2, UserCheck, BookOpen, FileText, ChevronDown, ChevronUp, CheckCircle2, AlertCircle, XCircle, RefreshCw,
 } from 'lucide-react';
@@ -78,7 +79,7 @@ const GroupsOverview = () => {
       ) : (
         <>
           <p className={`text-sm ${muted}`}>
-            يوم {data.day_name || ''} {data.date}
+            يوم {data.day_name || ''} {fmtDate(data.date)}
             {!data.is_lesson_day && <span className="text-amber-500 mr-2">— ليس من أيام الدوام حسب الجدول</span>}
             {data.is_saturday && <span className="text-emerald-500 mr-2">— دوام السبت: تظهر ورقة المتابعة</span>}
           </p>
@@ -88,13 +89,13 @@ const GroupsOverview = () => {
             <Stat icon={XCircle} label="مجموعات لم تُسجَّل" value={t.groups_none || 0} color="text-red-500" />
             <Stat icon={UserCheck} label="الحضور" value={`${t.present || 0} / ${t.students || 0}`} color="text-blue-500" />
             <Stat icon={BookOpen} label="سمّعوا" value={t.recited || 0} color="text-purple-500" />
-            {data.is_saturday && <Stat icon={FileText} label="سلّموا ورقة المتابعة" value={`${t.tracking_sheets || 0} / ${t.students || 0}`} color="text-amber-500" />}
+            {<Stat icon={FileText} label="سلّموا ورقة المتابعة" value={`${t.tracking_sheets || 0} / ${t.students || 0}`} color="text-amber-500" />}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {data.groups.map((g) => {
               const st = STATUS[g.status] || STATUS.none;
-              const isOpen = !!open[g.group_id];
+              const isOpen = open[g.group_id] !== false; // الطلاب ظاهرون افتراضيًا
               return (
                 <Card key={g.group_id} className={cardCls} data-testid={`overview-group-${g.group_id}`}>
                   <CardHeader className="pb-2">
@@ -102,7 +103,7 @@ const GroupsOverview = () => {
                       <div>
                         <CardTitle className={`text-lg ${strong}`}>{g.group_name}</CardTitle>
                         <p className={`text-xs mt-1 ${muted}`}>
-                          {g.sheikhs.map((s, i) => `${s.name}${i === 0 ? '' : ' (مساعد)'}`).join('، ') || 'بلا مشرف'} · {g.students_count} طالب
+                          {[...g.sheikhs.map((s, i) => `${s.name}${i === 0 ? '' : ' (مساعد)'}`), ...(g.assistants || []).map((a) => `${a.name} (طالب مساعد)`)].join('، ') || 'بلا مشرف'} · {g.students_count} طالب
                         </p>
                       </div>
                       <span className={`text-xs px-2 py-1 rounded-full flex items-center gap-1 whitespace-nowrap ${st.cls}`}>
@@ -111,7 +112,7 @@ const GroupsOverview = () => {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className={`grid ${data.is_saturday ? 'grid-cols-3' : 'grid-cols-2'} gap-2 text-center`}>
+                    <div className="grid grid-cols-3 gap-2 text-center">
                       <div className={`rounded-lg p-2 ${isDark ? 'bg-blue-500/10' : 'bg-blue-50'}`}>
                         <div className="text-xs text-blue-500 flex items-center justify-center gap-1"><UserCheck className="w-3.5 h-3.5" />الحضور</div>
                         <div className={`font-bold ${strong}`}>{g.present} / {g.students_count}</div>
@@ -122,12 +123,11 @@ const GroupsOverview = () => {
                         <div className={`font-bold ${strong}`}>{g.recited} / {g.students_count}</div>
                         <div className={`text-[11px] ${muted}`}>لم يسمّع {g.not_recited}</div>
                       </div>
-                      {data.is_saturday && (
-                        <div className={`rounded-lg p-2 ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
-                          <div className="text-xs text-amber-500 flex items-center justify-center gap-1"><FileText className="w-3.5 h-3.5" />ورقة المتابعة</div>
-                          <div className={`font-bold ${strong}`}>{g.tracking_sheets} / {g.students_count}</div>
-                        </div>
-                      )}
+                      <div className={`rounded-lg p-2 ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+                        <div className="text-xs text-amber-500 flex items-center justify-center gap-1"><FileText className="w-3.5 h-3.5" />ورقة المتابعة</div>
+                        <div className={`font-bold ${strong}`}>{g.tracking_sheets} / {g.students_count}</div>
+                        <div className={`text-[11px] ${muted}`}>هذا الأسبوع</div>
+                      </div>
                     </div>
                     <p className={`text-xs ${muted}`}>
                       سجّل: {g.recorded_by.length ? g.recorded_by.map((u) => `${u.name}${u.role ? ` (${u.role})` : ''}`).join('، ') : '—'}
@@ -147,24 +147,30 @@ const GroupsOverview = () => {
                               <th className="py-1 text-right font-medium">الطالب</th>
                               <th className="py-1 text-right font-medium">الحضور</th>
                               <th className="py-1 text-right font-medium">التسميع</th>
-                              {data.is_saturday && <th className="py-1 text-right font-medium">ورقة المتابعة</th>}
+                              <th className="py-1 text-right font-medium">الجديد</th>
+                              <th className="py-1 text-right font-medium">المراجعة</th>
+                              <th className="py-1 text-right font-medium">ورقة المتابعة</th>
                             </tr>
                           </thead>
                           <tbody>
                             {g.students.map((s) => (
-                              <tr key={s.student_id} className={`border-b ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
-                                <td className="py-1"><StudentLink studentId={s.student_id} name={s.name} /></td>
-                                <td className={`py-1 ${s.attendance === 'present' ? 'text-emerald-500' : s.attendance ? 'text-red-400' : muted}`}>
-                                  {s.attendance ? (ATT_LABEL[s.attendance] || s.attendance) : '—'}
+                              <tr key={s.student_id} className={`border-b align-top ${isDark ? 'border-white/5' : 'border-slate-100'}`}>
+                                <td className="py-1.5"><StudentLink studentId={s.student_id} name={s.name} /></td>
+                                <td className={`py-1.5 whitespace-nowrap ${s.attendance === 'present' ? 'text-emerald-500' : s.attendance ? 'text-red-400' : muted}`}>
+                                  {s.attendance ? (ATT_LABEL[s.attendance] || s.attendance) : 'لم يُسجَّل'}
                                 </td>
-                                <td className={`py-1 ${s.recited ? 'text-emerald-500' : s.recitation_recorded ? 'text-red-400' : muted}`}>
-                                  {s.recited ? `سمّع${s.pages ? ` (${s.pages} ص)` : ''}` : s.recitation_recorded ? 'لم يسمّع' : '—'}
+                                <td className={`py-1.5 whitespace-nowrap ${s.recited ? 'text-emerald-500' : 'text-red-400'}`}>
+                                  {s.recited ? 'سمّع' : 'لم يسمّع'}
                                 </td>
-                                {data.is_saturday && (
-                                  <td className={`py-1 ${s.sheet ? 'text-emerald-500' : 'text-red-400'}`}>
-                                    {s.sheet ? `سلّم (${s.sheet.points} نقطة)` : 'لم يسلّم'}
-                                  </td>
-                                )}
+                                <td className={`py-1.5 whitespace-nowrap ${muted}`}>
+                                  {s.new_pages ? `${s.new_pages} ص${s.new_juz?.length ? ` · ج ${s.new_juz.join('، ')}` : ''}` : '—'}
+                                </td>
+                                <td className={`py-1.5 whitespace-nowrap ${muted}`}>
+                                  {s.review_pages ? `${s.review_pages} ص${s.review_juz?.length ? ` · ج ${s.review_juz.join('، ')}` : ''}` : '—'}
+                                </td>
+                                <td className={`py-1.5 whitespace-nowrap ${s.sheet ? 'text-emerald-500' : 'text-red-400'}`}>
+                                  {s.sheet ? 'سلّم' : 'لم يسلّم'}
+                                </td>
                               </tr>
                             ))}
                           </tbody>

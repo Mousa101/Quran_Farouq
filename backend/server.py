@@ -2156,32 +2156,35 @@ async def late_sheikhs_report(days: int = LATE_ATTENDANCE_DEFAULT_DAYS,
             if d > last_by_sheikh.get(shid, ""):
                 last_by_sheikh[shid] = d
 
+    # صف واحد لكل مجموعة: المشرف ومساعدوه (مشرفون إضافيون أو طلاب مساعدون) معًا —
+    # تسجيل أي واحد منهم يغني عن الباقين، فلا يظهر أحدهم متأخرًا بسبب الآخر.
+    sheikh_names = {sh["id"]: sh["name"] for sh in sheikhs}
+    assistants = await db.users.find({"role": "student", "is_group_assistant": True},
+                                     {"_id": 0, "name": 1, "group_id": 1}).to_list(2000)
     today = datetime.now(timezone.utc).date()
     rows = []
-    for sh in sheikhs:
-        sh_groups = [g for g in groups if sh["id"] in group_sheikh_ids(g)]
-        sh_group_ids = {g["id"] for g in sh_groups}
-        students_count = sum(1 for s in students if s.get("group_id") in sh_group_ids)
-        last_date = last_by_sheikh.get(sh["id"]) or None
-
+    for g in groups:
+        ids = [i for i in group_all_sheikhs.get(g["id"], []) if i in sheikh_names]
+        students_count = sum(1 for s in students if s.get("group_id") == g["id"])
+        if not ids or students_count == 0:
+            continue
+        last_date = last_by_group.get(g["id"]) or None
         days_since = None
         if last_date:
             try:
                 days_since = (today - datetime.strptime(str(last_date)[:10], "%Y-%m-%d").date()).days
             except (ValueError, TypeError):
                 last_date, days_since = None, None
-
-        # المشرف بلا طلاب ما بينحسب متأخّر
-        if students_count == 0:
-            continue
         if days_since is not None and days_since < days:
             continue
-
+        names = [sheikh_names[ids[0]]] + [f"{sheikh_names[i]} (مساعد)" for i in ids[1:]]
+        names += [f"{a.get('name')} (طالب مساعد)" for a in assistants if a.get("group_id") == g["id"]]
         rows.append({
-            "sheikh_id": sh["id"],
-            "sheikh_name": sh["name"],
-            "email": sh.get("email", ""),
-            "groups": [g["name"] for g in sh_groups],
+            "key": g["id"],
+            "sheikh_id": ids[0],
+            "sheikh_ids": ids,
+            "sheikh_name": "، ".join(names),
+            "groups": [g.get("name") or ""],
             "students_count": students_count,
             "last_attendance": last_date,
             "days_since": days_since,
@@ -4065,7 +4068,7 @@ async def get_tracking_stats(student_id: str, current_user: dict = Depends(get_c
 
 @api_router.post("/recitations")
 async def create_recitation(recitation_data: RecitationCreate, current_user: dict = Depends(get_current_user)):
-    ensure_role(current_user, ["sheikh", "admin"], "فقط المشرف أو المدير يمكنه تسجيل التسميع")
+    await ensure_can_record(current_user, recitation_data.student_id, "recitations")
 
     # المدير يسجّل نيابةً عن مشرف مجموعة الطالب
     recording_sheikh_id = await resolve_recording_sheikh_id(current_user, recitation_data.student_id)
@@ -4470,9 +4473,30 @@ async def get_quran_juz(current_user: dict = Depends(get_current_user)):
 
 # ============== ATTENDANCE ROUTES ==============
 
+GROUP_ASSISTANT_PERMS = ("attendance", "recitations")
+
+
+async def ensure_can_record(current_user: dict, student_id: str, perm: str):
+    """المشرف/المدير يسجّلون كالمعتاد. الطالب «مساعد المشرف» يسجّل لطلاب مجموعته فقط،
+    وفي الخانات التي حدّدها له المشرف أو المدير. السجل يُنسب لمشرف المجموعة."""
+    if current_user["role"] in ("sheikh", "admin"):
+        return
+    if current_user["role"] == "student":
+        me = await db.users.find_one({"id": current_user["user_id"]},
+                                     {"_id": 0, "group_id": 1, "is_group_assistant": 1, "assistant_permissions": 1})
+        if me and me.get("is_group_assistant") and perm in (me.get("assistant_permissions") or []):
+            target = await db.users.find_one({"id": student_id, "role": "student"}, {"_id": 0, "group_id": 1})
+            if student_id == current_user["user_id"]:
+                raise HTTPException(status_code=403, detail="لا يمكنك التسجيل لنفسك — يسجّل لك المشرف")
+            if target and me.get("group_id") and target.get("group_id") == me["group_id"]:
+                return
+            raise HTTPException(status_code=403, detail="يمكنك التسجيل لطلاب مجموعتك فقط")
+    raise HTTPException(status_code=403, detail="غير مصرح لك بالتسجيل")
+
+
 @api_router.post("/attendance")
 async def mark_attendance(attendance_data: AttendanceCreate, current_user: dict = Depends(get_current_user)):
-    ensure_role(current_user, ["sheikh", "admin"], "فقط المشرف أو المدير يمكنه تسجيل الحضور")
+    await ensure_can_record(current_user, attendance_data.student_id, "attendance")
 
     # #6 — التحقق أن اليوم من أيام الدوام حسب الجدول المرتبط بالفصل الحالي
     await ensure_lesson_day(attendance_data.date, "الدوام")
@@ -4619,7 +4643,9 @@ class BulkAttendanceRequest(BaseModel):
 @api_router.post("/attendance/bulk")
 async def bulk_attendance(data: BulkAttendanceRequest, current_user: dict = Depends(get_current_user)):
     """T2 — تسجيل حضور مجموعة كاملة دفعةً واحدة (حاضر افتراضيًا مع استثناء الغائبين)."""
-    ensure_role(current_user, ["sheikh", "admin"], "فقط المشرف أو المدير يمكنه تسجيل الحضور")
+    if current_user["role"] not in ("sheikh", "admin"):
+        for rec in data.records:
+            await ensure_can_record(current_user, rec.student_id, "attendance")
     # #6 — تحقق مرة واحدة من أن اليوم من أيام الدوام حسب الجدول
     await ensure_lesson_day(data.date, "الدوام")
     count = 0
@@ -13059,9 +13085,15 @@ class DocumentUpdate(BaseModel):
 
 
 @api_router.get("/documents")
-async def list_documents(current_user: dict = Depends(get_current_user)):
+async def list_documents(q: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """قائمة المستندات. q = بحث في العنوان واسم الملف ونص المستند."""
     ensure_role(current_user, "admin", "غير مصرح لك")
-    return await db.documents.find({}, {"_id": 0, "html": 0}).sort("updated_at", -1).to_list(1000)
+    query = {}
+    if q and q.strip():
+        import re as _re
+        rx = {"$regex": _re.escape(q.strip()[:100]), "$options": "i"}
+        query = {"$or": [{"title": rx}, {"filename": rx}, {"html": rx}]}
+    return await db.documents.find(query, {"_id": 0, "html": 0}).sort("updated_at", -1).to_list(1000)
 
 
 @api_router.post("/documents")
@@ -13196,7 +13228,7 @@ async def groups_overview(date: Optional[str] = None, current_user: dict = Depen
     groups = await db.groups.find(gq, {"_id": 0}).to_list(3000)
     gids = [g["id"] for g in groups]
     students = await db.users.find({"role": "student", "group_id": {"$in": gids}},
-                                   {"_id": 0, "id": 1, "name": 1, "group_id": 1}).to_list(10000)
+                                   {"_id": 0, "id": 1, "name": 1, "group_id": 1, "is_group_assistant": 1}).to_list(10000)
     sids = [s["id"] for s in students]
 
     atts = await db.attendance.find({"student_id": {"$in": sids}, "date": day},
@@ -13204,12 +13236,16 @@ async def groups_overview(date: Optional[str] = None, current_user: dict = Depen
                                      "recorded_by": 1}).to_list(20000)
     recs = await db.recitations.find({"student_id": {"$in": sids}, "record_date": day},
                                      {"_id": 0, "student_id": 1, "did_not_recite": 1, "sheikh_id": 1,
-                                      "recorded_by": 1, "new_pages": 1}).to_list(20000)
+                                      "recorded_by": 1, "new_pages": 1, "pages_count": 1, "review_pages": 1,
+                                      "review_juz": 1, "partial_review_pages": 1, "juz_number": 1,
+                                      "page_from": 1, "page_to": 1}).to_list(20000)
 
     is_saturday = day_d.weekday() == 5
     sheets_by_student = {}
-    if is_saturday:
-        weeks = [day, (day_d - timedelta(days=7)).isoformat()]
+    # ورقة المتابعة: أسبوع اليوم المختار (يبدأ السبت)، ويوم السبت نقبل ورقة الأسبوع الماضي أيضًا
+    week_start_d = day_d - timedelta(days=(day_d.weekday() + 2) % 7)
+    if True:
+        weeks = [week_start_d.isoformat()] + ([(week_start_d - timedelta(days=7)).isoformat()] if is_saturday else [])
         for sh in await db.tracking_sheets.find({"student_id": {"$in": sids}, "week_start": {"$in": weeks}},
                                                 {"_id": 0, "student_id": 1, "week_start": 1,
                                                  "points_earned": 1}).to_list(20000):
@@ -13228,7 +13264,7 @@ async def groups_overview(date: Optional[str] = None, current_user: dict = Depen
 
     def who(uid):
         u = users.get(uid) or {}
-        role = {"admin": "مدير", "sheikh": "مشرف"}.get(u.get("role"), "")
+        role = {"admin": "مدير", "sheikh": "مشرف", "student": "مساعد المشرف"}.get(u.get("role"), "")
         if u.get("is_assistant"):
             role = "مدير مساعد"
         return {"id": uid, "name": u.get("name") or "—", "role": role}
@@ -13263,13 +13299,19 @@ async def groups_overview(date: Optional[str] = None, current_user: dict = Depen
             for r in rl:
                 uid = r.get("recorded_by") or r.get("sheikh_id")
                 recorders[uid] = who(uid)
-            sheet = sheets_by_student.get(s["id"]) if is_saturday else None
+            sheet = sheets_by_student.get(s["id"])
             sheets += bool(sheet)
+            new_juz = sorted({r.get("juz_number") for r in rl if r.get("juz_number") and (r.get("new_pages") or r.get("pages_count"))})
+            rev_juz = sorted({j for r in rl for j in (r.get("review_juz") or []) if j})
             st_rows.append({
                 "student_id": s["id"], "name": s.get("name") or "",
                 "attendance": a.get("status") if a else None,
                 "recited": did, "recitation_recorded": bool(rl),
-                "pages": sum((r.get("new_pages") or 0) for r in rl),
+                "pages": sum((r.get("new_pages") or r.get("pages_count") or 0) for r in rl),
+                "new_pages": sum((r.get("new_pages") or r.get("pages_count") or 0) for r in rl),
+                "new_juz": new_juz,
+                "review_pages": sum((r.get("review_pages") or 0) for r in rl),
+                "review_juz": rev_juz,
                 "sheet": {"week_start": sheet["week_start"], "points": sheet.get("points_earned", 0)} if sheet else None,
             })
         total = len(g_students)
@@ -13287,10 +13329,11 @@ async def groups_overview(date: Optional[str] = None, current_user: dict = Depen
         rows.append({
             "group_id": g["id"], "group_name": g.get("name") or "",
             "sheikhs": [who(i) for i in group_sheikh_ids(g)],
+            "assistants": [{"id": x["id"], "name": x.get("name") or ""} for x in g_students if x.get("is_group_assistant")],
             "students_count": total,
             "attendance_recorded": att_done, "present": present, "absent": absent, "excused": excused,
             "recitation_recorded": rec_done, "recited": recited, "not_recited": not_recited,
-            "tracking_sheets": sheets if is_saturday else None,
+            "tracking_sheets": sheets,
             "recorded_by": list(recorders.values()),
             "status": status,
             "students": st_rows,
@@ -13307,8 +13350,9 @@ async def groups_overview(date: Optional[str] = None, current_user: dict = Depen
             "recited": sum(r["recited"] for r in rows),
             "groups_done": sum(1 for r in rows if r["status"] == "done"),
             "groups_none": sum(1 for r in rows if r["status"] == "none"),
-            "tracking_sheets": sum(r["tracking_sheets"] or 0 for r in rows) if is_saturday else None,
+            "tracking_sheets": sum(r["tracking_sheets"] or 0 for r in rows),
         },
+        "week_start": week_start_d.isoformat(),
         "groups": rows,
     }
 
@@ -13443,6 +13487,72 @@ async def delete_term_permanently(term_id: str, confirm_name: str = "", current_
     await log_admin_action(current_user, "delete_term", "term", term_id, term.get("name"),
                            f"حذف الفصل نهائيًا مع {sum(removed.values())} سجل مؤرشف")
     return {"message": f"تم حذف الفصل «{term.get('name')}» نهائيًا", "removed": removed}
+
+
+# ============== مساعد المشرف (طالب بخانات تسجيل يحدّدها المشرف أو المدير) ==============
+class GroupAssistantUpdate(BaseModel):
+    enabled: bool
+    permissions: List[str] = []
+
+
+@api_router.put("/students/{student_id}/assistant")
+async def set_group_assistant(student_id: str, data: GroupAssistantUpdate,
+                              current_user: dict = Depends(get_current_user)):
+    """تعيين طالب مساعدًا لمشرف مجموعته وتحديد ما يسجّله (الحضور/التسميع). المدير أو مشرف المجموعة."""
+    ensure_role(current_user, ["admin", "sheikh"], "غير مصرح لك")
+    st = await db.users.find_one({"id": student_id, "role": "student"}, {"_id": 0, "name": 1, "group_id": 1})
+    if not st:
+        raise HTTPException(status_code=404, detail="الطالب غير موجود")
+    if not st.get("group_id"):
+        raise HTTPException(status_code=400, detail="الطالب ليس في مجموعة")
+    if current_user["role"] == "sheikh" and st["group_id"] not in await _sheikh_group_ids(current_user["user_id"]):
+        raise HTTPException(status_code=403, detail="هذا الطالب ليس من مجموعاتك")
+    perms = [p for p in data.permissions if p in GROUP_ASSISTANT_PERMS]
+    enabled = bool(data.enabled and perms)
+    await db.users.update_one({"id": student_id}, {"$set": {
+        "is_group_assistant": enabled, "assistant_permissions": perms if enabled else []}})
+    if enabled:
+        labels = "، ".join({"attendance": "الحضور", "recitations": "التسميع"}[p] for p in perms)
+        await create_notification_internal(student_id, "أصبحت مساعدًا للمشرف",
+                                           f"يمكنك الآن تسجيل {labels} لطلاب مجموعتك من صفحة «مساعد المشرف».", "info")
+    return {"message": "تم تعيين الطالب مساعدًا للمشرف" if enabled else "تم إلغاء صلاحيات المساعد",
+            "is_group_assistant": enabled, "assistant_permissions": perms if enabled else []}
+
+
+@api_router.get("/assistant/me")
+async def group_assistant_me(date: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """للطالب المساعد: صلاحياته + طلاب مجموعته مع حضورهم وتسميعهم في اليوم المختار."""
+    if current_user["role"] != "student":
+        return {"enabled": False}
+    me = await db.users.find_one({"id": current_user["user_id"]},
+                                 {"_id": 0, "group_id": 1, "is_group_assistant": 1, "assistant_permissions": 1})
+    if not me or not me.get("is_group_assistant") or not me.get("group_id"):
+        return {"enabled": False}
+    day = (date or _jordan_today())[:10]
+    group = await db.groups.find_one({"id": me["group_id"]}, {"_id": 0, "id": 1, "name": 1})
+    students = await db.users.find({"role": "student", "group_id": me["group_id"]},
+                                   {"_id": 0, "id": 1, "name": 1}).sort("name", 1).to_list(500)
+    sids = [x["id"] for x in students]
+    atts = {a["student_id"]: a.get("status") for a in await db.attendance.find(
+        {"student_id": {"$in": sids}, "date": day}, {"_id": 0, "student_id": 1, "status": 1}).to_list(1000)}
+    recs = {}
+    for r in await db.recitations.find({"student_id": {"$in": sids}, "record_date": day},
+                                       {"_id": 0, "student_id": 1, "did_not_recite": 1, "new_pages": 1,
+                                        "review_pages": 1}).to_list(2000):
+        recs.setdefault(r["student_id"], []).append(r)
+    rows = []
+    for x in students:
+        rl = recs.get(x["id"], [])
+        rows.append({
+            "id": x["id"], "name": x.get("name") or "", "is_me": x["id"] == current_user["user_id"],
+            "attendance": atts.get(x["id"]),
+            "recitation_recorded": bool(rl),
+            "recited": any(not r.get("did_not_recite") for r in rl),
+            "new_pages": sum(r.get("new_pages") or 0 for r in rl),
+            "review_pages": sum(r.get("review_pages") or 0 for r in rl),
+        })
+    return {"enabled": True, "permissions": me.get("assistant_permissions") or [],
+            "group": group, "date": day, "students": rows}
 
 # Include the router
 app.include_router(api_router, dependencies=[Depends(enforce_assistant_permissions)])
