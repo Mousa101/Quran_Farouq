@@ -10440,6 +10440,7 @@ async def get_active_term(current_user: dict = Depends(get_current_user)):
         term_dict = default_term.model_dump()
         term_dict["created_at"] = term_dict["created_at"].isoformat()
         await db.terms.insert_one(term_dict)
+        term_dict.pop("_id", None)  # insert_one يضيف ObjectId لا يمكن تحويله لـ JSON
         return term_dict
     return term
 
